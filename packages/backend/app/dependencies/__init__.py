@@ -3,55 +3,66 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any, Dict
+from typing import AsyncGenerator, Optional
 
-from pydantic import BaseSettings, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..cache import CacheService, RedisManager, get_redis_manager
+from ..config import Settings
+from ..db import get_db_manager
 from ..services.events import SessionEventManager
 from ..services.graph import TradingGraphService
 
-
-class BackendSettings(BaseSettings):
-    """Environment-driven configuration for the FastAPI backend."""
-
-    llm_provider: str | None = Field(default=None, alias="TRADINGAGENTS_LLM_PROVIDER")
-    deep_think_llm: str | None = Field(default=None, alias="TRADINGAGENTS_DEEP_THINK_LLM")
-    quick_think_llm: str | None = Field(default=None, alias="TRADINGAGENTS_QUICK_THINK_LLM")
-    results_dir: str | None = Field(default=None, alias="TRADINGAGENTS_RESULTS_DIR")
-
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
-
-    def config_overrides(self) -> Dict[str, Any]:
-        overrides: Dict[str, Any] = {}
-        if self.llm_provider:
-            overrides["llm_provider"] = self.llm_provider
-        if self.deep_think_llm:
-            overrides["deep_think_llm"] = self.deep_think_llm
-        if self.quick_think_llm:
-            overrides["quick_think_llm"] = self.quick_think_llm
-        if self.results_dir:
-            overrides["results_dir"] = self.results_dir
-        return overrides
-
-
-_settings = BackendSettings()
+# Global instances
+_settings = Settings()
 _event_manager = SessionEventManager()
 
 
-def get_settings() -> BackendSettings:
+def get_settings() -> Settings:
+    """Get the global settings instance."""
     return _settings
 
 
 def get_event_manager() -> SessionEventManager:
+    """Get the global event manager instance."""
     return _event_manager
 
 
 @lru_cache
 def get_graph_service() -> TradingGraphService:
+    """Get the TradingGraphService singleton."""
     return TradingGraphService(
         event_manager=_event_manager,
         config_overrides=_settings.config_overrides(),
     )
+
+
+async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
+    """Dependency to get a database session.
+    
+    Yields:
+        AsyncSession: A database session
+    """
+    db_manager = get_db_manager()
+    async for session in db_manager.get_session():
+        yield session
+
+
+def get_cache_service() -> Optional[CacheService]:
+    """Get the cache service if Redis is enabled.
+    
+    Returns:
+        CacheService or None if Redis is not enabled
+    """
+    if not _settings.redis_enabled:
+        return None
+    
+    redis_manager = get_redis_manager()
+    if redis_manager is None:
+        return None
+    
+    return CacheService(redis_manager)
+
+
+# Backward compatibility alias
+BackendSettings = Settings

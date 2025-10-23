@@ -24,6 +24,11 @@ chainlit
 rich
 questionary
 python-dotenv
+pydantic-settings
 langchain_anthropic
 langchain-google-genai
 uvicorn[standard]
+alembic
+sqlmodel
+asyncpg
+aiosqlite
