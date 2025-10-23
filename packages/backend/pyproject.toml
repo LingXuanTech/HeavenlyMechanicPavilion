@@ -1,8 +1,12 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "tradingagents"
 version = "0.1.0"
-description = "Add your description here"
-readme = "README.md"
+description = "Multi-Agents LLM Financial Trading Framework"
+readme = "../../README.md"
 requires-python = ">=3.10"
 dependencies = [
     "akshare>=1.16.98",
@@ -23,6 +27,7 @@ dependencies = [
     "praw>=7.8.1",
     "pytz>=2025.2",
     "questionary>=2.1.0",
+    "python-dotenv>=1.0.1",
     "redis>=6.2.0",
     "requests>=2.32.4",
     "rich>=14.0.0",
@@ -33,3 +38,34 @@ dependencies = [
     "typing-extensions>=4.14.0",
     "yfinance>=0.2.63",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.6.9",
+]
+
+[project.scripts]
+tradingagents = "cli.main:app"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"cli" = ["static/*.txt"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E203", "E266", "E501"]
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.uv]
+dev-dependencies = ["ruff>=0.6.9"]
