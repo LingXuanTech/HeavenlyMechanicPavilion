@@ -49,6 +49,15 @@ async def startup_event() -> None:
         logger.error(f"Failed to initialize database: {e}")
         raise
     
+    # Initialize vendor plugin registry
+    try:
+        from tradingagents.plugins import initialize_registry
+        registry = initialize_registry()
+        logger.info(f"Vendor plugin registry initialized with {len(registry.list_plugins())} plugins")
+    except Exception as e:
+        logger.error(f"Failed to initialize vendor plugin registry: {e}")
+        # Don't raise - continue without plugins
+    
     # Initialize Redis if enabled
     if settings.redis_enabled:
         try:

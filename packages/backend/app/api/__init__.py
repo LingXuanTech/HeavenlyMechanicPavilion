@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from .health import router as health_router
 from .sessions import router as sessions_router
 from .streams import router as streams_router
+from .vendors import router as vendors_router
 
 
 def get_api_router() -> APIRouter:
@@ -13,4 +14,5 @@ def get_api_router() -> APIRouter:
     api_router.include_router(health_router, tags=["health"])
     api_router.include_router(sessions_router, prefix="/sessions", tags=["sessions"])
     api_router.include_router(streams_router, prefix="/sessions", tags=["streams"])
+    api_router.include_router(vendors_router, prefix="/vendors", tags=["vendors"])
     return api_router

@@ -1,0 +1,79 @@
+# Example vendor configuration file
+# This file defines vendor plugins, their configurations, and routing priorities
+
+# Vendor-specific configurations
+vendors:
+  yfinance:
+    rate_limit_per_minute: 60
+    rate_limit_per_day: null
+    enabled: true
+  
+  alpha_vantage:
+    rate_limit_per_minute: 5
+    rate_limit_per_day: 500
+    api_key_ref: "ALPHA_VANTAGE_API_KEY"
+    enabled: true
+  
+  openai:
+    rate_limit_per_minute: 60
+    rate_limit_per_day: null
+    api_key_ref: "OPENAI_API_KEY"
+    enabled: true
+  
+  google:
+    rate_limit_per_minute: 100
+    rate_limit_per_day: null
+    enabled: true
+  
+  local:
+    enabled: true
+
+# Routing configuration: defines vendor priority for each method
+# Vendors are tried in order; if the first fails, the next is attempted
+routing:
+  get_stock_data:
+    - yfinance
+    - alpha_vantage
+    - local
+  
+  get_indicators:
+    - yfinance
+    - alpha_vantage
+    - local
+  
+  get_fundamentals:
+    - alpha_vantage
+    - openai
+  
+  get_balance_sheet:
+    - alpha_vantage
+    - yfinance
+    - local
+  
+  get_cashflow:
+    - alpha_vantage
+    - yfinance
+    - local
+  
+  get_income_statement:
+    - alpha_vantage
+    - yfinance
+    - local
+  
+  get_news:
+    - alpha_vantage
+    - google
+    - openai
+    - local
+  
+  get_global_news:
+    - openai
+    - local
+  
+  get_insider_sentiment:
+    - local
+  
+  get_insider_transactions:
+    - alpha_vantage
+    - yfinance
+    - local

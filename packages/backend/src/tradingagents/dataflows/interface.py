@@ -1,6 +1,6 @@
 from typing import Annotated
 
-# Import from vendor-specific modules
+# Import from vendor-specific modules (for backward compatibility)
 from .local import get_YFin_data, get_finnhub_news, get_finnhub_company_insider_sentiment, get_finnhub_company_insider_transactions, get_simfin_balance_sheet, get_simfin_cashflow, get_simfin_income_statements, get_reddit_global_news, get_reddit_company_news
 from .y_finance import get_YFin_data_online, get_stock_stats_indicators_window, get_balance_sheet as get_yfinance_balance_sheet, get_cashflow as get_yfinance_cashflow, get_income_statement as get_yfinance_income_statement, get_insider_transactions as get_yfinance_insider_transactions
 from .google import get_google_news
@@ -19,6 +19,24 @@ from .alpha_vantage_common import AlphaVantageRateLimitError
 
 # Configuration and routing logic
 from .config import get_config
+
+# Plugin system imports
+from tradingagents.plugins import initialize_registry, route_to_vendor as plugin_route_to_vendor
+
+# Initialize the plugin registry on module load
+_plugin_registry_initialized = False
+
+
+def _ensure_plugin_registry():
+    """Ensure the plugin registry is initialized."""
+    global _plugin_registry_initialized
+    if not _plugin_registry_initialized:
+        try:
+            initialize_registry()
+            _plugin_registry_initialized = True
+        except Exception as e:
+            print(f"Warning: Failed to initialize plugin registry: {e}")
+
 
 # Tools organized by category
 TOOLS_CATEGORIES = {
@@ -139,7 +157,20 @@ def get_vendor(category: str, method: str = None) -> str:
     return config.get("data_vendors", {}).get(category, "default")
 
 def route_to_vendor(method: str, *args, **kwargs):
-    """Route method calls to appropriate vendor implementation with fallback support."""
+    """Route method calls to appropriate vendor implementation with fallback support.
+    
+    This function now uses the plugin system by default, with fallback to legacy
+    routing if plugins are not available.
+    """
+    _ensure_plugin_registry()
+    
+    # Try plugin-based routing first
+    try:
+        return plugin_route_to_vendor(method, *args, **kwargs)
+    except Exception as e:
+        print(f"Warning: Plugin routing failed ({e}), falling back to legacy routing")
+    
+    # Legacy routing fallback
     category = get_category_for_method(method)
     vendor_config = get_vendor(category, method)
 
