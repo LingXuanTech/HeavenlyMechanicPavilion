@@ -1,0 +1,12 @@
+{
+  "name": "tradingagents",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "sync": "pnpm -r run sync",
+    "lint": "pnpm -r run lint",
+    "format": "pnpm -r run format",
+    "run": "pnpm --filter @tradingagents/backend run run",
+    "cli": "pnpm --filter @tradingagents/backend run cli"
+  }
+}

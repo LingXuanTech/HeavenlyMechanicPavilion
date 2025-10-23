@@ -91,6 +91,27 @@ Our framework decomposes complex trading tasks into specialized roles. This ensu
   <img src="assets/risk.png" width="70%" style="display: inline-block; margin: 0 2%;">
 </p>
 
+## Repository Layout
+
+```text
+.
+├── Makefile
+├── package.json
+├── pnpm-workspace.yaml
+└── packages
+    └── backend
+        ├── package.json
+        ├── pyproject.toml
+        ├── src
+        │   ├── tradingagents
+        │   └── cli
+        └── examples
+```
+
+The root of the repository is managed as a pnpm workspace. Each logical component of the
+system lives under the `packages/` directory, with the `backend` package containing the
+Python sources, examples, and packaging metadata.
+
 ## Installation and CLI
 
 ### Installation
@@ -101,15 +122,29 @@ git clone https://github.com/TauricResearch/TradingAgents.git
 cd TradingAgents
 ```
 
-Create a virtual environment in any of your favorite environment managers:
+Create and activate a Python environment using your preferred tool (conda, `python -m venv`,
+uv, etc.). For example, with conda:
 ```bash
 conda create -n tradingagents python=3.13
 conda activate tradingagents
 ```
 
-Install dependencies:
+Install the backend dependencies through the workspace helper:
 ```bash
-pip install -r requirements.txt
+pnpm sync
+# or
+make sync
+```
+
+The command above executes `uv sync` inside `packages/backend`. You can also run it manually:
+```bash
+cd packages/backend
+uv sync
+```
+
+If you prefer using pip instead of uv:
+```bash
+pip install -r packages/backend/requirements.txt
 ```
 
 ### Required APIs
@@ -131,9 +166,17 @@ cp .env.example .env
 
 ### CLI Usage
 
-You can also try out the CLI directly by running:
+You can run the interactive CLI through the workspace helper scripts:
 ```bash
-python -m cli.main
+pnpm cli
+# or
+make cli
+```
+These commands delegate to `uv run python -m cli.main` inside `packages/backend`. You can also
+invoke the module directly if you prefer:
+```bash
+cd packages/backend
+uv run python -m cli.main
 ```
 You will see a screen where you can select your desired tickers, date, LLMs, research depth, etc.
 
@@ -159,7 +202,7 @@ We built TradingAgents with LangGraph to ensure flexibility and modularity. We u
 
 ### Python Usage
 
-To use TradingAgents inside your code, you can import the `tradingagents` module and initialize a `TradingAgentsGraph()` object. The `.propagate()` function will return a decision. You can run `main.py`, here's also a quick example:
+To use TradingAgents inside your code, you can import the `tradingagents` module and initialize a `TradingAgentsGraph()` object. The `.propagate()` function will return a decision. The workspace exposes a demo runner via `pnpm run` (which executes `uv run python -m tradingagents`). Here's also a quick example:
 
 ```python
 from tradingagents.graph.trading_graph import TradingAgentsGraph

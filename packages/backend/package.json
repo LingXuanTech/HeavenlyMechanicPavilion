@@ -1,0 +1,12 @@
+{
+  "name": "@tradingagents/backend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "sync": "uv sync",
+    "lint": "uv run ruff check src examples",
+    "format": "uv run ruff format src examples",
+    "run": "uv run python -m tradingagents",
+    "cli": "uv run python -m cli.main"
+  }
+}

@@ -1,11 +1,38 @@
-.venv
-results
+# Python environments
+.venv/
 env/
+packages/backend/.venv/
+
+# Python artefacts
 __pycache__/
-.DS_Store
-*.csv
-src/
+*.pyc
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+results/
 eval_results/
 eval_data/
-*.egg-info/
+
+# Data and local secrets
 .env
+.env.*
+*.csv
+
+# Tool caches
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+
+# macOS
+.DS_Store
+
+# Node / pnpm
+node_modules/
+pnpm-lock.yaml
+.pnpm-store/
+
+# UV
+.uv/

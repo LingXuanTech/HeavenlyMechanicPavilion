@@ -8,6 +8,10 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
+
+PACKAGE_ROOT = Path(__file__).resolve().parent
+STATIC_DIR = PACKAGE_ROOT / "static"
+
 from rich.panel import Panel
 from rich.spinner import Spinner
 from rich.live import Live
@@ -398,8 +402,8 @@ def update_display(layout, spinner_text=None):
 def get_user_selections():
     """Get all user selections before starting the analysis display."""
     # Display ASCII art welcome message
-    with open("./cli/static/welcome.txt", "r") as f:
-        welcome_ascii = f.read()
+    with (STATIC_DIR / "welcome.txt").open("r", encoding="utf-8") as welcome_file:
+        welcome_ascii = welcome_file.read()
 
     # Create welcome box content
     welcome_content = f"{welcome_ascii}\n"
