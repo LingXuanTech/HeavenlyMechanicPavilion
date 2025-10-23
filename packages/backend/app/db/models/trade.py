@@ -50,5 +50,5 @@ class Trade(SQLModel, table=True):
     metadata_json: Optional[str] = Field(default=None)
     
     # Relationships
-    portfolio: Optional["Portfolio"] = Relationship(back_populates="trades")
+    portfolio: "Portfolio" = Relationship(back_populates="trades")
     executions: List["Execution"] = Relationship(back_populates="trade")
