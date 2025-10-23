@@ -37,6 +37,7 @@ setup(
         "praw>=7.8.1",
         "pydantic-settings>=2.0.0",
         "pytz>=2025.2",
+        "pyyaml>=6.0.2",
         "questionary>=2.1.0",
         "python-dotenv>=1.0.1",
         "redis>=6.2.0",
