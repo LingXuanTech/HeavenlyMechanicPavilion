@@ -194,6 +194,41 @@ An interface will appear showing results as they load, letting you track the age
   <img src="assets/cli/cli_transaction.png" width="100%" style="display: inline-block; margin: 0 2%;">
 </p>
 
+## FastAPI Backend
+
+A FastAPI application has been scaffolded under `packages/backend/app` to provide a
+service-oriented interface on top of the TradingAgents LangGraph workflow. The
+backend exposes REST endpoints together with Server-Sent Events (SSE) and
+WebSocket transports for streaming session updates.
+
+### Bootstrapping
+
+1. Ensure Python dependencies are installed (`pnpm sync`, `make sync`, or `uv sync`
+   from `packages/backend`).
+2. Configure the required API keys (e.g. `OPENAI_API_KEY`, `ALPHA_VANTAGE_API_KEY`).
+3. Optionally tailor the graph via environment variables: set
+   `TRADINGAGENTS_LLM_PROVIDER`, `TRADINGAGENTS_DEEP_THINK_LLM`,
+   `TRADINGAGENTS_QUICK_THINK_LLM`, or `TRADINGAGENTS_RESULTS_DIR` in your
+   environment or `.env` file.
+4. Start the server from `packages/backend`:
+
+   ```bash
+   uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+   ```
+
+### Available Endpoints
+
+- `GET /health` – lightweight service heartbeat.
+- `GET /sessions/config` – inspect the TradingAgents configuration the backend is using.
+- `POST /sessions` – start a new TradingAgents run (returns `session_id`).
+- `GET /sessions/{session_id}/events` – SSE stream emitting session lifecycle
+  and result events.
+- `WS /sessions/{session_id}/ws` – WebSocket alternative exposing the same stream.
+
+> **Note:** Event delivery currently uses process-local asyncio queues. The
+> interfaces are designed to transition to Redis-backed pub/sub without breaking
+> API contracts.
+
 ## TradingAgents Package
 
 ### Implementation Details

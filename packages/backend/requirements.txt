@@ -7,6 +7,7 @@ praw
 feedparser
 stockstats
 eodhd
+fastapi
 langgraph
 chromadb
 setuptools
@@ -25,3 +26,4 @@ questionary
 python-dotenv
 langchain_anthropic
 langchain-google-genai
+uvicorn[standard]
