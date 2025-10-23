@@ -25,8 +25,22 @@ class GraphSetup:
         invest_judge_memory,
         risk_manager_memory,
         conditional_logic: ConditionalLogic,
+        agent_registry=None,
     ):
-        """Initialize with required components."""
+        """Initialize with required components.
+        
+        Args:
+            quick_thinking_llm: LLM for quick thinking agents
+            deep_thinking_llm: LLM for deep thinking agents
+            tool_nodes: Dictionary of tool nodes
+            bull_memory: Memory for bull researcher
+            bear_memory: Memory for bear researcher
+            trader_memory: Memory for trader
+            invest_judge_memory: Memory for research manager
+            risk_manager_memory: Memory for risk manager
+            conditional_logic: Conditional logic handler
+            agent_registry: Optional agent plugin registry for plugin-based construction
+        """
         self.quick_thinking_llm = quick_thinking_llm
         self.deep_thinking_llm = deep_thinking_llm
         self.tool_nodes = tool_nodes
@@ -36,6 +50,7 @@ class GraphSetup:
         self.invest_judge_memory = invest_judge_memory
         self.risk_manager_memory = risk_manager_memory
         self.conditional_logic = conditional_logic
+        self.agent_registry = agent_registry
 
     def setup_graph(
         self, selected_analysts=["market", "social", "news", "fundamentals"]

@@ -19,6 +19,24 @@ from .managers.risk_manager import create_risk_manager
 
 from .trader.trader import create_trader
 
+# New plugin system
+from .plugin_base import AgentPlugin, AgentRole, AgentCapability
+from .plugin_registry import AgentPluginRegistry, get_agent_registry, initialize_agent_registry
+from .plugins import (
+    MarketAnalystPlugin,
+    SocialAnalystPlugin,
+    NewsAnalystPlugin,
+    FundamentalsAnalystPlugin,
+    BullResearcherPlugin,
+    BearResearcherPlugin,
+    ResearchManagerPlugin,
+    TraderPlugin,
+    RiskyAnalystPlugin,
+    SafeAnalystPlugin,
+    NeutralAnalystPlugin,
+    RiskManagerPlugin,
+)
+
 __all__ = [
     "FinancialSituationMemory",
     "AgentState",
@@ -37,4 +55,23 @@ __all__ = [
     "create_safe_debator",
     "create_social_media_analyst",
     "create_trader",
+    # Plugin system
+    "AgentPlugin",
+    "AgentRole",
+    "AgentCapability",
+    "AgentPluginRegistry",
+    "get_agent_registry",
+    "initialize_agent_registry",
+    "MarketAnalystPlugin",
+    "SocialAnalystPlugin",
+    "NewsAnalystPlugin",
+    "FundamentalsAnalystPlugin",
+    "BullResearcherPlugin",
+    "BearResearcherPlugin",
+    "ResearchManagerPlugin",
+    "TraderPlugin",
+    "RiskyAnalystPlugin",
+    "SafeAnalystPlugin",
+    "NeutralAnalystPlugin",
+    "RiskManagerPlugin",
 ]

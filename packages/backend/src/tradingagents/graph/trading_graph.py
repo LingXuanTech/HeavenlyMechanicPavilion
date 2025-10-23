@@ -51,6 +51,7 @@ class TradingAgentsGraph:
         selected_analysts=["market", "social", "news", "fundamentals"],
         debug=False,
         config: Dict[str, Any] = None,
+        use_plugin_system: bool = False,
     ):
         """Initialize the trading agents graph and components.
 
@@ -58,12 +59,21 @@ class TradingAgentsGraph:
             selected_analysts: List of analyst types to include
             debug: Whether to run in debug mode
             config: Configuration dictionary. If None, uses default config
+            use_plugin_system: Whether to use the new plugin system for agents
         """
         self.debug = debug
         self.config = config or DEFAULT_CONFIG
+        self.use_plugin_system = use_plugin_system
 
         # Update the interface's config
         set_config(self.config)
+        
+        # Initialize agent registry if using plugin system
+        if self.use_plugin_system:
+            from tradingagents.agents.plugin_loader import register_built_in_plugins
+            from tradingagents.agents import get_agent_registry
+            self.agent_registry = get_agent_registry()
+            register_built_in_plugins(self.agent_registry)
 
         # Create necessary directories
         os.makedirs(
@@ -106,6 +116,7 @@ class TradingAgentsGraph:
             self.invest_judge_memory,
             self.risk_manager_memory,
             self.conditional_logic,
+            agent_registry=self.agent_registry if self.use_plugin_system else None,
         )
 
         self.propagator = Propagator()
