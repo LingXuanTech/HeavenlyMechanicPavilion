@@ -10,6 +10,7 @@ import {
   TrendingUp,
   Settings,
   Boxes,
+  BarChart3,
 } from "lucide-react";
 
 export type NavItem = {
@@ -85,6 +86,12 @@ export const navigation: NavSection[] = [
         href: "/activity",
         description: "Execution logs and event timelines",
         icon: Activity,
+      },
+      {
+        label: "System Monitoring",
+        href: "/monitoring",
+        description: "Health metrics, alerts, and uptime",
+        icon: BarChart3,
       },
     ],
   },
