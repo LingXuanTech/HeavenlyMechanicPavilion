@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..cache import CacheService, RedisManager, get_redis_manager
 from ..config import Settings
 from ..db import get_db_manager
+from ..services import BacktestService
 from ..services.events import SessionEventManager
 from ..services.graph import TradingGraphService
 
@@ -35,6 +36,12 @@ def get_graph_service() -> TradingGraphService:
         event_manager=_event_manager,
         config_overrides=_settings.config_overrides(),
     )
+
+
+@lru_cache
+def get_backtest_service() -> BacktestService:
+    """Get the BacktestService singleton."""
+    return BacktestService(config_overrides=_settings.config_overrides())
 
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
