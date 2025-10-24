@@ -7,6 +7,7 @@ import {
   LineChart,
   ShieldCheck,
   Workflow,
+  TrendingUp,
 } from "lucide-react";
 
 export type NavItem = {
@@ -30,6 +31,12 @@ export const navigation: NavSection[] = [
         href: "/",
         description: "Session health, conviction, and capital at risk",
         icon: LayoutDashboard,
+      },
+      {
+        label: "Real-Time Dashboard",
+        href: "/dashboard",
+        description: "Live portfolio, signals, and agent activity",
+        icon: TrendingUp,
       },
       {
         label: "Market Radar",
