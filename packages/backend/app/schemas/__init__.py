@@ -18,6 +18,21 @@ from .trading import (
     TradeResponse,
     TradingSessionResponse,
 )
+from .backtest import (
+    BacktestArtifactResponse,
+    BacktestComparisonEntry,
+    BacktestComparisonResponse,
+    BacktestComparisonSummary,
+    BacktestDecisionLogEntry,
+    BacktestEquityPointResponse,
+    BacktestExportResponse,
+    BacktestMetricsResponse,
+    BacktestParameters,
+    BacktestRunDetailResponse,
+    BacktestRunResponse,
+    BacktestTradeLogEntry,
+    StartBacktestRequest,
+)
 
 __all__ = [
     "AgentConfigBase",
@@ -34,4 +49,17 @@ __all__ = [
     "StartSessionRequest",
     "TradeResponse",
     "TradingSessionResponse",
+    "BacktestArtifactResponse",
+    "BacktestComparisonEntry",
+    "BacktestComparisonResponse",
+    "BacktestComparisonSummary",
+    "BacktestDecisionLogEntry",
+    "BacktestEquityPointResponse",
+    "BacktestExportResponse",
+    "BacktestMetricsResponse",
+    "BacktestParameters",
+    "BacktestRunDetailResponse",
+    "BacktestRunResponse",
+    "BacktestTradeLogEntry",
+    "StartBacktestRequest",
 ]

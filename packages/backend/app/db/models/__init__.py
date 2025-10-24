@@ -11,6 +11,12 @@ from .run_log import RunLog
 from .trade import Trade
 from .trading_session import TradingSession
 from .vendor_config import VendorConfig
+from .backtest import (
+    BacktestArtifact,
+    BacktestEquityCurvePoint,
+    BacktestMetrics,
+    BacktestRun,
+)
 
 __all__ = [
     "AgentConfig",
@@ -22,4 +28,8 @@ __all__ = [
     "Trade",
     "TradingSession",
     "VendorConfig",
+    "BacktestRun",
+    "BacktestMetrics",
+    "BacktestEquityCurvePoint",
+    "BacktestArtifact",
 ]

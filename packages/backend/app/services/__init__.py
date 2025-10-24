@@ -1,5 +1,6 @@
 """Service layer for the FastAPI backend."""
 
+from .backtest import BacktestService
 from .broker_adapter import (
     BrokerAdapter,
     OrderAction,
@@ -19,6 +20,7 @@ from .risk_management import (
 from .trading_session import TradingSessionService
 
 __all__ = [
+    "BacktestService",
     "BrokerAdapter",
     "ExecutionService",
     "OrderAction",

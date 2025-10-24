@@ -13,6 +13,12 @@ from .models.execution import Execution  # noqa: F401
 from .models.agent_config import AgentConfig  # noqa: F401
 from .models.vendor_config import VendorConfig  # noqa: F401
 from .models.run_log import RunLog  # noqa: F401
+from .models.backtest import (  # noqa: F401
+    BacktestArtifact,
+    BacktestEquityCurvePoint,
+    BacktestMetrics,
+    BacktestRun,
+)
 
 __all__ = [
     "SQLModel",
@@ -23,4 +29,8 @@ __all__ = [
     "AgentConfig",
     "VendorConfig",
     "RunLog",
+    "BacktestRun",
+    "BacktestMetrics",
+    "BacktestEquityCurvePoint",
+    "BacktestArtifact",
 ]
