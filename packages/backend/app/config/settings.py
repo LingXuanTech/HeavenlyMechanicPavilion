@@ -35,6 +35,30 @@ class Settings(BaseSettings):
     streaming_enabled: bool = Field(default=True, alias="STREAMING_ENABLED")
     auto_start_workers: bool = Field(default=False, alias="AUTO_START_WORKERS")
 
+    # Monitoring configuration
+    monitoring_enabled: bool = Field(default=True, alias="MONITORING_ENABLED")
+    metrics_enabled: bool = Field(default=True, alias="METRICS_ENABLED")
+    
+    # Alerting configuration
+    alerting_enabled: bool = Field(default=False, alias="ALERTING_ENABLED")
+    alert_email_enabled: bool = Field(default=False, alias="ALERT_EMAIL_ENABLED")
+    alert_email_to: Optional[str] = Field(default=None, alias="ALERT_EMAIL_TO")
+    alert_email_from: Optional[str] = Field(default=None, alias="ALERT_EMAIL_FROM")
+    smtp_host: Optional[str] = Field(default=None, alias="SMTP_HOST")
+    smtp_port: int = Field(default=587, alias="SMTP_PORT")
+    smtp_username: Optional[str] = Field(default=None, alias="SMTP_USERNAME")
+    smtp_password: Optional[str] = Field(default=None, alias="SMTP_PASSWORD")
+    smtp_use_tls: bool = Field(default=True, alias="SMTP_USE_TLS")
+    
+    alert_webhook_enabled: bool = Field(default=False, alias="ALERT_WEBHOOK_ENABLED")
+    alert_webhook_url: Optional[str] = Field(default=None, alias="ALERT_WEBHOOK_URL")
+    alert_webhook_headers: Optional[str] = Field(default=None, alias="ALERT_WEBHOOK_HEADERS")
+    
+    # Worker watchdog configuration
+    watchdog_enabled: bool = Field(default=True, alias="WATCHDOG_ENABLED")
+    watchdog_check_interval: int = Field(default=60, alias="WATCHDOG_CHECK_INTERVAL")
+    watchdog_task_timeout: int = Field(default=300, alias="WATCHDOG_TASK_TIMEOUT")
+
     # Application configuration
     debug: bool = Field(default=False, alias="DEBUG")
     api_title: str = Field(default="TradingAgents Backend", alias="API_TITLE")

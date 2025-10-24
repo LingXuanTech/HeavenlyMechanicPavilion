@@ -12,6 +12,7 @@ from .api import get_api_router
 from .cache import init_redis
 from .db import init_db
 from .dependencies import get_settings
+from .middleware import MetricsMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,10 @@ app = FastAPI(
         "workflow with persistence and caching support."
     ),
 )
+
+# Add metrics middleware if enabled
+if settings.metrics_enabled:
+    app.add_middleware(MetricsMiddleware)
 
 
 @app.on_event("startup")
@@ -85,6 +90,12 @@ async def startup_event() -> None:
                     if settings.streaming_enabled and (settings.auto_start_workers or settings.debug):
                         worker_manager.start_all()
                         logger.info("Background workers started")
+                        
+                        # Start watchdog if enabled
+                        if settings.watchdog_enabled:
+                            from .workers.watchdog import start_watchdog
+                            start_watchdog()
+                            logger.info("Worker watchdog started")
                     else:
                         logger.info("Background workers initialized (use /streaming/config/workers/start-all to start)")
                     
@@ -104,6 +115,15 @@ async def startup_event() -> None:
 async def shutdown_event() -> None:
     """Cleanup application resources on shutdown."""
     logger.info("Shutting down TradingAgents backend...")
+    
+    # Stop watchdog
+    if settings.watchdog_enabled:
+        try:
+            from .workers.watchdog import stop_watchdog
+            await stop_watchdog()
+            logger.info("Worker watchdog stopped")
+        except Exception as e:
+            logger.error(f"Error stopping watchdog: {e}")
     
     # Stop background workers
     if settings.redis_enabled:
