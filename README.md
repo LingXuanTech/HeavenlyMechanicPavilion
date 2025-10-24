@@ -99,18 +99,34 @@ Our framework decomposes complex trading tasks into specialized roles. This ensu
 ├── package.json
 ├── pnpm-workspace.yaml
 └── packages
-    └── backend
+    ├── backend
+    │   ├── package.json
+    │   ├── pyproject.toml
+    │   ├── src
+    │   │   ├── tradingagents
+    │   │   └── cli
+    │   └── examples
+    ├── frontend
+    │   ├── package.json
+    │   ├── src
+    │   │   ├── app
+    │   │   ├── components
+    │   │   └── config
+    │   └── public
+    └── shared
         ├── package.json
-        ├── pyproject.toml
-        ├── src
-        │   ├── tradingagents
-        │   └── cli
-        └── examples
+        └── src
+            ├── clients
+            ├── domain
+            ├── theme
+            └── utils
 ```
 
 The root of the repository is managed as a pnpm workspace. Each logical component of the
-system lives under the `packages/` directory, with the `backend` package containing the
-Python sources, examples, and packaging metadata.
+system lives under the `packages/` directory. The `backend` package contains the Python
+sources, examples, and packaging metadata. The `frontend` package delivers the Next.js app
+for the TradingAgents Control Center, while the `shared` package centralizes OpenAPI clients,
+domain typings, and UI tokens for use across services.
 
 ## Installation and CLI
 
