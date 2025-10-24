@@ -71,6 +71,25 @@ async def startup_event() -> None:
             # Test Redis connection
             if await redis_manager.ping():
                 logger.info(f"Redis initialized: {settings.redis_host}:{settings.redis_port}")
+                
+                # Initialize streaming infrastructure
+                try:
+                    from .services.streaming_config import StreamingConfigService
+                    from .workers import init_worker_manager
+                    
+                    config_service = StreamingConfigService(redis_manager)
+                    worker_manager = init_worker_manager(redis_manager, config_service)
+                    await worker_manager.initialize()
+                    
+                    # Auto-start workers if configured
+                    if settings.streaming_enabled and (settings.auto_start_workers or settings.debug):
+                        worker_manager.start_all()
+                        logger.info("Background workers started")
+                    else:
+                        logger.info("Background workers initialized (use /streaming/config/workers/start-all to start)")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to initialize streaming infrastructure: {e}")
             else:
                 logger.warning("Redis ping failed, caching may not work correctly")
         except Exception as e:
@@ -85,6 +104,17 @@ async def startup_event() -> None:
 async def shutdown_event() -> None:
     """Cleanup application resources on shutdown."""
     logger.info("Shutting down TradingAgents backend...")
+    
+    # Stop background workers
+    if settings.redis_enabled:
+        try:
+            from .workers import get_worker_manager
+            worker_manager = get_worker_manager()
+            if worker_manager:
+                await worker_manager.stop_all()
+                logger.info("Background workers stopped")
+        except Exception as e:
+            logger.error(f"Error stopping workers: {e}")
     
     # Close database connections
     try:
