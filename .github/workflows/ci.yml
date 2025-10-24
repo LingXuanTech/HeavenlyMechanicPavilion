@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop, ci-testing-*]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  python-tests:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/backend
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            packages/backend/.venv
+          key: ${{ runner.os }}-uv-${{ hashFiles('packages/backend/uv.lock') }}
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Lint with ruff
+        run: uv run ruff check src app
+
+      - name: Type check with mypy
+        run: uv run mypy src app --ignore-missing-imports
+
+      - name: Run tests
+        run: uv run pytest --cov=src --cov=app --cov-report=xml
+        env:
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+
+  node-tests:
+    name: Node Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 8
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint frontend
+        run: pnpm --filter @tradingagents/frontend run lint
+
+      - name: Type check
+        run: |
+          pnpm --filter @tradingagents/frontend run type-check
+          pnpm --filter @tradingagents/shared run type-check
+
+      - name: Run unit tests
+        run: |
+          pnpm --filter @tradingagents/shared run test -- --coverage
+          pnpm --filter @tradingagents/frontend run test:coverage
+
+      - name: Build packages
+        run: |
+          pnpm --filter @tradingagents/shared run build
+          pnpm --filter @tradingagents/frontend run build
