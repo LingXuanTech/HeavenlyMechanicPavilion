@@ -4,8 +4,11 @@
   "private": true,
   "scripts": {
     "sync": "uv sync",
-    "lint": "uv run ruff check src examples",
-    "format": "uv run ruff format src examples",
+    "lint": "uv run ruff check src app",
+    "format": "uv run ruff format src app",
+    "type-check": "uv run mypy src app",
+    "test": "uv run pytest",
+    "coverage": "uv run pytest --cov=src --cov=app",
     "run": "uv run python -m tradingagents",
     "cli": "uv run python -m cli.main"
   }
