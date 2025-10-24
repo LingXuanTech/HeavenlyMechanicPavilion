@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     redis_port: int = Field(default=6379, alias="REDIS_PORT")
     redis_db: int = Field(default=0, alias="REDIS_DB")
     redis_password: Optional[str] = Field(default=None, alias="REDIS_PASSWORD")
+    
+    # Streaming configuration
+    streaming_enabled: bool = Field(default=True, alias="STREAMING_ENABLED")
+    auto_start_workers: bool = Field(default=False, alias="AUTO_START_WORKERS")
 
     # Application configuration
     debug: bool = Field(default=False, alias="DEBUG")

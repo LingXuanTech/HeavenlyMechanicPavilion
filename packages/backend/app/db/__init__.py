@@ -14,6 +14,9 @@ from .base import (
 )
 from .session import DatabaseManager, get_db_manager, get_session, init_db
 
+# Alias for compatibility
+get_db = get_session
+
 __all__ = [
     "AgentConfig",
     "DatabaseManager",
@@ -24,6 +27,7 @@ __all__ = [
     "SQLModel",
     "Trade",
     "VendorConfig",
+    "get_db",
     "get_db_manager",
     "get_session",
     "init_db",
