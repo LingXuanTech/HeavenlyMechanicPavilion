@@ -6,8 +6,10 @@ from .agent_config import AgentConfig
 from .execution import Execution
 from .portfolio import Portfolio
 from .position import Position
+from .risk_metrics import RiskMetrics
 from .run_log import RunLog
 from .trade import Trade
+from .trading_session import TradingSession
 from .vendor_config import VendorConfig
 
 __all__ = [
@@ -15,7 +17,9 @@ __all__ = [
     "Execution",
     "Portfolio",
     "Position",
+    "RiskMetrics",
     "RunLog",
     "Trade",
+    "TradingSession",
     "VendorConfig",
 ]

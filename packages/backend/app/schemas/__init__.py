@@ -7,6 +7,17 @@ from .agent_config import (
     AgentConfigResponse,
     AgentConfigList,
 )
+from .trading import (
+    ExecuteSignalRequest,
+    ForceExitRequest,
+    PortfolioStateDetailResponse,
+    PortfolioStateResponse,
+    PositionResponse,
+    RiskDiagnosticsResponse,
+    StartSessionRequest,
+    TradeResponse,
+    TradingSessionResponse,
+)
 
 __all__ = [
     "AgentConfigBase",
@@ -14,4 +25,13 @@ __all__ = [
     "AgentConfigUpdate",
     "AgentConfigResponse",
     "AgentConfigList",
+    "ExecuteSignalRequest",
+    "ForceExitRequest",
+    "PortfolioStateDetailResponse",
+    "PortfolioStateResponse",
+    "PositionResponse",
+    "RiskDiagnosticsResponse",
+    "StartSessionRequest",
+    "TradeResponse",
+    "TradingSessionResponse",
 ]
