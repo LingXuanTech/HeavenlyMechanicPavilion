@@ -8,6 +8,8 @@ import {
   ShieldCheck,
   Workflow,
   TrendingUp,
+  Settings,
+  Boxes,
 } from "lucide-react";
 
 export type NavItem = {
@@ -83,6 +85,23 @@ export const navigation: NavSection[] = [
         href: "/activity",
         description: "Execution logs and event timelines",
         icon: Activity,
+      },
+    ],
+  },
+  {
+    title: "Administration",
+    items: [
+      {
+        label: "Vendor Management",
+        href: "/admin/vendors",
+        description: "Configure data vendors and routing priorities",
+        icon: Settings,
+      },
+      {
+        label: "Agent Marketplace",
+        href: "/admin/agents",
+        description: "Manage plugin inventory and prompts",
+        icon: Boxes,
       },
     ],
   },
