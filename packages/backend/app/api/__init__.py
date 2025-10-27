@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from .agents import router as agents_router
 from .backtests import router as backtests_router
 from .health import router as health_router
+from .monitoring import router as monitoring_router
 from .sessions import router as sessions_router
 from .streaming import router as streaming_router
 from .streaming_config import router as streaming_config_router
@@ -17,6 +18,7 @@ def get_api_router() -> APIRouter:
     """Construct the application router with all included endpoints."""
     api_router = APIRouter()
     api_router.include_router(health_router, tags=["health"])
+    api_router.include_router(monitoring_router, prefix="/monitoring", tags=["monitoring"])
     api_router.include_router(sessions_router, prefix="/sessions", tags=["sessions"])
     api_router.include_router(streams_router, prefix="/sessions", tags=["streams"])
     api_router.include_router(vendors_router, prefix="/vendors", tags=["vendors"])
