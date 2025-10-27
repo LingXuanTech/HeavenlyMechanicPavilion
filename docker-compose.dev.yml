@@ -1,0 +1,41 @@
+# Development override for docker-compose.yml
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  backend:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+      target: dependencies
+    volumes:
+      - ./packages/backend:/app:delegated
+      - backend_results:/app/results
+      - backend_data:/app/data
+    environment:
+      DEBUG: "true"
+      RELOAD: "true"
+      DATABASE_ECHO: "true"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    entrypoint: []
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./packages/frontend/Dockerfile
+      target: dependencies
+    volumes:
+      - ./packages/frontend:/app/packages/frontend:delegated
+      - ./packages/shared:/app/packages/shared:delegated
+      - /app/packages/frontend/node_modules
+      - /app/packages/shared/node_modules
+    environment:
+      NODE_ENV: development
+    command: ["pnpm", "dev"]
+
+  worker:
+    environment:
+      DEBUG: "true"
+    volumes:
+      - ./packages/backend:/app:delegated
+      - backend_results:/app/results
+      - backend_data:/app/data

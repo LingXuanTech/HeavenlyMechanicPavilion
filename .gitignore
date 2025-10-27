@@ -19,7 +19,11 @@ eval_data/
 # Data and local secrets
 .env
 .env.*
+!.env.example
+!.env.docker
 *.csv
+secrets.yml
+secrets.yaml
 
 # Tool caches
 .ruff_cache/
@@ -36,3 +40,15 @@ pnpm-lock.yaml
 
 # UV
 .uv/
+
+# Docker
+*.db
+*.db-journal
+data/
+postgres_data/
+redis_data/
+
+# SSL certificates
+nginx/ssl/*.pem
+nginx/ssl/*.key
+nginx/ssl/*.crt

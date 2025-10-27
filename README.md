@@ -298,6 +298,56 @@ print(decision)
 
 You can view the full list of configurations in `tradingagents/default_config.py`.
 
+## Docker Deployment
+
+TradingAgents can be deployed using Docker and Docker Compose for easy setup and production deployment.
+
+### Quick Start with Docker
+
+```bash
+# Copy environment template
+cp .env.docker .env
+
+# Edit .env with your API keys and configuration
+nano .env
+
+# Start all services
+./scripts/deploy.sh up
+
+# Or with frontend and workers
+PROFILE=frontend,workers ./scripts/deploy.sh up
+```
+
+The Docker deployment includes:
+- **Backend API**: FastAPI application with TradingAgents
+- **PostgreSQL**: Database for persistence
+- **Redis**: Caching and streaming support
+- **Frontend**: Next.js Control Center (optional)
+- **Workers**: Background task processing (optional)
+- **Nginx**: Reverse proxy with WebSocket support (optional)
+
+### Available Commands
+
+```bash
+./scripts/deploy.sh up       # Start services
+./scripts/deploy.sh down     # Stop services
+./scripts/deploy.sh logs     # View logs
+./scripts/deploy.sh migrate  # Run database migrations
+./scripts/deploy.sh shell    # Open shell in backend container
+```
+
+### Production Deployment
+
+For comprehensive production deployment guidance including:
+- SSL/TLS configuration
+- Scaling services horizontally and vertically
+- Reverse proxy and WebSocket configuration
+- Monitoring and logging
+- Backup and restore procedures
+- Security best practices
+
+See the complete [DEPLOYMENT.md](./DEPLOYMENT.md) guide.
+
 ## Contributing
 
 We welcome contributions from the community! Whether it's fixing a bug, improving documentation, or suggesting a new feature, your input helps make this project better. If you are interested in this line of research, please consider joining our open-source financial AI research community [Tauric Research](https://tauric.ai/).
