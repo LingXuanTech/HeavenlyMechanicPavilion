@@ -41,6 +41,7 @@ dependencies = [
     "setuptools>=80.9.0",
     "sqlmodel>=0.0.22",
     "stockstats>=0.6.5",
+    "tiktoken>=0.5.0",
     "tqdm>=4.67.1",
     "tushare>=1.4.21",
     "typing-extensions>=4.14.0",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .agent_config import AgentConfig
+from .agent_llm_config import AgentLLMConfig
 from .execution import Execution
 from .portfolio import Portfolio
 from .position import Position
@@ -20,6 +21,7 @@ from .backtest import (
 
 __all__ = [
     "AgentConfig",
+    "AgentLLMConfig",
     "Execution",
     "Portfolio",
     "Position",
