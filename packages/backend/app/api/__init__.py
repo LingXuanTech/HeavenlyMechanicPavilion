@@ -6,6 +6,7 @@ from .agents import router as agents_router
 from .backtests import router as backtests_router
 from .health import router as health_router
 from .monitoring import router as monitoring_router
+from .llm_providers import router as llm_providers_router
 from .sessions import router as sessions_router
 from .streaming import router as streaming_router
 from .streaming_config import router as streaming_config_router

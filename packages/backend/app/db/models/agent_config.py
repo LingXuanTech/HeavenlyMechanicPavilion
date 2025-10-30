@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from sqlmodel import Field, SQLModel
+from sqlmodel import Field, Relationship, SQLModel
 
 
 class AgentConfig(SQLModel, table=True):
@@ -51,3 +51,6 @@ class AgentConfig(SQLModel, table=True):
     # Metadata fields
     description: Optional[str] = Field(default=None, max_length=1000)
     metadata_json: Optional[str] = Field(default=None)
+
+    llm_config: Optional["AgentLLMConfig"] = Relationship(back_populates="agent")
+    llm_usage_events: list["AgentLLMUsage"] = Relationship(back_populates="agent")

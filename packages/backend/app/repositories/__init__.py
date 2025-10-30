@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from .agent_config import AgentConfigRepository
+from .agent_llm_config import AgentLLMConfigRepository
+from .agent_llm_usage import AgentLLMUsageRepository
 from .backtest import (
     BacktestArtifactRepository,
     BacktestEquityCurveRepository,
@@ -21,6 +23,8 @@ from .vendor_config import VendorConfigRepository
 
 __all__ = [
     "AgentConfigRepository",
+    "AgentLLMConfigRepository",
+    "AgentLLMUsageRepository",
     "BacktestArtifactRepository",
     "BacktestEquityCurveRepository",
     "BacktestMetricsRepository",

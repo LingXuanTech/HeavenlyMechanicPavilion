@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     monitoring_enabled: bool = Field(default=True, alias="MONITORING_ENABLED")
     metrics_enabled: bool = Field(default=True, alias="METRICS_ENABLED")
     
+    # Security
+    encryption_key: str = Field(
+        default="QW1oUnp2aEo0RkYzTnZTZnVMd3o0a0c0NnM5c0FSazg=",
+        alias="APP_ENCRYPTION_KEY",
+        description="Base64 encoded key for encrypting secrets",
+    )
+    
     # Alerting configuration
     alerting_enabled: bool = Field(default=False, alias="ALERTING_ENABLED")
     alert_email_enabled: bool = Field(default=False, alias="ALERT_EMAIL_ENABLED")
