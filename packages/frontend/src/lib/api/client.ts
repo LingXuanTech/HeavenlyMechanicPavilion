@@ -72,6 +72,24 @@ export const api = {
       fetchAPI<any>("/api/vendors/config/reload", { method: "POST" }),
   },
 
+  // LLM provider endpoints
+  llmProviders: {
+    list: () => fetchAPI<any>("/api/llm-providers"),
+    listModels: (provider: string) => fetchAPI<any>(`/api/llm-providers/${provider}/models`),
+    validateKey: (payload: {
+      provider: string;
+      api_key: string;
+      model_name?: string;
+      temperature?: number;
+      max_tokens?: number;
+      top_p?: number;
+    }) =>
+      fetchAPI<any>("/api/llm-providers/validate-key", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+  },
+
   // Agent endpoints
   agents: {
     list: (params?: { role?: string; is_active?: boolean; skip?: number; limit?: number }) => {
@@ -80,7 +98,7 @@ export const api = {
       if (params?.is_active !== undefined) queryParams.append("is_active", String(params.is_active));
       if (params?.skip !== undefined) queryParams.append("skip", String(params.skip));
       if (params?.limit !== undefined) queryParams.append("limit", String(params.limit));
-      
+
       const query = queryParams.toString();
       return fetchAPI<any>(`/api/agents${query ? `?${query}` : ""}`);
     },
@@ -103,5 +121,39 @@ export const api = {
     deactivate: (agentId: number) =>
       fetchAPI<any>(`/api/agents/${agentId}/deactivate`, { method: "POST" }),
     reload: () => fetchAPI<any>("/api/agents/reload", { method: "POST" }),
+    listLLMConfigs: (
+      agentId: number,
+      options?: { enabledOnly?: boolean },
+    ) => {
+      const query = options?.enabledOnly ? "?enabled_only=true" : "";
+      return fetchAPI<any>(`/api/agents/${agentId}/llm-config${query}`);
+    },
+    upsertLLMConfig: (agentId: number, config: any) =>
+      fetchAPI<any>(`/api/agents/${agentId}/llm-config`, {
+        method: "PUT",
+        body: JSON.stringify(config),
+      }),
+    bulkAssignLLMConfigs: (payload: any) =>
+      fetchAPI<any>("/api/agents/bulk-llm-config", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    testLLM: (agentId: number, configId?: number) => {
+      const query = configId ? `?config_id=${configId}` : "";
+      return fetchAPI<any>(`/api/agents/${agentId}/test-llm${query}`, {
+        method: "POST",
+      });
+    },
+    llmUsage: (
+      agentId: number,
+      params?: { start?: string; end?: string; limit?: number },
+    ) => {
+      const queryParams = new URLSearchParams();
+      if (params?.start) queryParams.append("start", params.start);
+      if (params?.end) queryParams.append("end", params.end);
+      if (params?.limit !== undefined) queryParams.append("limit", String(params.limit));
+      const query = queryParams.toString();
+      return fetchAPI<any>(`/api/agents/${agentId}/llm-usage${query ? `?${query}` : ""}`);
+    },
   },
 };
