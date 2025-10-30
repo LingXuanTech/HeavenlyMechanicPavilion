@@ -141,6 +141,23 @@ class AgentLLMConfigService:
             return self._to_response(config)
         return None
 
+    async def list_configs(
+        self,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[AgentLLMConfigResponse]:
+        """List LLM configurations across all agents.
+
+        Args:
+            skip: Number of records to skip
+            limit: Maximum number of records to return
+
+        Returns:
+            List[AgentLLMConfigResponse]: List of LLM configurations
+        """
+        configs = await self.repository.get_multi(skip=skip, limit=limit)
+        return [self._to_response(config) for config in configs]
+
     async def update_config(
         self, config_id: int, config_data: AgentLLMConfigUpdate
     ) -> Optional[AgentLLMConfigResponse]:
