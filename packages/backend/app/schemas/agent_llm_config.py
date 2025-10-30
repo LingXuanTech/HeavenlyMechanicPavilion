@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -34,6 +34,15 @@ class AgentLLMConfigCreate(AgentLLMConfigBase):
     cost_per_1k_output_tokens: float = Field(
         default=0.0, ge=0.0, description="Cost per 1K output tokens"
     )
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
+
+
+class AgentLLMConfigUpsert(AgentLLMConfigBase):
+    """Schema for upserting an AgentLLMConfig without binding to an agent."""
+
+    api_key: Optional[str] = Field(default=None, description="Optional API key override")
+    cost_per_1k_input_tokens: Optional[float] = Field(default=None, ge=0.0)
+    cost_per_1k_output_tokens: Optional[float] = Field(default=None, ge=0.0)
     metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
 
 
@@ -70,3 +79,10 @@ class AgentLLMConfigResponse(AgentLLMConfigBase):
 
     class Config:
         from_attributes = True
+
+
+class BulkAgentLLMConfigRequest(BaseModel):
+    """Bulk assignment request for LLM configurations."""
+
+    agent_ids: List[int] = Field(..., description="Agents that should receive the configuration")
+    config: AgentLLMConfigUpsert

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -12,19 +13,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db.session import get_session
 from ..schemas.agent_config import (
     AgentConfigCreate,
+    AgentConfigList,
     AgentConfigResponse,
     AgentConfigUpdate,
-    AgentConfigList,
 )
+from ..schemas.agent_llm_config import (
+    AgentLLMConfigResponse,
+    AgentLLMConfigUpsert,
+    BulkAgentLLMConfigRequest,
+)
+from ..schemas.agent_llm_usage import AgentLLMUsageQuery, AgentLLMUsageSummary
+from ..schemas.llm_provider import ValidateKeyResponse
 from ..services.agent_config import AgentConfigService
-
+from ..services.agent_llm_config import AgentLLMConfigService
+from ..services.agent_llm_usage import AgentLLMUsageService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
 
-def _convert_db_to_response(agent) -> AgentConfigResponse:
+def _convert_db_to_response(agent, active_llm: Optional[AgentLLMConfigResponse] = None) -> AgentConfigResponse:
     """Convert database model to response schema."""
     agent_dict = {
         "id": agent.id,
@@ -46,6 +55,7 @@ def _convert_db_to_response(agent) -> AgentConfigResponse:
         "version": agent.version,
         "created_at": agent.created_at,
         "updated_at": agent.updated_at,
+        "active_llm_config": active_llm,
     }
     
     # Parse JSON fields
@@ -84,23 +94,14 @@ async def list_agents(
     limit: int = Query(100, ge=1, le=1000),
     session: AsyncSession = Depends(get_session),
 ):
-    """List all agent configurations.
-    
-    Args:
-        role: Optional role filter
-        is_active: Optional active status filter
-        skip: Number of records to skip
-        limit: Maximum number of records to return
-        session: Database session
-        
-    Returns:
-        AgentConfigList: List of agent configurations
-    """
+    """List all agent configurations."""
     service = AgentConfigService(session)
+    llm_service = AgentLLMConfigService(session)
     agents = await service.list_agents(role=role, is_active=is_active, skip=skip, limit=limit)
-    
-    response_agents = [_convert_db_to_response(agent) for agent in agents]
-    
+    response_agents = []
+    for agent in agents:
+        primary_llm = await llm_service.get_primary_config(agent.id)
+        response_agents.append(_convert_db_to_response(agent, primary_llm))
     return AgentConfigList(agents=response_agents, total=len(response_agents))
 
 
@@ -109,28 +110,16 @@ async def get_agent(
     agent_id: int,
     session: AsyncSession = Depends(get_session),
 ):
-    """Get an agent configuration by ID.
-    
-    Args:
-        agent_id: Agent ID
-        session: Database session
-        
-    Returns:
-        AgentConfigResponse: Agent configuration
-        
-    Raises:
-        HTTPException: If agent not found
-    """
+    """Get an agent configuration by ID."""
     service = AgentConfigService(session)
     agent = await service.get_agent(agent_id)
-    
     if not agent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Agent with ID {agent_id} not found",
         )
-    
-    return _convert_db_to_response(agent)
+    primary_llm = await AgentLLMConfigService(session).get_primary_config(agent_id)
+    return _convert_db_to_response(agent, primary_llm)
 
 
 @router.get("/by-name/{agent_name}", response_model=AgentConfigResponse)
@@ -138,28 +127,16 @@ async def get_agent_by_name(
     agent_name: str,
     session: AsyncSession = Depends(get_session),
 ):
-    """Get an agent configuration by name.
-    
-    Args:
-        agent_name: Agent name
-        session: Database session
-        
-    Returns:
-        AgentConfigResponse: Agent configuration
-        
-    Raises:
-        HTTPException: If agent not found
-    """
+    """Get an agent configuration by name."""
     service = AgentConfigService(session)
     agent = await service.get_agent_by_name(agent_name)
-    
     if not agent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Agent with name '{agent_name}' not found",
         )
-    
-    return _convert_db_to_response(agent)
+    primary_llm = await AgentLLMConfigService(session).get_primary_config(agent.id)
+    return _convert_db_to_response(agent, primary_llm)
 
 
 @router.post("/", response_model=AgentConfigResponse, status_code=status.HTTP_201_CREATED)
@@ -167,20 +144,8 @@ async def create_agent(
     agent_data: AgentConfigCreate,
     session: AsyncSession = Depends(get_session),
 ):
-    """Create a new agent configuration.
-    
-    Args:
-        agent_data: Agent configuration data
-        session: Database session
-        
-    Returns:
-        AgentConfigResponse: Created agent configuration
-        
-    Raises:
-        HTTPException: If agent name already exists
-    """
+    """Create a new agent configuration."""
     service = AgentConfigService(session)
-    
     try:
         agent = await service.create_agent(agent_data)
         return _convert_db_to_response(agent)
@@ -197,29 +162,16 @@ async def update_agent(
     agent_data: AgentConfigUpdate,
     session: AsyncSession = Depends(get_session),
 ):
-    """Update an agent configuration.
-    
-    Args:
-        agent_id: Agent ID
-        agent_data: Updated agent data
-        session: Database session
-        
-    Returns:
-        AgentConfigResponse: Updated agent configuration
-        
-    Raises:
-        HTTPException: If agent not found
-    """
+    """Update an agent configuration."""
     service = AgentConfigService(session)
     agent = await service.update_agent(agent_id, agent_data)
-    
     if not agent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Agent with ID {agent_id} not found",
         )
-    
-    return _convert_db_to_response(agent)
+    primary_llm = await AgentLLMConfigService(session).get_primary_config(agent_id)
+    return _convert_db_to_response(agent, primary_llm)
 
 
 @router.delete("/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -227,17 +179,8 @@ async def delete_agent(
     agent_id: int,
     session: AsyncSession = Depends(get_session),
 ):
-    """Delete an agent configuration.
-    
-    Args:
-        agent_id: Agent ID
-        session: Database session
-        
-    Raises:
-        HTTPException: If agent not found or is reserved
-    """
+    """Delete an agent configuration."""
     service = AgentConfigService(session)
-    
     try:
         success = await service.delete_agent(agent_id)
         if not success:
@@ -257,28 +200,16 @@ async def activate_agent(
     agent_id: int,
     session: AsyncSession = Depends(get_session),
 ):
-    """Activate an agent configuration.
-    
-    Args:
-        agent_id: Agent ID
-        session: Database session
-        
-    Returns:
-        AgentConfigResponse: Updated agent configuration
-        
-    Raises:
-        HTTPException: If agent not found
-    """
+    """Activate an agent configuration."""
     service = AgentConfigService(session)
     agent = await service.activate_agent(agent_id)
-    
     if not agent:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status=status.HTTP_404_NOT_FOUND,
             detail=f"Agent with ID {agent_id} not found",
         )
-    
-    return _convert_db_to_response(agent)
+    primary_llm = await AgentLLMConfigService(session).get_primary_config(agent_id)
+    return _convert_db_to_response(agent, primary_llm)
 
 
 @router.post("/{agent_id}/deactivate", response_model=AgentConfigResponse)
@@ -286,46 +217,100 @@ async def deactivate_agent(
     agent_id: int,
     session: AsyncSession = Depends(get_session),
 ):
-    """Deactivate an agent configuration.
-    
-    Args:
-        agent_id: Agent ID
-        session: Database session
-        
-    Returns:
-        AgentConfigResponse: Updated agent configuration
-        
-    Raises:
-        HTTPException: If agent not found
-    """
+    """Deactivate an agent configuration."""
     service = AgentConfigService(session)
     agent = await service.deactivate_agent(agent_id)
-    
     if not agent:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status=status.HTTP_404_NOT_FOUND,
             detail=f"Agent with ID {agent_id} not found",
         )
-    
-    return _convert_db_to_response(agent)
+    primary_llm = await AgentLLMConfigService(session).get_primary_config(agent_id)
+    return _convert_db_to_response(agent, primary_llm)
 
 
 @router.post("/reload", status_code=status.HTTP_200_OK)
 async def reload_agent_registry(
     session: AsyncSession = Depends(get_session),
 ):
-    """Reload the agent plugin registry (hot-reload).
-    
-    This endpoint triggers a reload of the agent registry to pick up
-    any changes in agent configurations without restarting the service.
-    
-    Args:
-        session: Database session
-        
-    Returns:
-        dict: Success message
-    """
+    """Reload the agent plugin registry (hot-reload)."""
     service = AgentConfigService(session)
     await service._trigger_hot_reload()
-    
     return {"message": "Agent registry reloaded successfully"}
+
+
+# ---------------------------------------------------------------------------
+# Agent LLM configuration endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{agent_id}/llm-config", response_model=List[AgentLLMConfigResponse])
+async def list_agent_llm_configs(
+    agent_id: int,
+    enabled_only: bool = Query(False, description="Return only enabled configs"),
+    session: AsyncSession = Depends(get_session),
+):
+    service = AgentLLMConfigService(session)
+    configs = await service.get_configs_by_agent(agent_id, enabled_only=enabled_only)
+    return configs
+
+
+@router.put("/{agent_id}/llm-config", response_model=AgentLLMConfigResponse)
+async def upsert_agent_llm_config(
+    agent_id: int,
+    config: AgentLLMConfigUpsert,
+    session: AsyncSession = Depends(get_session),
+):
+    service = AgentLLMConfigService(session)
+    return await service.upsert_primary_config(agent_id, config)
+
+
+@router.post("/bulk-llm-config", response_model=List[AgentLLMConfigResponse])
+async def bulk_assign_llm_configs(
+    request: BulkAgentLLMConfigRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    service = AgentLLMConfigService(session)
+    if not request.agent_ids:
+        raise HTTPException(status_code=400, detail="agent_ids cannot be empty")
+    return await service.bulk_assign_config(request.agent_ids, request.config)
+
+
+@router.post("/{agent_id}/test-llm", response_model=ValidateKeyResponse)
+async def test_agent_llm_configuration(
+    agent_id: int,
+    config_id: Optional[int] = Query(None, description="Specific configuration ID to test"),
+    session: AsyncSession = Depends(get_session),
+):
+    service = AgentLLMConfigService(session)
+    target_config: Optional[AgentLLMConfigResponse]
+    if config_id is not None:
+        target_config = await service.get_config(config_id)
+        if not target_config or target_config.agent_id != agent_id:
+            raise HTTPException(status_code=404, detail="LLM configuration not found for agent")
+    else:
+        target_config = await service.get_primary_config(agent_id)
+        if not target_config:
+            raise HTTPException(status_code=404, detail="Agent has no primary LLM configuration")
+        config_id = target_config.id
+
+    is_valid, detail = await service.validate_config(config_id)
+    return ValidateKeyResponse(
+        provider=target_config.provider,
+        model_name=target_config.model_name,
+        valid=is_valid,
+        detail=detail,
+    )
+
+
+@router.get("/{agent_id}/llm-usage", response_model=AgentLLMUsageSummary)
+async def get_agent_llm_usage(
+    agent_id: int,
+    start: Optional[datetime] = Query(None, description="Filter usage at or after this timestamp"),
+    end: Optional[datetime] = Query(None, description="Filter usage before this timestamp"),
+    limit: int = Query(100, ge=1, le=1000),
+    session: AsyncSession = Depends(get_session),
+):
+    usage_service = AgentLLMUsageService(session)
+    query = AgentLLMUsageQuery(start=start, end=end, limit=limit)
+    return await usage_service.get_usage(agent_id, query)

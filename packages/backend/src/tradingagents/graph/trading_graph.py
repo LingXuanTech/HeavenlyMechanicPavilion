@@ -1,5 +1,6 @@
 # TradingAgents/graph/trading_graph.py
 
+import logging
 import os
 from pathlib import Path
 import json
@@ -36,6 +37,8 @@ from tradingagents.agents.utils.agent_utils import (
     get_global_news
 )
 
+logger = logging.getLogger(__name__)
+
 from .conditional_logic import ConditionalLogic
 from .setup import GraphSetup
 from .propagation import Propagator
@@ -52,6 +55,7 @@ class TradingAgentsGraph:
         debug=False,
         config: Dict[str, Any] = None,
         use_plugin_system: bool = False,
+        llm_runtime: Optional[Any] = None,
     ):
         """Initialize the trading agents graph and components.
 
@@ -60,10 +64,12 @@ class TradingAgentsGraph:
             debug: Whether to run in debug mode
             config: Configuration dictionary. If None, uses default config
             use_plugin_system: Whether to use the new plugin system for agents
+            llm_runtime: Optional runtime manager for dynamic LLM resolution
         """
         self.debug = debug
         self.config = config or DEFAULT_CONFIG
         self.use_plugin_system = use_plugin_system
+        self.llm_runtime = llm_runtime
 
         # Update the interface's config
         set_config(self.config)
@@ -81,19 +87,11 @@ class TradingAgentsGraph:
             exist_ok=True,
         )
 
-        # Initialize LLMs
-        if self.config["llm_provider"].lower() == "openai" or self.config["llm_provider"] == "ollama" or self.config["llm_provider"] == "openrouter":
-            self.deep_thinking_llm = ChatOpenAI(model=self.config["deep_think_llm"], base_url=self.config["backend_url"])
-            self.quick_thinking_llm = ChatOpenAI(model=self.config["quick_think_llm"], base_url=self.config["backend_url"])
-        elif self.config["llm_provider"].lower() == "anthropic":
-            self.deep_thinking_llm = ChatAnthropic(model=self.config["deep_think_llm"], base_url=self.config["backend_url"])
-            self.quick_thinking_llm = ChatAnthropic(model=self.config["quick_think_llm"], base_url=self.config["backend_url"])
-        elif self.config["llm_provider"].lower() == "google":
-            self.deep_thinking_llm = ChatGoogleGenerativeAI(model=self.config["deep_think_llm"])
-            self.quick_thinking_llm = ChatGoogleGenerativeAI(model=self.config["quick_think_llm"])
-        else:
-            raise ValueError(f"Unsupported LLM provider: {self.config['llm_provider']}")
-        
+        # Initialize fallback LLMs for legacy and error scenarios
+        self._default_llms = self._initialize_default_llms()
+        self.quick_thinking_llm = self._default_llms.get("quick")
+        self.deep_thinking_llm = self._default_llms.get("deep")
+
         # Initialize memories
         self.bull_memory = FinancialSituationMemory("bull_memory", self.config)
         self.bear_memory = FinancialSituationMemory("bear_memory", self.config)
@@ -107,21 +105,20 @@ class TradingAgentsGraph:
         # Initialize components
         self.conditional_logic = ConditionalLogic()
         self.graph_setup = GraphSetup(
-            self.quick_thinking_llm,
-            self.deep_thinking_llm,
-            self.tool_nodes,
-            self.bull_memory,
-            self.bear_memory,
-            self.trader_memory,
-            self.invest_judge_memory,
-            self.risk_manager_memory,
-            self.conditional_logic,
+            llm_resolver=self._resolve_llm,
+            tool_nodes=self.tool_nodes,
+            bull_memory=self.bull_memory,
+            bear_memory=self.bear_memory,
+            trader_memory=self.trader_memory,
+            invest_judge_memory=self.invest_judge_memory,
+            risk_manager_memory=self.risk_manager_memory,
+            conditional_logic=self.conditional_logic,
             agent_registry=self.agent_registry if self.use_plugin_system else None,
         )
 
         self.propagator = Propagator()
-        self.reflector = Reflector(self.quick_thinking_llm)
-        self.signal_processor = SignalProcessor(self.quick_thinking_llm)
+        self.reflector = Reflector(self._resolve_llm("reflector", "quick"))
+        self.signal_processor = SignalProcessor(self._resolve_llm("signal_processor", "quick"))
 
         # State tracking
         self.curr_state = None
@@ -167,6 +164,64 @@ class TradingAgentsGraph:
                 ]
             ),
         }
+
+    def _initialize_default_llms(self) -> Dict[str, Any]:
+        """Create baseline LLM instances used when runtime configs are unavailable."""
+        defaults: Dict[str, Any] = {}
+        provider = (self.config.get("llm_provider") or "openai").lower()
+        backend_url = self.config.get("backend_url")
+        quick_model = self.config.get("quick_think_llm")
+        deep_model = self.config.get("deep_think_llm")
+
+        try:
+            if provider in {"openai", "ollama", "openrouter"}:
+                if deep_model:
+                    kwargs: Dict[str, Any] = {"model": deep_model}
+                    if backend_url:
+                        kwargs["base_url"] = backend_url
+                    defaults["deep"] = ChatOpenAI(**kwargs)
+                if quick_model:
+                    kwargs = {"model": quick_model}
+                    if backend_url:
+                        kwargs["base_url"] = backend_url
+                    defaults["quick"] = ChatOpenAI(**kwargs)
+            elif provider == "anthropic":
+                if deep_model:
+                    kwargs = {"model": deep_model}
+                    if backend_url:
+                        kwargs["base_url"] = backend_url
+                    defaults["deep"] = ChatAnthropic(**kwargs)
+                if quick_model:
+                    kwargs = {"model": quick_model}
+                    if backend_url:
+                        kwargs["base_url"] = backend_url
+                    defaults["quick"] = ChatAnthropic(**kwargs)
+            elif provider == "google":
+                if deep_model:
+                    defaults["deep"] = ChatGoogleGenerativeAI(model=deep_model)
+                if quick_model:
+                    defaults["quick"] = ChatGoogleGenerativeAI(model=quick_model)
+            else:
+                logger.warning("Unsupported LLM provider configured: %s", provider)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.error("Failed to initialize default LLMs: %s", exc)
+
+        return defaults
+
+    def _resolve_llm(self, agent_name: str, llm_type: str) -> Any:
+        """Resolve the LLM instance for a specific agent."""
+        if self.llm_runtime:
+            try:
+                managed = self.llm_runtime.get_llm(agent_name, llm_type)
+                if managed is not None:
+                    return managed
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.error("LLM runtime resolution failed for %s: %s", agent_name, exc)
+
+        fallback = self._default_llms.get(llm_type)
+        if fallback is None:
+            raise ValueError(f"No fallback LLM configured for type '{llm_type}'")
+        return fallback
 
     def propagate(self, company_name, trade_date):
         """Run the trading agents graph for a company on a specific date."""

@@ -12,6 +12,7 @@ from .models.trade import Trade  # noqa: F401
 from .models.execution import Execution  # noqa: F401
 from .models.agent_config import AgentConfig  # noqa: F401
 from .models.agent_llm_config import AgentLLMConfig  # noqa: F401
+from .models.agent_llm_usage import AgentLLMUsage  # noqa: F401
 from .models.vendor_config import VendorConfig  # noqa: F401
 from .models.run_log import RunLog  # noqa: F401
 from .models.backtest import (  # noqa: F401
@@ -29,6 +30,7 @@ __all__ = [
     "Execution",
     "AgentConfig",
     "AgentLLMConfig",
+    "AgentLLMUsage",
     "VendorConfig",
     "RunLog",
     "BacktestRun",

@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:  # pragma: no cover - import guard for type checkers
+    from .agent_llm_config import AgentLLMConfigResponse
 
 
 class AgentConfigBase(BaseModel):
@@ -91,6 +94,7 @@ class AgentConfigResponse(AgentConfigBase):
     id: int
     created_at: datetime
     updated_at: datetime
+    active_llm_config: Optional["AgentLLMConfigResponse"] = None
     
     class Config:
         from_attributes = True
@@ -101,3 +105,6 @@ class AgentConfigList(BaseModel):
     
     agents: List[AgentConfigResponse]
     total: int
+
+
+AgentConfigResponse.model_rebuild()

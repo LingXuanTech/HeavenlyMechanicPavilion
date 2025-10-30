@@ -23,6 +23,7 @@ from ..schemas.agent_llm_config import (
     AgentLLMConfigCreate,
     AgentLLMConfigResponse,
     AgentLLMConfigUpdate,
+    AgentLLMConfigUpsert,
 )
 from ..security.encryption import decrypt_api_key, encrypt_api_key
 
@@ -260,6 +261,52 @@ class AgentLLMConfigService:
         except Exception as e:
             logger.error(f"Error validating config {config_id}: {e}")
             return False, str(e)
+
+    async def upsert_primary_config(
+        self, agent_id: int, payload: AgentLLMConfigUpsert
+    ) -> AgentLLMConfigResponse:
+        """Create or update the primary LLM configuration for an agent."""
+        existing = await self.get_primary_config(agent_id)
+        data = payload.model_dump(exclude_unset=True)
+
+        provider = data.get("provider")
+        model_name = data.get("model_name")
+        if not provider or not model_name:
+            raise ValueError("provider and model_name are required for LLM configuration")
+
+        if existing:
+            update_payload = AgentLLMConfigUpdate(**data)
+            return await self.update_config(existing.id, update_payload)
+
+        create_payload = AgentLLMConfigCreate(
+            agent_id=agent_id,
+            provider=provider,
+            model_name=model_name,
+            temperature=data.get("temperature", 0.7),
+            max_tokens=data.get("max_tokens"),
+            top_p=data.get("top_p"),
+            fallback_provider=data.get("fallback_provider"),
+            fallback_model=data.get("fallback_model"),
+            enabled=data.get("enabled", True),
+            api_key=data.get("api_key"),
+            cost_per_1k_input_tokens=data.get("cost_per_1k_input_tokens", 0.0) or 0.0,
+            cost_per_1k_output_tokens=data.get("cost_per_1k_output_tokens", 0.0) or 0.0,
+            metadata=data.get("metadata"),
+        )
+        return await self.create_config(create_payload)
+
+    async def bulk_assign_config(
+        self, agent_ids: List[int], payload: AgentLLMConfigUpsert
+    ) -> List[AgentLLMConfigResponse]:
+        """Bulk assign or update LLM configurations for multiple agents."""
+        results: List[AgentLLMConfigResponse] = []
+        for agent_id in agent_ids:
+            try:
+                result = await self.upsert_primary_config(agent_id, payload)
+                results.append(result)
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.error("Failed to assign LLM config to agent %s: %s", agent_id, exc)
+        return results
 
     async def _get_api_key(self, config: AgentLLMConfig) -> Optional[str]:
         """Get API key for a configuration.
