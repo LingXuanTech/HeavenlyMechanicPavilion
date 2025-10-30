@@ -103,5 +103,20 @@ export const api = {
     deactivate: (agentId: number) =>
       fetchAPI<any>(`/api/agents/${agentId}/deactivate`, { method: "POST" }),
     reload: () => fetchAPI<any>("/api/agents/reload", { method: "POST" }),
+    getLLMConfig: (agentId: number) =>
+      fetchAPI<any>(`/api/agents/${agentId}/llm-config`),
+    updateLLMConfig: (agentId: number, config: any) =>
+      fetchAPI<any>(`/api/agents/${agentId}/llm-config`, {
+        method: "PUT",
+        body: JSON.stringify(config),
+      }),
+    listLLMConfigs: (params?: { skip?: number; limit?: number }) => {
+      const queryParams = new URLSearchParams();
+      if (params?.skip !== undefined) queryParams.append("skip", String(params.skip));
+      if (params?.limit !== undefined) queryParams.append("limit", String(params.limit));
+      
+      const query = queryParams.toString();
+      return fetchAPI<any>(`/api/agents/llm-configs${query ? `?${query}` : ""}`);
+    },
   },
 };
