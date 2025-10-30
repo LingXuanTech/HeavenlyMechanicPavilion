@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,13 +17,8 @@ from ..schemas.agent_config import (
     AgentConfigResponse,
     AgentConfigUpdate,
 )
-from ..schemas.agent_llm_config import (
-    AgentLLMConfigResponse,
-    AgentLLMConfigUpsert,
-    BulkAgentLLMConfigRequest,
-)
+from ..schemas.agent_llm_config import AgentLLMConfigResponse
 from ..schemas.agent_llm_usage import AgentLLMUsageQuery, AgentLLMUsageSummary
-from ..schemas.llm_provider import ValidateKeyResponse
 from ..services.agent_config import AgentConfigService
 from ..services.agent_llm_config import AgentLLMConfigService
 from ..services.agent_llm_usage import AgentLLMUsageService
@@ -238,69 +233,6 @@ async def reload_agent_registry(
     await service._trigger_hot_reload()
     return {"message": "Agent registry reloaded successfully"}
 
-
-# ---------------------------------------------------------------------------
-# Agent LLM configuration endpoints
-# ---------------------------------------------------------------------------
-
-
-@router.get("/{agent_id}/llm-config", response_model=List[AgentLLMConfigResponse])
-async def list_agent_llm_configs(
-    agent_id: int,
-    enabled_only: bool = Query(False, description="Return only enabled configs"),
-    session: AsyncSession = Depends(get_session),
-):
-    service = AgentLLMConfigService(session)
-    configs = await service.get_configs_by_agent(agent_id, enabled_only=enabled_only)
-    return configs
-
-
-@router.put("/{agent_id}/llm-config", response_model=AgentLLMConfigResponse)
-async def upsert_agent_llm_config(
-    agent_id: int,
-    config: AgentLLMConfigUpsert,
-    session: AsyncSession = Depends(get_session),
-):
-    service = AgentLLMConfigService(session)
-    return await service.upsert_primary_config(agent_id, config)
-
-
-@router.post("/bulk-llm-config", response_model=List[AgentLLMConfigResponse])
-async def bulk_assign_llm_configs(
-    request: BulkAgentLLMConfigRequest,
-    session: AsyncSession = Depends(get_session),
-):
-    service = AgentLLMConfigService(session)
-    if not request.agent_ids:
-        raise HTTPException(status_code=400, detail="agent_ids cannot be empty")
-    return await service.bulk_assign_config(request.agent_ids, request.config)
-
-
-@router.post("/{agent_id}/test-llm", response_model=ValidateKeyResponse)
-async def test_agent_llm_configuration(
-    agent_id: int,
-    config_id: Optional[int] = Query(None, description="Specific configuration ID to test"),
-    session: AsyncSession = Depends(get_session),
-):
-    service = AgentLLMConfigService(session)
-    target_config: Optional[AgentLLMConfigResponse]
-    if config_id is not None:
-        target_config = await service.get_config(config_id)
-        if not target_config or target_config.agent_id != agent_id:
-            raise HTTPException(status_code=404, detail="LLM configuration not found for agent")
-    else:
-        target_config = await service.get_primary_config(agent_id)
-        if not target_config:
-            raise HTTPException(status_code=404, detail="Agent has no primary LLM configuration")
-        config_id = target_config.id
-
-    is_valid, detail = await service.validate_config(config_id)
-    return ValidateKeyResponse(
-        provider=target_config.provider,
-        model_name=target_config.model_name,
-        valid=is_valid,
-        detail=detail,
-    )
 
 
 @router.get("/{agent_id}/llm-usage", response_model=AgentLLMUsageSummary)
