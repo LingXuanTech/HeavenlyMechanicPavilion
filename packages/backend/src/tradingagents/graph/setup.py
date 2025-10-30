@@ -13,6 +13,7 @@ from tradingagents.agents import (
     create_msg_delete,
     create_neutral_debator,
     create_news_analyst,
+    create_research_manager,
     create_risk_manager,
     create_risky_debator,
     create_safe_debator,
