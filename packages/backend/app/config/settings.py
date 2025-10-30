@@ -17,6 +17,15 @@ class Settings(BaseSettings):
     quick_think_llm: Optional[str] = Field(default=None, alias="TRADINGAGENTS_QUICK_THINK_LLM")
     results_dir: Optional[str] = Field(default=None, alias="TRADINGAGENTS_RESULTS_DIR")
 
+    # LLM Provider API Keys
+    openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
+    deepseek_api_key: Optional[str] = Field(default=None, alias="DEEPSEEK_API_KEY")
+    grok_api_key: Optional[str] = Field(default=None, alias="GROK_API_KEY")
+    anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
+
+    # Encryption key for sensitive data
+    encryption_key: Optional[str] = Field(default=None, alias="ENCRYPTION_KEY")
+
     # Database configuration
     database_url: str = Field(
         default="sqlite+aiosqlite:///./tradingagents.db",
