@@ -1,11 +1,24 @@
 # TradingAgents/graph/setup.py
 
-from typing import Dict, Any
-from langchain_openai import ChatOpenAI
+from typing import Any, Callable, Dict
+
 from langgraph.graph import END, StateGraph, START
 from langgraph.prebuilt import ToolNode
 
-from tradingagents.agents import *
+from tradingagents.agents import (
+    create_bear_researcher,
+    create_bull_researcher,
+    create_fundamentals_analyst,
+    create_market_analyst,
+    create_msg_delete,
+    create_neutral_debator,
+    create_news_analyst,
+    create_risk_manager,
+    create_risky_debator,
+    create_safe_debator,
+    create_social_media_analyst,
+    create_trader,
+)
 from tradingagents.agents.utils.agent_states import AgentState
 
 from .conditional_logic import ConditionalLogic
@@ -16,8 +29,8 @@ class GraphSetup:
 
     def __init__(
         self,
-        quick_thinking_llm: ChatOpenAI,
-        deep_thinking_llm: ChatOpenAI,
+        *,
+        llm_resolver: Callable[[str, str], Any],
         tool_nodes: Dict[str, ToolNode],
         bull_memory,
         bear_memory,
@@ -26,23 +39,9 @@ class GraphSetup:
         risk_manager_memory,
         conditional_logic: ConditionalLogic,
         agent_registry=None,
-    ):
-        """Initialize with required components.
-        
-        Args:
-            quick_thinking_llm: LLM for quick thinking agents
-            deep_thinking_llm: LLM for deep thinking agents
-            tool_nodes: Dictionary of tool nodes
-            bull_memory: Memory for bull researcher
-            bear_memory: Memory for bear researcher
-            trader_memory: Memory for trader
-            invest_judge_memory: Memory for research manager
-            risk_manager_memory: Memory for risk manager
-            conditional_logic: Conditional logic handler
-            agent_registry: Optional agent plugin registry for plugin-based construction
-        """
-        self.quick_thinking_llm = quick_thinking_llm
-        self.deep_thinking_llm = deep_thinking_llm
+    ) -> None:
+        """Initialize with required components."""
+        self._llm_resolver = llm_resolver
         self.tool_nodes = tool_nodes
         self.bull_memory = bull_memory
         self.bear_memory = bear_memory
@@ -52,78 +51,58 @@ class GraphSetup:
         self.conditional_logic = conditional_logic
         self.agent_registry = agent_registry
 
+    def _resolve(self, agent_name: str, llm_type: str) -> Any:
+        return self._llm_resolver(agent_name, llm_type)
+
     def setup_graph(
         self, selected_analysts=["market", "social", "news", "fundamentals"]
     ):
-        """Set up and compile the agent workflow graph.
-
-        Args:
-            selected_analysts (list): List of analyst types to include. Options are:
-                - "market": Market analyst
-                - "social": Social media analyst
-                - "news": News analyst
-                - "fundamentals": Fundamentals analyst
-        """
+        """Set up and compile the agent workflow graph."""
         if len(selected_analysts) == 0:
             raise ValueError("Trading Agents Graph Setup Error: no analysts selected!")
 
-        # Create analyst nodes
-        analyst_nodes = {}
-        delete_nodes = {}
-        tool_nodes = {}
+        analyst_specs = {
+            "market": ("market_analyst", create_market_analyst, "market"),
+            "social": ("social_analyst", create_social_media_analyst, "social"),
+            "news": ("news_analyst", create_news_analyst, "news"),
+            "fundamentals": ("fundamentals_analyst", create_fundamentals_analyst, "fundamentals"),
+        }
 
-        if "market" in selected_analysts:
-            analyst_nodes["market"] = create_market_analyst(
-                self.quick_thinking_llm
-            )
-            delete_nodes["market"] = create_msg_delete()
-            tool_nodes["market"] = self.tool_nodes["market"]
+        analyst_nodes: Dict[str, Any] = {}
+        delete_nodes: Dict[str, Any] = {}
+        tool_nodes: Dict[str, ToolNode] = {}
 
-        if "social" in selected_analysts:
-            analyst_nodes["social"] = create_social_media_analyst(
-                self.quick_thinking_llm
-            )
-            delete_nodes["social"] = create_msg_delete()
-            tool_nodes["social"] = self.tool_nodes["social"]
+        for analyst_key in selected_analysts:
+            if analyst_key not in analyst_specs:
+                continue
+            agent_name, factory, tool_key = analyst_specs[analyst_key]
+            analyst_llm = self._resolve(agent_name, "quick")
+            analyst_nodes[analyst_key] = factory(analyst_llm)
+            delete_nodes[analyst_key] = create_msg_delete()
+            tool_nodes[analyst_key] = self.tool_nodes[tool_key]
 
-        if "news" in selected_analysts:
-            analyst_nodes["news"] = create_news_analyst(
-                self.quick_thinking_llm
-            )
-            delete_nodes["news"] = create_msg_delete()
-            tool_nodes["news"] = self.tool_nodes["news"]
-
-        if "fundamentals" in selected_analysts:
-            analyst_nodes["fundamentals"] = create_fundamentals_analyst(
-                self.quick_thinking_llm
-            )
-            delete_nodes["fundamentals"] = create_msg_delete()
-            tool_nodes["fundamentals"] = self.tool_nodes["fundamentals"]
-
-        # Create researcher and manager nodes
         bull_researcher_node = create_bull_researcher(
-            self.quick_thinking_llm, self.bull_memory
+            self._resolve("bull_researcher", "quick"), self.bull_memory
         )
         bear_researcher_node = create_bear_researcher(
-            self.quick_thinking_llm, self.bear_memory
+            self._resolve("bear_researcher", "quick"), self.bear_memory
         )
         research_manager_node = create_research_manager(
-            self.deep_thinking_llm, self.invest_judge_memory
+            self._resolve("research_manager", "deep"), self.invest_judge_memory
         )
-        trader_node = create_trader(self.quick_thinking_llm, self.trader_memory)
+        trader_node = create_trader(
+            self._resolve("trader", "quick"), self.trader_memory
+        )
 
-        # Create risk analysis nodes
-        risky_analyst = create_risky_debator(self.quick_thinking_llm)
-        neutral_analyst = create_neutral_debator(self.quick_thinking_llm)
-        safe_analyst = create_safe_debator(self.quick_thinking_llm)
+        risky_analyst = create_risky_debator(self._resolve("risky_analyst", "quick"))
+        neutral_analyst = create_neutral_debator(self._resolve("neutral_analyst", "quick"))
+        safe_analyst = create_safe_debator(self._resolve("safe_analyst", "quick"))
         risk_manager_node = create_risk_manager(
-            self.deep_thinking_llm, self.risk_manager_memory
+            self._resolve("risk_manager", "deep"), self.risk_manager_memory
         )
 
-        # Create workflow
         workflow = StateGraph(AgentState)
 
-        # Add analyst nodes to the graph
         for analyst_type, node in analyst_nodes.items():
             workflow.add_node(f"{analyst_type.capitalize()} Analyst", node)
             workflow.add_node(
@@ -131,7 +110,6 @@ class GraphSetup:
             )
             workflow.add_node(f"tools_{analyst_type}", tool_nodes[analyst_type])
 
-        # Add other nodes
         workflow.add_node("Bull Researcher", bull_researcher_node)
         workflow.add_node("Bear Researcher", bear_researcher_node)
         workflow.add_node("Research Manager", research_manager_node)
@@ -141,18 +119,14 @@ class GraphSetup:
         workflow.add_node("Safe Analyst", safe_analyst)
         workflow.add_node("Risk Judge", risk_manager_node)
 
-        # Define edges
-        # Start with the first analyst
         first_analyst = selected_analysts[0]
         workflow.add_edge(START, f"{first_analyst.capitalize()} Analyst")
 
-        # Connect analysts in sequence
         for i, analyst_type in enumerate(selected_analysts):
             current_analyst = f"{analyst_type.capitalize()} Analyst"
             current_tools = f"tools_{analyst_type}"
             current_clear = f"Msg Clear {analyst_type.capitalize()}"
 
-            # Add conditional edges for current analyst
             workflow.add_conditional_edges(
                 current_analyst,
                 getattr(self.conditional_logic, f"should_continue_{analyst_type}"),
@@ -160,14 +134,12 @@ class GraphSetup:
             )
             workflow.add_edge(current_tools, current_analyst)
 
-            # Connect to next analyst or to Bull Researcher if this is the last analyst
             if i < len(selected_analysts) - 1:
-                next_analyst = f"{selected_analysts[i+1].capitalize()} Analyst"
+                next_analyst = f"{selected_analysts[i + 1].capitalize()} Analyst"
                 workflow.add_edge(current_clear, next_analyst)
             else:
                 workflow.add_edge(current_clear, "Bull Researcher")
 
-        # Add remaining edges
         workflow.add_conditional_edges(
             "Bull Researcher",
             self.conditional_logic.should_continue_debate,
@@ -213,5 +185,4 @@ class GraphSetup:
 
         workflow.add_edge("Risk Judge", END)
 
-        # Compile and return
         return workflow.compile()

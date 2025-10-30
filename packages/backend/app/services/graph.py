@@ -14,6 +14,7 @@ from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 
 from .events import SessionEventManager
+from .llm_runtime import AgentLLMRuntime
 
 DEFAULT_ANALYSTS = ["market", "social", "news", "fundamentals"]
 
@@ -34,6 +35,9 @@ class TradingGraphService:
             self._base_config.update(config_overrides)
         self._executor = ThreadPoolExecutor(max_workers=max_workers)
         self._tasks: Dict[str, Future] = {}
+        self._llm_runtime = AgentLLMRuntime(self._base_config)
+        # Preload configuration to reduce latency on first invocation
+        self._llm_runtime.refresh_if_needed(force=True)
 
     # ------------------------------------------------------------------
     # Health & configuration helpers
@@ -46,6 +50,7 @@ class TradingGraphService:
             "llm_provider": self._base_config.get("llm_provider"),
             "deep_think_llm": self._base_config.get("deep_think_llm"),
             "quick_think_llm": self._base_config.get("quick_think_llm"),
+            "runtime_providers": self._llm_runtime.provider_status(),
         }
         return {"status": status, "details": details}
 
@@ -83,9 +88,13 @@ class TradingGraphService:
                 },
             )
 
+            # Ensure the runtime picks up any new configuration before execution
+            self._llm_runtime.refresh_if_needed()
+
             graph = TradingAgentsGraph(
                 selected_analysts=analysts,
                 config=deepcopy(self._base_config),
+                llm_runtime=self._llm_runtime,
             )
 
             try:
