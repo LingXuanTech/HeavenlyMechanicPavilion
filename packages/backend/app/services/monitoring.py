@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from prometheus_client import (
+    CONTENT_TYPE_LATEST,
     Counter,
     Gauge,
     Histogram,
     generate_latest,
-    CONTENT_TYPE_LATEST,
 )
 
 from ..cache import get_redis_manager
@@ -88,7 +87,7 @@ class MonitoringService:
 
     async def get_health_status(self) -> Dict[str, Any]:
         """Get comprehensive health status of all services.
-        
+
         Returns:
             Dictionary containing health status for all services
         """
@@ -99,12 +98,12 @@ class MonitoringService:
 
         # Determine overall status
         all_critical_healthy = db_health["status"] == "healthy"
-        
+
         if redis_health.get("enabled", False):
             all_critical_healthy = all_critical_healthy and redis_health["status"] == "healthy"
-        
+
         overall_status = "healthy" if all_critical_healthy else "degraded"
-        
+
         # Check for errors
         if db_health["status"] == "error":
             overall_status = "error"
@@ -123,7 +122,7 @@ class MonitoringService:
 
     async def _check_database_health(self) -> Dict[str, Any]:
         """Check database health and latency.
-        
+
         Returns:
             Dictionary with database health information
         """
@@ -136,15 +135,16 @@ class MonitoringService:
                 }
 
             start_time = time.time()
-            
+
             # Simple health check query
             from sqlalchemy import text
+
             async for session in db_manager.get_session():
                 await session.execute(text("SELECT 1"))
                 break
-            
+
             latency_ms = (time.time() - start_time) * 1000
-            
+
             # Record metric
             DB_LATENCY.labels(operation="health_check").observe(latency_ms / 1000)
             SERVICE_UP.labels(service="database").set(1)
@@ -167,12 +167,12 @@ class MonitoringService:
 
     async def _check_redis_health(self) -> Dict[str, Any]:
         """Check Redis health and latency.
-        
+
         Returns:
             Dictionary with Redis health information
         """
         redis_manager = get_redis_manager()
-        
+
         if not redis_manager:
             return {
                 "status": "not_configured",
@@ -188,7 +188,7 @@ class MonitoringService:
             if is_up:
                 # Get Redis info
                 info = await redis_manager.client.info()
-                
+
                 # Record metric
                 REDIS_LATENCY.labels(operation="ping").observe(latency_ms / 1000)
                 SERVICE_UP.labels(service="redis").set(1)
@@ -222,30 +222,30 @@ class MonitoringService:
 
     async def _check_vendor_health(self) -> Dict[str, Any]:
         """Check vendor plugin availability and error rates.
-        
+
         Returns:
             Dictionary with vendor health information
         """
         try:
             from tradingagents.plugins import get_registry
-            
+
             registry = get_registry()
             plugins = registry.list_plugins()
-            
+
             vendor_statuses = {}
             total_vendors = len(plugins)
             healthy_vendors = 0
-            
+
             for plugin in plugins:
                 vendor_name = plugin.name
-                
+
                 # Get stats from internal tracking
                 stats = self._vendor_stats.get(vendor_name, {})
-                
+
                 total_requests = stats.get("total_requests", 0)
                 total_errors = stats.get("total_errors", 0)
                 error_rate = (total_errors / total_requests * 100) if total_requests > 0 else 0
-                
+
                 status = "healthy"
                 if error_rate > 50:
                     status = "error"
@@ -253,7 +253,7 @@ class MonitoringService:
                     status = "degraded"
                 else:
                     healthy_vendors += 1
-                
+
                 vendor_statuses[vendor_name] = {
                     "status": status,
                     "provider": plugin.provider,
@@ -262,15 +262,15 @@ class MonitoringService:
                     "error_rate_percent": round(error_rate, 2),
                     "rate_limits": plugin.get_rate_limits(),
                 }
-            
+
             overall_status = "healthy"
             if healthy_vendors < total_vendors * 0.5:
                 overall_status = "degraded"
             elif healthy_vendors == 0 and total_vendors > 0:
                 overall_status = "error"
-            
+
             SERVICE_UP.labels(service="vendors").set(1 if overall_status != "error" else 0)
-            
+
             return {
                 "status": overall_status,
                 "total_vendors": total_vendors,
@@ -287,48 +287,48 @@ class MonitoringService:
 
     async def _check_worker_health(self) -> Dict[str, Any]:
         """Check background worker health and queue status.
-        
+
         Returns:
             Dictionary with worker health information
         """
         try:
             from ..workers import get_worker_manager
-            
+
             worker_manager = get_worker_manager()
-            
+
             if not worker_manager:
                 return {
                     "status": "not_configured",
                     "message": "Workers not initialized",
                 }
-            
+
             worker_statuses = {}
             total_workers = 0
             running_workers = 0
-            
+
             for worker_name, worker in worker_manager._workers.items():
                 total_workers += 1
                 is_running = worker.is_running()
-                
+
                 if is_running:
                     running_workers += 1
-                
+
                 worker_statuses[worker_name] = {
                     "status": "running" if is_running else "stopped",
                     "tasks_processed": getattr(worker, "_tasks_processed", 0),
                     "current_tasks": getattr(worker, "_current_tasks", 0),
                 }
-                
+
                 # Update Prometheus metrics
                 if is_running:
                     WORKER_TASKS.labels(worker_type=worker_name).set(
                         getattr(worker, "_current_tasks", 0)
                     )
-            
+
             overall_status = "healthy" if running_workers == total_workers else "degraded"
-            
+
             SERVICE_UP.labels(service="workers").set(1 if running_workers > 0 else 0)
-            
+
             return {
                 "status": overall_status,
                 "total_workers": total_workers,
@@ -345,12 +345,12 @@ class MonitoringService:
 
     async def get_queue_metrics(self) -> Dict[str, Any]:
         """Get queue backlog metrics.
-        
+
         Returns:
             Dictionary with queue metrics
         """
         redis_manager = get_redis_manager()
-        
+
         if not redis_manager:
             return {
                 "status": "not_available",
@@ -359,26 +359,26 @@ class MonitoringService:
 
         try:
             queues = {}
-            
+
             # Check common queue patterns
             queue_patterns = [
                 "queue:data_fetch:*",
                 "queue:analysis:*",
                 "queue:trading:*",
             ]
-            
+
             for pattern in queue_patterns:
                 keys = await redis_manager.client.keys(pattern)
                 for key in keys:
                     queue_name = key.replace("queue:", "")
                     size = await redis_manager.client.llen(key)
                     queues[queue_name] = size
-                    
+
                     # Update Prometheus metric
                     QUEUE_SIZE.labels(queue_name=queue_name).set(size)
-            
+
             total_items = sum(queues.values())
-            
+
             return {
                 "status": "ok",
                 "total_items": total_items,
@@ -392,9 +392,11 @@ class MonitoringService:
                 "message": str(e),
             }
 
-    def record_vendor_request(self, vendor_name: str, success: bool, error_type: Optional[str] = None):
+    def record_vendor_request(
+        self, vendor_name: str, success: bool, error_type: Optional[str] = None
+    ):
         """Record a vendor API request for metrics.
-        
+
         Args:
             vendor_name: Name of the vendor
             success: Whether the request was successful
@@ -405,12 +407,12 @@ class MonitoringService:
                 "total_requests": 0,
                 "total_errors": 0,
             }
-        
+
         self._vendor_stats[vendor_name]["total_requests"] += 1
-        
+
         status = "success" if success else "error"
         VENDOR_REQUESTS.labels(vendor=vendor_name, status=status).inc()
-        
+
         if not success:
             self._vendor_stats[vendor_name]["total_errors"] += 1
             if error_type:
@@ -418,10 +420,8 @@ class MonitoringService:
 
     def get_prometheus_metrics(self) -> tuple[bytes, str]:
         """Get Prometheus-formatted metrics.
-        
+
         Returns:
             Tuple of (metrics_bytes, content_type)
         """
         return generate_latest(), CONTENT_TYPE_LATEST
-
-

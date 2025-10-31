@@ -24,14 +24,14 @@ router = APIRouter()
 
 def get_config_service(
     redis: Optional[RedisManager] = Depends(get_redis_manager),
-    settings = Depends(get_settings),
+    settings=Depends(get_settings),
 ) -> StreamingConfigService:
     """Get streaming config service dependency.
-    
+
     Args:
         redis: Redis manager
         settings: Application settings
-        
+
     Returns:
         StreamingConfigService instance
     """
@@ -161,7 +161,7 @@ async def get_worker_status(worker_id: str):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Worker manager not initialized",
         )
-    
+
     status_info = manager.get_worker_status(worker_id)
     if not status_info:
         raise HTTPException(
@@ -180,7 +180,7 @@ async def start_worker(worker_id: str):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Worker manager not initialized",
         )
-    
+
     if not manager.start_worker(worker_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -197,7 +197,7 @@ async def stop_worker(worker_id: str):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Worker manager not initialized",
         )
-    
+
     if not await manager.stop_worker(worker_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -235,16 +235,16 @@ async def get_telemetry(
     data_type: DataType,
     limit: int = 100,
     redis: Optional[RedisManager] = Depends(get_redis_manager),
-    settings = Depends(get_settings),
+    settings=Depends(get_settings),
 ):
     """Get telemetry records for a data type.
-    
+
     Args:
         data_type: Data type to get telemetry for
         limit: Maximum number of records to return
         redis: Redis manager
         settings: Application settings
-        
+
     Returns:
         List of telemetry records
     """
@@ -253,11 +253,12 @@ async def get_telemetry(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Redis is required for telemetry",
         )
-    
+
     telemetry_key = f"telemetry:{data_type.value}"
     records = await redis.client.lrange(telemetry_key, 0, limit - 1)
-    
+
     import json
+
     telemetry_records = []
     for record in records:
         try:
@@ -265,5 +266,5 @@ async def get_telemetry(
             telemetry_records.append(TelemetryRecord(**data))
         except Exception:
             continue
-    
+
     return telemetry_records

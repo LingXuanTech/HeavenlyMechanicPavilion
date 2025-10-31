@@ -21,12 +21,12 @@ class TradeRepository(BaseRepository[Trade]):
         self, portfolio_id: int, *, skip: int = 0, limit: int = 100
     ) -> List[Trade]:
         """Get all trades for a portfolio.
-        
+
         Args:
             portfolio_id: The portfolio ID
             skip: Number of records to skip
             limit: Maximum number of records to return
-            
+
         Returns:
             List of trades
         """
@@ -40,16 +40,14 @@ class TradeRepository(BaseRepository[Trade]):
         result = await self.session.execute(statement)
         return list(result.scalars().all())
 
-    async def get_by_status(
-        self, status: str, *, skip: int = 0, limit: int = 100
-    ) -> List[Trade]:
+    async def get_by_status(self, status: str, *, skip: int = 0, limit: int = 100) -> List[Trade]:
         """Get trades by status.
-        
+
         Args:
             status: The trade status
             skip: Number of records to skip
             limit: Maximum number of records to return
-            
+
         Returns:
             List of trades
         """

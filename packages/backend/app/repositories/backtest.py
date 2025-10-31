@@ -29,10 +29,7 @@ class BacktestRunRepository(BaseRepository[BacktestRun]):
 
     async def list_recent(self, *, skip: int = 0, limit: int = 100) -> List[BacktestRun]:
         statement = (
-            select(BacktestRun)
-            .order_by(BacktestRun.created_at.desc())
-            .offset(skip)
-            .limit(limit)
+            select(BacktestRun).order_by(BacktestRun.created_at.desc()).offset(skip).limit(limit)
         )
         result = await self.session.execute(statement)
         return list(result.scalars().all())
@@ -121,7 +118,9 @@ class BacktestArtifactRepository(BaseRepository[BacktestArtifact]):
         return list(result.scalars().all())
 
     async def delete_for_run(self, run_id: int) -> None:
-        await self.session.execute(delete(BacktestArtifact).where(BacktestArtifact.run_id == run_id))
+        await self.session.execute(
+            delete(BacktestArtifact).where(BacktestArtifact.run_id == run_id)
+        )
         await self.session.commit()
 
     async def create_many(self, artifacts: Iterable[BacktestArtifact]) -> None:

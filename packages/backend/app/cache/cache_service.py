@@ -12,22 +12,20 @@ class CacheService:
 
     def __init__(self, redis_manager: RedisManager):
         """Initialize the cache service.
-        
+
         Args:
             redis_manager: The Redis manager instance
         """
         self.redis = redis_manager
 
     # Market data cache
-    async def get_market_data(
-        self, symbol: str, date: str
-    ) -> Optional[dict[str, Any]]:
+    async def get_market_data(self, symbol: str, date: str) -> Optional[dict[str, Any]]:
         """Get cached market data for a symbol and date.
-        
+
         Args:
             symbol: Stock symbol
             date: Date string
-            
+
         Returns:
             Market data dict or None if not cached
         """
@@ -42,13 +40,13 @@ class CacheService:
         expire: int = 3600,
     ) -> bool:
         """Cache market data for a symbol and date.
-        
+
         Args:
             symbol: Stock symbol
             date: Date string
             data: Market data to cache
             expire: Expiration time in seconds (default: 1 hour)
-            
+
         Returns:
             True if successful
         """
@@ -58,10 +56,10 @@ class CacheService:
     # Session cache
     async def get_session_data(self, session_id: str) -> Optional[dict[str, Any]]:
         """Get cached session data.
-        
+
         Args:
             session_id: Session ID
-            
+
         Returns:
             Session data dict or None if not cached
         """
@@ -75,12 +73,12 @@ class CacheService:
         expire: int = 86400,
     ) -> bool:
         """Cache session data.
-        
+
         Args:
             session_id: Session ID
             data: Session data to cache
             expire: Expiration time in seconds (default: 24 hours)
-            
+
         Returns:
             True if successful
         """
@@ -89,10 +87,10 @@ class CacheService:
 
     async def delete_session_data(self, session_id: str) -> bool:
         """Delete cached session data.
-        
+
         Args:
             session_id: Session ID
-            
+
         Returns:
             True if deleted
         """
@@ -102,10 +100,10 @@ class CacheService:
     # Agent config cache
     async def get_agent_config(self, config_name: str) -> Optional[dict[str, Any]]:
         """Get cached agent configuration.
-        
+
         Args:
             config_name: Configuration name
-            
+
         Returns:
             Config dict or None if not cached
         """
@@ -119,12 +117,12 @@ class CacheService:
         expire: int = 7200,
     ) -> bool:
         """Cache agent configuration.
-        
+
         Args:
             config_name: Configuration name
             config: Configuration data to cache
             expire: Expiration time in seconds (default: 2 hours)
-            
+
         Returns:
             True if successful
         """
@@ -134,10 +132,10 @@ class CacheService:
     # Generic cache operations
     async def get_cached(self, key: str) -> Optional[Any]:
         """Get a generic cached value.
-        
+
         Args:
             key: Cache key
-            
+
         Returns:
             Cached value or None
         """
@@ -150,12 +148,12 @@ class CacheService:
         expire: Optional[int] = None,
     ) -> bool:
         """Cache a generic value.
-        
+
         Args:
             key: Cache key
             value: Value to cache
             expire: Expiration time in seconds
-            
+
         Returns:
             True if successful
         """
@@ -163,10 +161,10 @@ class CacheService:
 
     async def invalidate(self, key: str) -> bool:
         """Invalidate (delete) a cached value.
-        
+
         Args:
             key: Cache key
-            
+
         Returns:
             True if deleted
         """

@@ -2,7 +2,7 @@
 
 from typing import Any, Callable, Dict
 
-from langgraph.graph import END, StateGraph, START
+from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 
 from tradingagents.agents import (
@@ -55,9 +55,7 @@ class GraphSetup:
     def _resolve(self, agent_name: str, llm_type: str) -> Any:
         return self._llm_resolver(agent_name, llm_type)
 
-    def setup_graph(
-        self, selected_analysts=["market", "social", "news", "fundamentals"]
-    ):
+    def setup_graph(self, selected_analysts=["market", "social", "news", "fundamentals"]):
         """Set up and compile the agent workflow graph."""
         if len(selected_analysts) == 0:
             raise ValueError("Trading Agents Graph Setup Error: no analysts selected!")
@@ -91,9 +89,7 @@ class GraphSetup:
         research_manager_node = create_research_manager(
             self._resolve("research_manager", "deep"), self.invest_judge_memory
         )
-        trader_node = create_trader(
-            self._resolve("trader", "quick"), self.trader_memory
-        )
+        trader_node = create_trader(self._resolve("trader", "quick"), self.trader_memory)
 
         risky_analyst = create_risky_debator(self._resolve("risky_analyst", "quick"))
         neutral_analyst = create_neutral_debator(self._resolve("neutral_analyst", "quick"))
@@ -106,9 +102,7 @@ class GraphSetup:
 
         for analyst_type, node in analyst_nodes.items():
             workflow.add_node(f"{analyst_type.capitalize()} Analyst", node)
-            workflow.add_node(
-                f"Msg Clear {analyst_type.capitalize()}", delete_nodes[analyst_type]
-            )
+            workflow.add_node(f"Msg Clear {analyst_type.capitalize()}", delete_nodes[analyst_type])
             workflow.add_node(f"tools_{analyst_type}", tool_nodes[analyst_type])
 
         workflow.add_node("Bull Researcher", bull_researcher_node)

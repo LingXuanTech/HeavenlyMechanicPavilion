@@ -8,7 +8,7 @@ import os
 from typing import Any
 
 try:  # pragma: no cover - handled in __init__
-    from anthropic import Anthropic, AsyncAnthropic, APIError, APIStatusError, RateLimitError
+    from anthropic import Anthropic, APIError, APIStatusError, AsyncAnthropic, RateLimitError
 except ImportError as exc:  # pragma: no cover - handled in __init__
     Anthropic = AsyncAnthropic = None  # type: ignore[assignment]
 
@@ -182,7 +182,9 @@ class ClaudeProvider:
                     exc,
                 )
                 if attempt == retry_count - 1:
-                    raise ClaudeRateLimitExceededError(f"Claude rate limit exceeded: {exc}") from exc
+                    raise ClaudeRateLimitExceededError(
+                        f"Claude rate limit exceeded: {exc}"
+                    ) from exc
                 await asyncio.sleep(retry_delay)
                 retry_delay *= 2
             except (APIStatusError, APIError) as exc:  # type: ignore[misc]
@@ -229,12 +231,10 @@ class ClaudeProvider:
         return self.SUPPORTED_MODELS.get(self.model_name)
 
     def __repr__(self) -> str:  # pragma: no cover - trivial representation
-        return (
-            "ClaudeProvider(model={model}, temperature={temp}, max_tokens={tokens})".format(
-                model=self.model_name,
-                temp=self.temperature,
-                tokens=self.max_tokens,
-            )
+        return "ClaudeProvider(model={model}, temperature={temp}, max_tokens={tokens})".format(
+            model=self.model_name,
+            temp=self.temperature,
+            tokens=self.max_tokens,
         )
 
     def _validate_max_tokens(self, value: int | None) -> int:
@@ -270,9 +270,7 @@ class ClaudeProvider:
             content = message.get("content", "")
 
             if role == "system":
-                system_prompt = (
-                    f"{system_prompt}\n{content}" if system_prompt else str(content)
-                )
+                system_prompt = f"{system_prompt}\n{content}" if system_prompt else str(content)
                 continue
 
             if role not in {"user", "assistant"}:
@@ -361,7 +359,9 @@ class ClaudeProvider:
         if isinstance(usage, dict):
             value = usage.get("output_tokens") or usage.get("completion_tokens")
         else:
-            value = getattr(usage, "output_tokens", None) or getattr(usage, "completion_tokens", None)
+            value = getattr(usage, "output_tokens", None) or getattr(
+                usage, "completion_tokens", None
+            )
         return int(value) if value is not None else default
 
     def _extract_total_tokens(self, usage: Any) -> int | None:

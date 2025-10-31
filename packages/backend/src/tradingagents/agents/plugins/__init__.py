@@ -1,18 +1,17 @@
 """Built-in agent plugin implementations."""
 
-from .market_analyst_plugin import MarketAnalystPlugin
-from .social_analyst_plugin import SocialAnalystPlugin
-from .news_analyst_plugin import NewsAnalystPlugin
-from .fundamentals_analyst_plugin import FundamentalsAnalystPlugin
-from .bull_researcher_plugin import BullResearcherPlugin
 from .bear_researcher_plugin import BearResearcherPlugin
+from .bull_researcher_plugin import BullResearcherPlugin
+from .fundamentals_analyst_plugin import FundamentalsAnalystPlugin
+from .market_analyst_plugin import MarketAnalystPlugin
+from .neutral_analyst_plugin import NeutralAnalystPlugin
+from .news_analyst_plugin import NewsAnalystPlugin
 from .research_manager_plugin import ResearchManagerPlugin
-from .trader_plugin import TraderPlugin
+from .risk_manager_plugin import RiskManagerPlugin
 from .risky_analyst_plugin import RiskyAnalystPlugin
 from .safe_analyst_plugin import SafeAnalystPlugin
-from .neutral_analyst_plugin import NeutralAnalystPlugin
-from .risk_manager_plugin import RiskManagerPlugin
-
+from .social_analyst_plugin import SocialAnalystPlugin
+from .trader_plugin import TraderPlugin
 
 __all__ = [
     "MarketAnalystPlugin",

@@ -19,10 +19,10 @@ class AgentConfigRepository(BaseRepository[AgentConfig]):
 
     async def get_by_name(self, name: str) -> Optional[AgentConfig]:
         """Get an agent config by name.
-        
+
         Args:
             name: The config name
-            
+
         Returns:
             The agent config if found, None otherwise
         """
@@ -32,10 +32,10 @@ class AgentConfigRepository(BaseRepository[AgentConfig]):
 
     async def get_by_type(self, agent_type: str) -> List[AgentConfig]:
         """Get agent configs by type.
-        
+
         Args:
             agent_type: The agent type
-            
+
         Returns:
             List of agent configs
         """
@@ -48,7 +48,7 @@ class AgentConfigRepository(BaseRepository[AgentConfig]):
 
     async def get_active(self) -> List[AgentConfig]:
         """Get all active agent configs.
-        
+
         Returns:
             List of active agent configs
         """

@@ -10,8 +10,8 @@ from datetime import date
 from typing import Any, Dict, Iterable, Optional
 from uuid import uuid4
 
-from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
+from tradingagents.graph.trading_graph import TradingAgentsGraph
 
 from .events import SessionEventManager
 from .llm_runtime import AgentLLMRuntime
@@ -98,9 +98,7 @@ class TradingGraphService:
             )
 
             try:
-                final_state, processed_signal = graph.propagate(
-                    ticker, trade_date.isoformat()
-                )
+                final_state, processed_signal = graph.propagate(ticker, trade_date.isoformat())
                 self._event_manager.publish(
                     session_id,
                     {

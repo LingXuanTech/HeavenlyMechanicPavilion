@@ -26,13 +26,13 @@ class Portfolio(SQLModel, table=True):
     initial_capital: float = Field(default=100000.0)
     current_capital: float = Field(default=100000.0)
     currency: str = Field(default="USD", max_length=3)
-    
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    
+
     # Metadata fields
     metadata_json: Optional[str] = Field(default=None)
-    
+
     # Relationships
     positions: List["Position"] = Relationship(back_populates="portfolio")
     trades: List["Trade"] = Relationship(back_populates="portfolio")

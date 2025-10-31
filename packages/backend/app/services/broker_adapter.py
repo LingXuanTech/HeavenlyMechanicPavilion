@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class OrderStatus(str, Enum):
     """Order status enumeration."""
-    
+
     PENDING = "PENDING"
     SUBMITTED = "SUBMITTED"
     PARTIAL = "PARTIAL"
@@ -25,7 +25,7 @@ class OrderStatus(str, Enum):
 
 class OrderType(str, Enum):
     """Order type enumeration."""
-    
+
     MARKET = "MARKET"
     LIMIT = "LIMIT"
     STOP = "STOP"
@@ -34,7 +34,7 @@ class OrderType(str, Enum):
 
 class OrderAction(str, Enum):
     """Order action enumeration."""
-    
+
     BUY = "BUY"
     SELL = "SELL"
     SHORT = "SHORT"
@@ -44,7 +44,7 @@ class OrderAction(str, Enum):
 @dataclass
 class OrderRequest:
     """Order request data structure."""
-    
+
     symbol: str
     action: OrderAction
     quantity: float
@@ -52,7 +52,7 @@ class OrderRequest:
     limit_price: Optional[float] = None
     stop_price: Optional[float] = None
     time_in_force: str = "DAY"
-    
+
     # Optional metadata
     portfolio_id: Optional[int] = None
     session_id: Optional[int] = None
@@ -63,7 +63,7 @@ class OrderRequest:
 @dataclass
 class OrderResponse:
     """Order response data structure."""
-    
+
     order_id: str
     status: OrderStatus
     symbol: str
@@ -71,12 +71,12 @@ class OrderResponse:
     quantity: float
     filled_quantity: float
     average_fill_price: Optional[float]
-    
+
     # Execution details
     commission: float = 0.0
     fees: float = 0.0
     message: Optional[str] = None
-    
+
     # Timestamps
     submitted_at: Optional[datetime] = None
     filled_at: Optional[datetime] = None
@@ -85,7 +85,7 @@ class OrderResponse:
 @dataclass
 class MarketPrice:
     """Market price data structure."""
-    
+
     symbol: str
     bid: float
     ask: float
@@ -95,59 +95,59 @@ class MarketPrice:
 
 class BrokerAdapter(ABC):
     """Abstract base class for broker adapters."""
-    
+
     @abstractmethod
     async def submit_order(self, order: OrderRequest) -> OrderResponse:
         """Submit an order to the broker.
-        
+
         Args:
             order: Order request
-            
+
         Returns:
             Order response with execution details
         """
         pass
-    
+
     @abstractmethod
     async def cancel_order(self, order_id: str) -> OrderResponse:
         """Cancel an existing order.
-        
+
         Args:
             order_id: Order ID to cancel
-            
+
         Returns:
             Order response with updated status
         """
         pass
-    
+
     @abstractmethod
     async def get_order_status(self, order_id: str) -> OrderResponse:
         """Get the status of an order.
-        
+
         Args:
             order_id: Order ID
-            
+
         Returns:
             Order response with current status
         """
         pass
-    
+
     @abstractmethod
     async def get_market_price(self, symbol: str) -> MarketPrice:
         """Get current market price for a symbol.
-        
+
         Args:
             symbol: Stock symbol
-            
+
         Returns:
             Market price data
         """
         pass
-    
+
     @abstractmethod
     async def get_buying_power(self) -> float:
         """Get available buying power.
-        
+
         Returns:
             Available buying power
         """
@@ -156,7 +156,7 @@ class BrokerAdapter(ABC):
 
 class SimulatedBroker(BrokerAdapter):
     """Simulated broker for paper trading."""
-    
+
     def __init__(
         self,
         initial_capital: float = 100000.0,
@@ -164,7 +164,7 @@ class SimulatedBroker(BrokerAdapter):
         slippage_percent: float = 0.001,
     ):
         """Initialize simulated broker.
-        
+
         Args:
             initial_capital: Initial capital for simulation
             commission_per_trade: Commission per trade
@@ -174,36 +174,36 @@ class SimulatedBroker(BrokerAdapter):
         self.current_capital = initial_capital
         self.commission_per_trade = commission_per_trade
         self.slippage_percent = slippage_percent
-        
+
         self.orders = {}
         self.order_counter = 0
-        
+
         logger.info(
             f"Initialized SimulatedBroker with capital=${initial_capital:,.2f}, "
-            f"commission=${commission_per_trade}, slippage={slippage_percent*100}%"
+            f"commission=${commission_per_trade}, slippage={slippage_percent * 100}%"
         )
-    
+
     async def submit_order(self, order: OrderRequest) -> OrderResponse:
         """Submit an order for simulated execution.
-        
+
         Args:
             order: Order request
-            
+
         Returns:
             Order response with simulated execution
         """
         self.order_counter += 1
         order_id = f"SIM{self.order_counter:06d}"
-        
+
         logger.info(
             f"Submitting simulated order {order_id}: {order.action.value} "
             f"{order.quantity} {order.symbol} @ {order.order_type.value}"
         )
-        
+
         try:
             # Get market price
             market_price = await self.get_market_price(order.symbol)
-            
+
             # Determine fill price based on order type
             if order.order_type == OrderType.MARKET:
                 # Market orders execute immediately with slippage
@@ -211,17 +211,17 @@ class SimulatedBroker(BrokerAdapter):
                     fill_price = market_price.ask * (1 + self.slippage_percent)
                 else:
                     fill_price = market_price.bid * (1 - self.slippage_percent)
-                
+
                 status = OrderStatus.FILLED
                 filled_quantity = order.quantity
                 filled_at = datetime.utcnow()
-                
+
             elif order.order_type == OrderType.LIMIT:
                 # Limit orders require price to be met
                 # For simulation, we'll execute if limit price is reasonable
                 if order.limit_price is None:
                     raise ValueError("Limit price required for LIMIT orders")
-                
+
                 if order.action in [OrderAction.BUY, OrderAction.COVER]:
                     if order.limit_price >= market_price.ask:
                         fill_price = min(order.limit_price, market_price.ask)
@@ -244,34 +244,34 @@ class SimulatedBroker(BrokerAdapter):
                         status = OrderStatus.PENDING
                         filled_quantity = 0.0
                         filled_at = None
-            
+
             else:
                 # For other order types, default to market-like behavior
                 if order.action in [OrderAction.BUY, OrderAction.COVER]:
                     fill_price = market_price.ask * (1 + self.slippage_percent)
                 else:
                     fill_price = market_price.bid * (1 - self.slippage_percent)
-                
+
                 status = OrderStatus.FILLED
                 filled_quantity = order.quantity
                 filled_at = datetime.utcnow()
-            
+
             # Calculate commission
             commission = self.commission_per_trade
-            
+
             # Update capital if filled
             if status == OrderStatus.FILLED and fill_price is not None:
                 trade_value = filled_quantity * fill_price
                 if order.action in [OrderAction.BUY, OrderAction.COVER]:
-                    self.current_capital -= (trade_value + commission)
+                    self.current_capital -= trade_value + commission
                 else:
-                    self.current_capital += (trade_value - commission)
-                
+                    self.current_capital += trade_value - commission
+
                 logger.info(
                     f"Order {order_id} FILLED: {filled_quantity} @ ${fill_price:.2f}, "
                     f"capital now ${self.current_capital:,.2f}"
                 )
-            
+
             response = OrderResponse(
                 order_id=order_id,
                 status=status,
@@ -286,10 +286,10 @@ class SimulatedBroker(BrokerAdapter):
                 submitted_at=datetime.utcnow(),
                 filled_at=filled_at,
             )
-            
+
             self.orders[order_id] = response
             return response
-            
+
         except Exception as e:
             logger.error(f"Error submitting order {order_id}: {e}")
             return OrderResponse(
@@ -306,68 +306,68 @@ class SimulatedBroker(BrokerAdapter):
                 submitted_at=datetime.utcnow(),
                 filled_at=None,
             )
-    
+
     async def cancel_order(self, order_id: str) -> OrderResponse:
         """Cancel an order.
-        
+
         Args:
             order_id: Order ID to cancel
-            
+
         Returns:
             Updated order response
         """
         if order_id not in self.orders:
             raise ValueError(f"Order {order_id} not found")
-        
+
         order = self.orders[order_id]
-        
+
         if order.status in [OrderStatus.FILLED, OrderStatus.CANCELLED, OrderStatus.REJECTED]:
             logger.warning(f"Cannot cancel order {order_id} with status {order.status}")
             return order
-        
+
         order.status = OrderStatus.CANCELLED
         order.message = "Cancelled by user"
-        
+
         logger.info(f"Order {order_id} cancelled")
         return order
-    
+
     async def get_order_status(self, order_id: str) -> OrderResponse:
         """Get order status.
-        
+
         Args:
             order_id: Order ID
-            
+
         Returns:
             Order response
         """
         if order_id not in self.orders:
             raise ValueError(f"Order {order_id} not found")
-        
+
         return self.orders[order_id]
-    
+
     async def get_market_price(self, symbol: str) -> MarketPrice:
         """Get simulated market price.
-        
+
         For simulation, we'll use a simple mock price.
         In production, this would integrate with real market data.
-        
+
         Args:
             symbol: Stock symbol
-            
+
         Returns:
             Market price data
         """
         # TODO: Integrate with actual market data service
         # For now, return mock data
         import random
-        
+
         base_price = 100.0
         spread = 0.10
-        
+
         last = base_price + random.uniform(-5, 5)
         bid = last - spread / 2
         ask = last + spread / 2
-        
+
         return MarketPrice(
             symbol=symbol,
             bid=bid,
@@ -375,10 +375,10 @@ class SimulatedBroker(BrokerAdapter):
             last=last,
             timestamp=datetime.utcnow(),
         )
-    
+
     async def get_buying_power(self) -> float:
         """Get available buying power.
-        
+
         Returns:
             Available buying power
         """

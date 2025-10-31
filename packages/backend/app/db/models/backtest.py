@@ -29,7 +29,9 @@ class BacktestRun(SQLModel, table=True):
 
     initial_capital: float = Field(default=100_000.0)
     position_size: float = Field(default=1.0, description="Number of shares per trade")
-    risk_free_rate: float = Field(default=0.0, description="Annualised risk free rate used for metrics")
+    risk_free_rate: float = Field(
+        default=0.0, description="Annualised risk free rate used for metrics"
+    )
 
     status: str = Field(default="PENDING", max_length=32, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
@@ -93,8 +95,12 @@ class BacktestArtifact(SQLModel, table=True):
     run_id: int = Field(foreign_key="backtest_runs.id", index=True)
     artifact_type: str = Field(max_length=50, index=True)
 
-    content: Optional[str] = Field(default=None, description="Inline artifact content (typically JSON)")
-    uri: Optional[str] = Field(default=None, max_length=500, description="Pointer to persisted artifacts")
+    content: Optional[str] = Field(
+        default=None, description="Inline artifact content (typically JSON)"
+    )
+    uri: Optional[str] = Field(
+        default=None, max_length=500, description="Pointer to persisted artifacts"
+    )
     description: Optional[str] = Field(default=None, max_length=255)
 
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)

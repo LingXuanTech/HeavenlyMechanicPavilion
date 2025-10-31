@@ -72,6 +72,17 @@ uv run pytest -m integration
 
 Backend tests rely on fixtures defined in `packages/backend/tests/conftest.py`, including in-memory databases, Redis fakes, and mock LLM clients.
 
+#### Environment Setup for Tests
+
+The test infrastructure requires proper Python path configuration to discover both the `app` module (FastAPI application) and `src` packages (tradingagents, cli, llm_providers). This is configured in `pyproject.toml`:
+
+```toml
+[tool.pytest.ini_options]
+pythonpath = [".", "src"]
+```
+
+If tests fail with `ModuleNotFoundError` for `app` or `tradingagents` modules, ensure you're running tests from the `packages/backend` directory and that `pyproject.toml` has the correct `pythonpath` configuration.
+
 ### Frontend (Next.js)
 
 ```bash

@@ -67,6 +67,7 @@ class WorkerWatchdog:
             # Try to send alert about watchdog failure
             try:
                 from ..config.settings import get_settings
+
                 settings = get_settings()
                 alerting_service = get_alerting_service(settings)
                 await alerting_service.send_alert(
@@ -81,7 +82,7 @@ class WorkerWatchdog:
         """Check all workers for health issues."""
         try:
             from . import get_worker_manager
-            
+
             worker_manager = get_worker_manager()
             if not worker_manager:
                 logger.debug("Worker manager not initialized, skipping check")
@@ -89,13 +90,14 @@ class WorkerWatchdog:
 
             current_time = time.time()
             from ..config.settings import get_settings
+
             settings = get_settings()
             alerting_service = get_alerting_service(settings)
 
             for worker_name, worker in worker_manager._workers.items():
                 # Check if worker is running
                 is_running = worker.is_running()
-                
+
                 if not is_running:
                     # Worker is stopped - check if it was expected
                     if worker_name in self._worker_last_seen:
@@ -107,8 +109,7 @@ class WorkerWatchdog:
                             details={
                                 "worker": worker_name,
                                 "last_seen": datetime.fromtimestamp(
-                                    self._worker_last_seen[worker_name], 
-                                    tz=timezone.utc
+                                    self._worker_last_seen[worker_name], tz=timezone.utc
                                 ).isoformat(),
                             },
                         )
@@ -130,7 +131,7 @@ class WorkerWatchdog:
                     # Check if it's been too long
                     last_seen = self._worker_last_seen.get(worker_name, current_time)
                     time_stuck = current_time - last_seen
-                    
+
                     if time_stuck > self.settings.watchdog_task_timeout:
                         await alerting_service.send_alert(
                             title=f"Worker Task Timeout: {worker_name}",
@@ -153,7 +154,7 @@ class WorkerWatchdog:
 
     def record_worker_activity(self, worker_name: str):
         """Record that a worker has completed activity.
-        
+
         Args:
             worker_name: Name of the worker
         """
@@ -161,21 +162,23 @@ class WorkerWatchdog:
 
     def get_worker_status(self) -> Dict[str, Dict[str, any]]:
         """Get current status of all tracked workers.
-        
+
         Returns:
             Dictionary of worker statuses
         """
         current_time = time.time()
         statuses = {}
-        
+
         for worker_name, last_seen in self._worker_last_seen.items():
             time_since_activity = current_time - last_seen
             statuses[worker_name] = {
                 "last_seen_seconds_ago": round(time_since_activity, 2),
                 "current_tasks": self._worker_task_counts.get(worker_name, 0),
-                "status": "healthy" if time_since_activity < self.settings.watchdog_task_timeout else "warning",
+                "status": "healthy"
+                if time_since_activity < self.settings.watchdog_task_timeout
+                else "warning",
             }
-        
+
         return statuses
 
 
@@ -185,7 +188,7 @@ _watchdog: Optional[WorkerWatchdog] = None
 
 def get_watchdog() -> WorkerWatchdog:
     """Get or create the global watchdog instance.
-    
+
     Returns:
         WorkerWatchdog instance
     """

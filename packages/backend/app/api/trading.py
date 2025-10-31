@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,7 +45,7 @@ async def start_trading_session(
             sizing_method = PositionSizingMethod(request.position_sizing_method)
         except ValueError:
             sizing_method = PositionSizingMethod.FIXED_PERCENTAGE
-        
+
         session = await trading_session_service.start_session(
             session=db,
             portfolio_id=request.portfolio_id,
@@ -59,9 +58,9 @@ async def start_trading_session(
             take_profit_percentage=request.take_profit_percentage,
             position_sizing_method=sizing_method,
         )
-        
+
         return TradingSessionResponse.model_validate(session)
-        
+
     except ValueError as e:
         logger.error(f"Validation error starting session: {e}")
         raise HTTPException(
@@ -87,9 +86,9 @@ async def stop_trading_session(
             session=db,
             session_id=session_id,
         )
-        
+
         return TradingSessionResponse.model_validate(session)
-        
+
     except ValueError as e:
         logger.error(f"Validation error stopping session: {e}")
         raise HTTPException(
@@ -113,18 +112,16 @@ async def execute_signal(
     try:
         # Get execution service
         execution_service = None
-        
+
         if request.session_id:
-            execution_service = trading_session_service.get_execution_service(
-                request.session_id
-            )
-        
+            execution_service = trading_session_service.get_execution_service(request.session_id)
+
         if not execution_service:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No active session found or session_id not provided",
             )
-        
+
         # Execute signal
         trade = await execution_service.execute_signal(
             session=db,
@@ -136,12 +133,12 @@ async def execute_signal(
             confidence_score=request.confidence_score,
             session_id=request.session_id,
         )
-        
+
         if trade is None:
             return None
-        
+
         return TradeResponse.model_validate(trade)
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -162,19 +159,19 @@ async def force_exit_position(
         # Find an active session for the portfolio
         # In a real implementation, you might want to specify the session
         execution_service = None
-        
+
         for session_id, session_data in trading_session_service.active_sessions.items():
             session_obj = session_data["session"]
             if session_obj.portfolio_id == request.portfolio_id:
                 execution_service = session_data["execution_service"]
                 break
-        
+
         if not execution_service:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No active session found for portfolio",
             )
-        
+
         # Force exit
         trade = await execution_service.force_exit_position(
             session=db,
@@ -182,12 +179,12 @@ async def force_exit_position(
             symbol=request.symbol,
             reason=request.reason,
         )
-        
+
         if trade is None:
             return None
-        
+
         return TradeResponse.model_validate(trade)
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -212,18 +209,18 @@ async def get_risk_diagnostics(
             portfolio_id=portfolio_id,
             session_id=session_id,
         )
-        
+
         # Get risk management service
         risk_service = None
         if session_id:
             risk_service = trading_session_service.get_risk_management_service(session_id)
-        
+
         # Get positions for warnings
         position_repo = PositionRepository(db)
         positions = await position_repo.get_by_portfolio(portfolio_id)
-        
+
         current_prices = {pos.symbol: pos.current_price for pos in positions}
-        
+
         if risk_service:
             diagnostics = await risk_service.calculate_diagnostics(
                 portfolio_id=portfolio_id,
@@ -233,7 +230,7 @@ async def get_risk_diagnostics(
             warnings = diagnostics.warnings
         else:
             warnings = []
-        
+
         return RiskDiagnosticsResponse(
             portfolio_id=risk_metrics.portfolio_id,
             portfolio_value=risk_metrics.portfolio_value,
@@ -254,7 +251,7 @@ async def get_risk_diagnostics(
             warnings=warnings,
             measured_at=risk_metrics.measured_at,
         )
-        
+
     except Exception as e:
         logger.error(f"Error getting risk diagnostics: {e}")
         raise HTTPException(
@@ -273,28 +270,28 @@ async def get_portfolio_state(
         # Get portfolio
         portfolio_repo = PortfolioRepository(db)
         portfolio = await portfolio_repo.get(portfolio_id)
-        
+
         if not portfolio:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Portfolio {portfolio_id} not found",
             )
-        
+
         # Get positions
         position_repo = PositionRepository(db)
         positions = await position_repo.get_by_portfolio(portfolio_id)
-        
+
         # Calculate totals
         total_value = portfolio.current_capital
         total_unrealized_pnl = 0.0
         total_realized_pnl = 0.0
-        
+
         for pos in positions:
             if pos.quantity != 0:
                 total_value += pos.quantity * pos.current_price
                 total_unrealized_pnl += pos.unrealized_pnl
                 total_realized_pnl += pos.realized_pnl
-        
+
         return PortfolioStateDetailResponse(
             portfolio=PortfolioStateResponse.model_validate(portfolio),
             positions=[PositionResponse.model_validate(pos) for pos in positions],
@@ -302,7 +299,7 @@ async def get_portfolio_state(
             total_unrealized_pnl=total_unrealized_pnl,
             total_realized_pnl=total_realized_pnl,
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:

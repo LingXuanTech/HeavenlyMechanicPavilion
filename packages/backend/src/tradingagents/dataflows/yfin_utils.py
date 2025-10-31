@@ -1,12 +1,13 @@
 # gets data/stats
 
-import yfinance as yf
-from typing import Annotated, Callable, Any, Optional
-from pandas import DataFrame
-import pandas as pd
 from functools import wraps
+from typing import Annotated, Any, Callable, Optional
 
-from .utils import save_output, SavePathType, decorate_all_methods
+import pandas as pd
+import yfinance as yf
+from pandas import DataFrame
+
+from .utils import SavePathType, decorate_all_methods
 
 
 def init_ticker(func: Callable) -> Callable:
@@ -22,15 +23,10 @@ def init_ticker(func: Callable) -> Callable:
 
 @decorate_all_methods(init_ticker)
 class YFinanceUtils:
-
     def get_stock_data(
         symbol: Annotated[str, "ticker symbol"],
-        start_date: Annotated[
-            str, "start date for retrieving stock price data, YYYY-mm-dd"
-        ],
-        end_date: Annotated[
-            str, "end date for retrieving stock price data, YYYY-mm-dd"
-        ],
+        start_date: Annotated[str, "start date for retrieving stock price data, YYYY-mm-dd"],
+        end_date: Annotated[str, "end date for retrieving stock price data, YYYY-mm-dd"],
         save_path: SavePathType = None,
     ) -> DataFrame:
         """retrieve stock price data for designated ticker symbol"""

@@ -5,13 +5,13 @@ from __future__ import annotations
 from typing import List
 
 from fastapi import APIRouter, HTTPException
-
-from tradingagents.llm_providers import ProviderFactory
 from tradingagents.llm_providers.registry import (
     ProviderType,
     get_provider_info,
     list_providers,
 )
+
+from tradingagents.llm_providers import ProviderFactory
 
 from ..schemas.llm_provider import (
     LLMModelInfo,

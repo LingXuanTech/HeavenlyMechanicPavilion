@@ -1,27 +1,27 @@
 """Bull researcher agent plugin."""
 
 from typing import Any, Callable, List, Optional
-from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage
 
-from ..plugin_base import AgentPlugin, AgentRole, AgentCapability
+from langchain_core.language_models import BaseChatModel
+
+from ..plugin_base import AgentCapability, AgentPlugin, AgentRole
 
 
 class BullResearcherPlugin(AgentPlugin):
     """Bull researcher agent for building bullish investment cases."""
-    
+
     @property
     def name(self) -> str:
         return "bull_researcher"
-    
+
     @property
     def role(self) -> AgentRole:
         return AgentRole.RESEARCHER
-    
+
     @property
     def capabilities(self) -> List[AgentCapability]:
         return [AgentCapability.BULL_RESEARCH]
-    
+
     @property
     def prompt_template(self) -> str:
         return """You are a Bull Analyst advocating for investing in the stock. Your task is to build a strong, evidence-based case emphasizing growth potential, competitive advantages, and positive market indicators. Leverage the provided research and data to address concerns and counter bearish arguments effectively.
@@ -42,48 +42,44 @@ Conversation history of the debate: {history}
 Last bear argument: {current_response}
 Reflections from similar situations and lessons learned: {past_memory_str}
 Use this information to deliver a compelling bull argument, refute the bear's concerns, and engage in a dynamic debate that demonstrates the strengths of the bull position. You must also address reflections and learn from lessons and mistakes you made in the past."""
-    
+
     @property
     def description(self) -> str:
         return "Bull researcher building bullish investment cases"
-    
+
     @property
     def requires_memory(self) -> bool:
         return True
-    
+
     @property
     def memory_name(self) -> Optional[str]:
         return "bull_memory"
-    
+
     @property
     def llm_type(self) -> str:
         return "quick"
-    
-    def create_node(
-        self,
-        llm: BaseChatModel,
-        memory: Optional[Any] = None,
-        **kwargs
-    ) -> Callable:
+
+    def create_node(self, llm: BaseChatModel, memory: Optional[Any] = None, **kwargs) -> Callable:
         """Create the bull researcher node function."""
+
         def bull_node(state) -> dict:
             investment_debate_state = state["investment_debate_state"]
             history = investment_debate_state.get("history", "")
             bull_history = investment_debate_state.get("bull_history", "")
-            
+
             current_response = investment_debate_state.get("current_response", "")
             market_research_report = state["market_report"]
             sentiment_report = state["sentiment_report"]
             news_report = state["news_report"]
             fundamentals_report = state["fundamentals_report"]
-            
+
             curr_situation = f"{market_research_report}\n\n{sentiment_report}\n\n{news_report}\n\n{fundamentals_report}"
             past_memories = memory.get_memories(curr_situation, n_matches=2) if memory else []
-            
+
             past_memory_str = ""
             for i, rec in enumerate(past_memories, 1):
                 past_memory_str += rec["recommendation"] + "\n\n"
-            
+
             prompt = f"""You are a Bull Analyst advocating for investing in the stock. Your task is to build a strong, evidence-based case emphasizing growth potential, competitive advantages, and positive market indicators. Leverage the provided research and data to address concerns and counter bearish arguments effectively.
 
 Key points to focus on:
@@ -103,11 +99,11 @@ Last bear argument: {current_response}
 Reflections from similar situations and lessons learned: {past_memory_str}
 Use this information to deliver a compelling bull argument, refute the bear's concerns, and engage in a dynamic debate that demonstrates the strengths of the bull position. You must also address reflections and learn from lessons and mistakes you made in the past.
 """
-            
+
             response = llm.invoke(prompt)
-            
+
             argument = f"Bull Analyst: {response.content}"
-            
+
             new_investment_debate_state = {
                 "history": history + "\n" + argument,
                 "bull_history": bull_history + "\n" + argument,
@@ -115,7 +111,7 @@ Use this information to deliver a compelling bull argument, refute the bear's co
                 "current_response": argument,
                 "count": investment_debate_state["count"] + 1,
             }
-            
+
             return {"investment_debate_state": new_investment_debate_state}
-        
+
         return bull_node

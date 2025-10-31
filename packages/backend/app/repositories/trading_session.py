@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,12 +21,12 @@ class TradingSessionRepository(BaseRepository[TradingSession]):
         self, portfolio_id: int, *, skip: int = 0, limit: int = 100
     ) -> List[TradingSession]:
         """Get all trading sessions for a portfolio.
-        
+
         Args:
             portfolio_id: The portfolio ID
             skip: Number of records to skip
             limit: Maximum number of records to return
-            
+
         Returns:
             List of trading sessions
         """
@@ -40,15 +40,13 @@ class TradingSessionRepository(BaseRepository[TradingSession]):
         result = await self.session.execute(statement)
         return list(result.scalars().all())
 
-    async def get_active_sessions(
-        self, *, skip: int = 0, limit: int = 100
-    ) -> List[TradingSession]:
+    async def get_active_sessions(self, *, skip: int = 0, limit: int = 100) -> List[TradingSession]:
         """Get all active trading sessions.
-        
+
         Args:
             skip: Number of records to skip
             limit: Maximum number of records to return
-            
+
         Returns:
             List of active trading sessions
         """
@@ -66,12 +64,12 @@ class TradingSessionRepository(BaseRepository[TradingSession]):
         self, status: str, *, skip: int = 0, limit: int = 100
     ) -> List[TradingSession]:
         """Get trading sessions by status.
-        
+
         Args:
             status: The session status
             skip: Number of records to skip
             limit: Maximum number of records to return
-            
+
         Returns:
             List of trading sessions
         """

@@ -3,8 +3,7 @@
 import logging
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Response, Depends
-from fastapi.responses import PlainTextResponse
+from fastapi import APIRouter, Depends, Response
 
 from ..dependencies import get_alerting_service, get_monitoring_service
 from ..services.alerting import AlertingService, AlertLevel
@@ -21,7 +20,7 @@ async def get_comprehensive_health(
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
 ):
     """Get comprehensive health status of all services.
-    
+
     Returns detailed health information for:
     - Database (with latency)
     - Redis (if enabled)
@@ -36,7 +35,7 @@ async def get_prometheus_metrics(
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
 ):
     """Get Prometheus-formatted metrics.
-    
+
     Returns metrics in Prometheus exposition format including:
     - HTTP request counts and durations
     - Database query latencies
@@ -47,7 +46,7 @@ async def get_prometheus_metrics(
     - Service availability
     """
     metrics_bytes, content_type = monitoring_service.get_prometheus_metrics()
-    
+
     return Response(content=metrics_bytes, media_type=content_type)
 
 
@@ -56,7 +55,7 @@ async def get_vendor_status(
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
 ):
     """Get vendor availability and error rates.
-    
+
     Returns detailed information about each vendor plugin including:
     - Current status
     - Request counts
@@ -72,7 +71,7 @@ async def get_worker_status(
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
 ):
     """Get background worker status.
-    
+
     Returns information about:
     - Worker running status
     - Current active tasks
@@ -80,17 +79,17 @@ async def get_worker_status(
     - Watchdog status
     """
     health_status = await monitoring_service.get_health_status()
-    
+
     # Also get watchdog status
     watchdog = get_watchdog()
     watchdog_status = watchdog.get_worker_status()
-    
+
     worker_data = health_status.get("services", {}).get("workers", {})
     worker_data["watchdog"] = {
         "enabled": watchdog._running,
         "tracked_workers": watchdog_status,
     }
-    
+
     return worker_data
 
 
@@ -99,7 +98,7 @@ async def get_queue_metrics(
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
 ):
     """Get queue backlog metrics.
-    
+
     Returns information about:
     - Queue sizes
     - Total items across all queues
@@ -112,7 +111,7 @@ async def get_database_metrics(
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
 ):
     """Get database health and metrics.
-    
+
     Returns:
     - Connection status
     - Query latency
@@ -127,7 +126,7 @@ async def get_redis_metrics(
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
 ):
     """Get Redis health and metrics.
-    
+
     Returns:
     - Connection status
     - Latency
@@ -144,10 +143,10 @@ async def get_alert_history(
     alerting_service: AlertingService = Depends(get_alerting_service),
 ):
     """Get recent alert history.
-    
+
     Args:
         limit: Maximum number of alerts to return (default: 50)
-    
+
     Returns:
         List of recent alerts with timestamps and details
     """
@@ -159,12 +158,11 @@ async def send_test_alert(
     alerting_service: AlertingService = Depends(get_alerting_service),
 ):
     """Send a test alert to verify alerting configuration.
-    
+
     Returns:
         Status of the test alert
     """
-    from ..services.alerting import AlertLevel
-    
+
     success = await alerting_service.send_alert(
         title="Test Alert",
         message="This is a test alert from TradingAgents monitoring system.",
@@ -174,7 +172,7 @@ async def send_test_alert(
             "purpose": "Configuration verification",
         },
     )
-    
+
     return {
         "success": success,
         "message": "Test alert sent" if success else "Failed to send test alert",
@@ -186,19 +184,19 @@ async def get_uptime(
     monitoring_service: MonitoringService = Depends(get_monitoring_service),
 ):
     """Get system uptime information.
-    
+
     Returns:
         Uptime in seconds and formatted string
     """
     import time
-    
+
     uptime_seconds = time.time() - monitoring_service._start_time
-    
+
     days = int(uptime_seconds // 86400)
     hours = int((uptime_seconds % 86400) // 3600)
     minutes = int((uptime_seconds % 3600) // 60)
     seconds = int(uptime_seconds % 60)
-    
+
     return {
         "uptime_seconds": round(uptime_seconds, 2),
         "uptime_formatted": f"{days}d {hours}h {minutes}m {seconds}s",

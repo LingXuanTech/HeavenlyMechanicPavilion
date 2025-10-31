@@ -19,10 +19,10 @@ class PositionRepository(BaseRepository[Position]):
 
     async def get_by_portfolio(self, portfolio_id: int) -> List[Position]:
         """Get all positions for a portfolio.
-        
+
         Args:
             portfolio_id: The portfolio ID
-            
+
         Returns:
             List of positions
         """
@@ -30,15 +30,13 @@ class PositionRepository(BaseRepository[Position]):
         result = await self.session.execute(statement)
         return list(result.scalars().all())
 
-    async def get_by_symbol(
-        self, portfolio_id: int, symbol: str
-    ) -> Optional[Position]:
+    async def get_by_symbol(self, portfolio_id: int, symbol: str) -> Optional[Position]:
         """Get a position by portfolio and symbol.
-        
+
         Args:
             portfolio_id: The portfolio ID
             symbol: The symbol
-            
+
         Returns:
             The position if found, None otherwise
         """

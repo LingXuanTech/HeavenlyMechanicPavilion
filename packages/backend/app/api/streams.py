@@ -34,7 +34,9 @@ async def session_sse(
     try:
         queue = await service.ensure_session_stream(session_id)
     except KeyError as exc:  # pragma: no cover - defensive guard
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session"
+        ) from exc
 
     return StreamingResponse(
         _event_generator(queue),
