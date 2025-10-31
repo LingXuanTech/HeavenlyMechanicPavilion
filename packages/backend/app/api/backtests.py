@@ -9,6 +9,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..db.session import get_session
 from ..repositories import BacktestRunRepository
 from ..schemas.backtest import (
     BacktestArtifactResponse,
@@ -147,9 +148,9 @@ def _trade_from_dict(payload: dict) -> BacktestTradeLogEntry:
 )
 async def start_backtest(
     request: StartBacktestRequest,
-    db: AsyncSession = Depends(get_db_session),
-    service: BacktestService = Depends(get_backtest_service),
+    db: AsyncSession = Depends(get_session),
 ) -> BacktestRunResponse:
+    service = BacktestService()
     repo = BacktestRunRepository(db)
     try:
         run = await service.start_backtest(session=repo, request=request)
@@ -170,9 +171,9 @@ async def list_backtests(
     status_filter: Optional[str] = Query(None, alias="status"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
-    db: AsyncSession = Depends(get_db_session),
-    service: BacktestService = Depends(get_backtest_service),
+    db: AsyncSession = Depends(get_session),
 ) -> List[BacktestRunResponse]:
+    service = BacktestService()
     repo = BacktestRunRepository(db)
     runs = await service.list_runs(
         session=repo,
@@ -186,9 +187,9 @@ async def list_backtests(
 @router.get("/{run_id}", response_model=BacktestRunDetailResponse)
 async def get_backtest(
     run_id: str,
-    db: AsyncSession = Depends(get_db_session),
-    service: BacktestService = Depends(get_backtest_service),
+    db: AsyncSession = Depends(get_session),
 ) -> BacktestRunDetailResponse:
+    service = BacktestService()
     repo = BacktestRunRepository(db)
     details = await service.get_run_details(session=repo, run_id=run_id)
     if not details:
@@ -213,14 +214,14 @@ async def get_backtest(
 @router.get("/compare", response_model=BacktestComparisonResponse)
 async def compare_backtests(
     run_ids: List[str] = Query(..., alias="id"),
-    db: AsyncSession = Depends(get_db_session),
-    service: BacktestService = Depends(get_backtest_service),
+    db: AsyncSession = Depends(get_session),
 ) -> BacktestComparisonResponse:
     if not run_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="At least one run id is required"
         )
 
+    service = BacktestService()
     repo = BacktestRunRepository(db)
     comparisons = await service.compare_runs(session=repo, run_ids=run_ids)
     if not comparisons:
