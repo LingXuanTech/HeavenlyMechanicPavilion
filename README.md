@@ -30,6 +30,14 @@ TradingAgents orchestrates a team of specialist LLM-driven agents – analysts, 
 | [DEPLOYMENT](docs/DEPLOYMENT.md) | Docker Compose stacks, production hardening, scaling, and maintenance. |
 | [DEVELOPMENT](docs/DEVELOPMENT.md) | Conventions, testing matrix, tooling, and contribution workflow. |
 
+### 📊 Project Status & Roadmap
+
+| Document | Summary |
+| --- | --- |
+| [PROJECT ANALYSIS](PROJECT_ANALYSIS.md) | Comprehensive analysis of codebase strengths, issues, and recommendations. |
+| [IMPROVEMENT PLAN](IMPROVEMENT_PLAN.md) | Detailed 6-month roadmap with priorities, timelines, and success metrics. |
+| [QUICK FIXES](docs/QUICK_FIXES.md) | Step-by-step guide to fix critical issues (P0 priority items). |
+
 Additional operational guidance (e.g., Kubernetes manifests) lives under [`docs/operations/`](docs/operations/README.md).
 
 ## 🔍 What You Get
