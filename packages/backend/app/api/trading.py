@@ -7,6 +7,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..core.errors import TradingAgentsError
 from ..db import get_db
 from ..repositories import PortfolioRepository, PositionRepository
 from ..schemas.trading import (
@@ -61,6 +62,8 @@ async def start_trading_session(
 
         return TradingSessionResponse.model_validate(session)
 
+    except TradingAgentsError as exc:
+        raise exc
     except ValueError as e:
         logger.error(f"Validation error starting session: {e}")
         raise HTTPException(
@@ -89,6 +92,8 @@ async def stop_trading_session(
 
         return TradingSessionResponse.model_validate(session)
 
+    except TradingAgentsError as exc:
+        raise exc
     except ValueError as e:
         logger.error(f"Validation error stopping session: {e}")
         raise HTTPException(
@@ -141,6 +146,8 @@ async def execute_signal(
 
     except HTTPException:
         raise
+    except TradingAgentsError as exc:
+        raise exc
     except Exception as e:
         logger.error(f"Error executing signal: {e}")
         raise HTTPException(
@@ -187,6 +194,8 @@ async def force_exit_position(
 
     except HTTPException:
         raise
+    except TradingAgentsError as exc:
+        raise exc
     except Exception as e:
         logger.error(f"Error forcing exit: {e}")
         raise HTTPException(
@@ -252,6 +261,8 @@ async def get_risk_diagnostics(
             measured_at=risk_metrics.measured_at,
         )
 
+    except TradingAgentsError as exc:
+        raise exc
     except Exception as e:
         logger.error(f"Error getting risk diagnostics: {e}")
         raise HTTPException(
@@ -302,6 +313,8 @@ async def get_portfolio_state(
 
     except HTTPException:
         raise
+    except TradingAgentsError as exc:
+        raise exc
     except Exception as e:
         logger.error(f"Error getting portfolio state: {e}")
         raise HTTPException(

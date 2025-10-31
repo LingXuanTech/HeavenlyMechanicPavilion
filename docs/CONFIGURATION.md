@@ -90,6 +90,22 @@ Configuration can be supplied via:
 | `WATCHDOG_CHECK_INTERVAL` | `60` | Watchdog poll interval (seconds). |
 | `WATCHDOG_TASK_TIMEOUT` | `300` | Maximum task duration before alerting (seconds). |
 
+### Error Tracking & Resilience
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `ENVIRONMENT` | `development` | High-level environment label surfaced in logs and Sentry. |
+| `ERROR_TRACKING_ENABLED` | `false` | Toggle Sentry error capture and distributed tracing. |
+| `SENTRY_DSN` |  | Sentry DSN for the project. |
+| `SENTRY_TRACES_SAMPLE_RATE` | `0.0` | Fraction of requests to capture for tracing. |
+| `SENTRY_PROFILES_SAMPLE_RATE` | `0.0` | Fraction of requests to sample for profiling. |
+| `RETRY_DEFAULT_ATTEMPTS` | `3` | Default retry attempts for vendor/API calls. |
+| `RETRY_DEFAULT_BACKOFF_SECONDS` | `0.5` | Base delay (seconds) for exponential backoff. |
+| `RETRY_MAX_BACKOFF_SECONDS` | `30.0` | Ceiling for backoff delays. |
+| `CIRCUIT_BREAKER_FAILURE_THRESHOLD` | `5` | Consecutive failures before a vendor circuit opens. |
+| `CIRCUIT_BREAKER_RECOVERY_SECONDS` | `60` | Cooldown period before half-open retries. |
+| `CIRCUIT_BREAKER_HALF_OPEN_SUCCESSES` | `1` | Successful calls required to fully close the breaker. |
+
 ## Default Configuration Overrides
 
 The Python package bundles a `DEFAULT_CONFIG` under `tradingagents/default_config.py`. You can clone and mutate it to experiment with model choices, debate settings, or vendor preferences:
@@ -178,6 +194,13 @@ Templates:
 - `secrets.example.yml` – optional Docker/Kubernetes secrets mapping.
 
 Never commit filled `.env` files; rely on `.gitignore` to keep them out of version control.
+
+## Error Handling & Observability
+
+- All REST responses follow the schema `{"error": {"code": ..., "message": ...}, "correlation_id": ...}`. The middleware automatically injects an `X-Correlation-ID` response header so logs and clients can trace requests across systems.
+- Raise exceptions from `app.core.errors` in services and vendor adapters instead of `HTTPException`; the middleware maps them to status codes and error codes while logging structured context.
+- External calls should use the `execute_with_retry` helper and share circuit breakers via `CircuitBreaker` to prevent cascading vendor failures. Defaults can be tuned with the resilience environment variables above.
+- Enable Sentry by providing `ERROR_TRACKING_ENABLED=true` and a `SENTRY_DSN`. When active, unhandled exceptions are captured alongside correlation IDs, traces, and release metadata.
 
 ## Troubleshooting Tips
 

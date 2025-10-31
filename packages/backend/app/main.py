@@ -12,11 +12,13 @@ from .api import get_api_router
 from .cache import init_redis
 from .db import init_db
 from .dependencies import get_settings
-from .middleware import AuthMiddleware, MetricsMiddleware, RateLimitMiddleware
+from .core.sentry import init_sentry
+from .middleware import AuthMiddleware, ErrorHandlingMiddleware, MetricsMiddleware, RateLimitMiddleware
 
 logger = logging.getLogger(__name__)
 
 settings = get_settings()
+init_sentry(settings)
 
 app = FastAPI(
     title=settings.api_title,
@@ -26,6 +28,9 @@ app = FastAPI(
         "workflow with persistence and caching support."
     ),
 )
+
+# Add global error handling middleware
+app.add_middleware(ErrorHandlingMiddleware)
 
 # Add authentication and rate limiting middleware
 app.add_middleware(AuthMiddleware)
