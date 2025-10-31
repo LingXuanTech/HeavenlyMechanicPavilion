@@ -98,11 +98,13 @@ async def list_agents(
 ):
     """List all agent configurations."""
     service = AgentConfigService(session)
-    llm_service = AgentLLMConfigService(session)
+    # NOTE: AgentLLMConfigService not yet implemented
+    # llm_service = AgentLLMConfigService(session)
     agents = await service.list_agents(role=role, is_active=is_active, skip=skip, limit=limit)
     response_agents = []
     for agent in agents:
-        primary_llm = await llm_service.get_primary_config(agent.id)
+        # primary_llm = await llm_service.get_primary_config(agent.id)
+        primary_llm = None
         response_agents.append(_convert_db_to_response(agent, primary_llm))
     return AgentConfigList(agents=response_agents, total=len(response_agents))
 
@@ -120,7 +122,9 @@ async def get_agent(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Agent with ID {agent_id} not found",
         )
-    primary_llm = await AgentLLMConfigService(session).get_primary_config(agent_id)
+    # NOTE: AgentLLMConfigService not yet implemented
+    # primary_llm = await AgentLLMConfigService(session).get_primary_config(agent_id)
+    primary_llm = None
     return _convert_db_to_response(agent, primary_llm)
 
 
@@ -137,7 +141,9 @@ async def get_agent_by_name(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Agent with name '{agent_name}' not found",
         )
-    primary_llm = await AgentLLMConfigService(session).get_primary_config(agent.id)
+    # NOTE: AgentLLMConfigService not yet implemented
+    # primary_llm = await AgentLLMConfigService(session).get_primary_config(agent.id)
+    primary_llm = None
     return _convert_db_to_response(agent, primary_llm)
 
 
@@ -172,7 +178,9 @@ async def update_agent(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Agent with ID {agent_id} not found",
         )
-    primary_llm = await AgentLLMConfigService(session).get_primary_config(agent_id)
+    # NOTE: AgentLLMConfigService not yet implemented
+    # primary_llm = await AgentLLMConfigService(session).get_primary_config(agent_id)
+    primary_llm = None
     return _convert_db_to_response(agent, primary_llm)
 
 
@@ -210,7 +218,9 @@ async def activate_agent(
             status=status.HTTP_404_NOT_FOUND,
             detail=f"Agent with ID {agent_id} not found",
         )
-    primary_llm = await AgentLLMConfigService(session).get_primary_config(agent_id)
+    # NOTE: AgentLLMConfigService not yet implemented
+    # primary_llm = await AgentLLMConfigService(session).get_primary_config(agent_id)
+    primary_llm = None
     return _convert_db_to_response(agent, primary_llm)
 
 
@@ -227,7 +237,9 @@ async def deactivate_agent(
             status=status.HTTP_404_NOT_FOUND,
             detail=f"Agent with ID {agent_id} not found",
         )
-    primary_llm = await AgentLLMConfigService(session).get_primary_config(agent_id)
+    # NOTE: AgentLLMConfigService not yet implemented
+    # primary_llm = await AgentLLMConfigService(session).get_primary_config(agent_id)
+    primary_llm = None
     return _convert_db_to_response(agent, primary_llm)
 
 
