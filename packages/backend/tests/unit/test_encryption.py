@@ -5,8 +5,6 @@ from __future__ import annotations
 import os
 from unittest.mock import patch
 
-import pytest
-
 from app.security.encryption import decrypt_api_key, encrypt_api_key
 
 

@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import pytest
+from app.db.models.agent_llm_config import AgentLLMConfig
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.agent_config import AgentConfig
-from app.db.models.agent_llm_config import AgentLLMConfig
 
 
 @pytest.mark.asyncio

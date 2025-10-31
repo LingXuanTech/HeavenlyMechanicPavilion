@@ -5,12 +5,11 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from app.schemas.agent_llm_config import AgentLLMConfigCreate, AgentLLMConfigUpdate
+from app.services.agent_llm_config import AgentLLMConfigService
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.agent_config import AgentConfig
-from app.db.models.agent_llm_config import AgentLLMConfig
-from app.schemas.agent_llm_config import AgentLLMConfigCreate, AgentLLMConfigUpdate
-from app.services.agent_llm_config import AgentLLMConfigService
 
 
 @pytest.fixture

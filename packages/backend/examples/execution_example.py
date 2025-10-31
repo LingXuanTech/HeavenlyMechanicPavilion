@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
@@ -27,12 +26,12 @@ async def main():
     from app.db.models import Portfolio
     from app.repositories import PortfolioRepository
     from app.services import (
-        SimulatedBroker,
-        PositionSizingService,
-        PositionSizingMethod,
-        RiskManagementService,
-        RiskConstraints,
         ExecutionService,
+        PositionSizingMethod,
+        PositionSizingService,
+        RiskConstraints,
+        RiskManagementService,
+        SimulatedBroker,
     )
     
     # Create database engine (use your actual database URL)

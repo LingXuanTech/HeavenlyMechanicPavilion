@@ -94,6 +94,22 @@ class Settings(BaseSettings):
     api_title: str = Field(default="TradingAgents Backend", alias="API_TITLE")
     api_version: str = Field(default="0.1.0", alias="API_VERSION")
 
+    # Authentication configuration
+    jwt_secret_key: str = Field(
+        default="change-this-secret-key-in-production-use-openssl-rand-hex-32",
+        alias="JWT_SECRET_KEY",
+    )
+    jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
+    jwt_access_token_expire_minutes: int = Field(
+        default=30, alias="JWT_ACCESS_TOKEN_EXPIRE_MINUTES"
+    )
+    jwt_refresh_token_expire_days: int = Field(default=7, alias="JWT_REFRESH_TOKEN_EXPIRE_DAYS")
+
+    # Rate limiting configuration
+    rate_limit_enabled: bool = Field(default=True, alias="RATE_LIMIT_ENABLED")
+    rate_limit_per_minute: int = Field(default=60, alias="RATE_LIMIT_PER_MINUTE")
+    rate_limit_per_hour: int = Field(default=1000, alias="RATE_LIMIT_PER_HOUR")
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

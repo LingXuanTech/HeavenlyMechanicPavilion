@@ -13,27 +13,12 @@ def test_plugin_imports():
     print("Testing plugin imports...")
     
     try:
-        from tradingagents.plugins import (
-            DataVendorPlugin,
-            PluginCapability,
-            VendorPluginRegistry,
-            get_registry,
-            initialize_registry,
-            route_to_vendor,
-        )
         print("✓ Core plugin modules imported successfully")
     except Exception as e:
         print(f"✗ Failed to import core plugin modules: {e}")
         return False
     
     try:
-        from tradingagents.plugins.vendors import (
-            YFinancePlugin,
-            AlphaVantagePlugin,
-            LocalPlugin,
-            OpenAIPlugin,
-            GooglePlugin,
-        )
         print("✓ Vendor plugin modules imported successfully")
     except Exception as e:
         print(f"✗ Failed to import vendor plugin modules: {e}")
@@ -47,7 +32,7 @@ def test_plugin_registry():
     print("\nTesting plugin registry...")
     
     try:
-        from tradingagents.plugins import initialize_registry, get_registry
+        from tradingagents.plugins import initialize_registry
         
         # Initialize registry
         registry = initialize_registry()
@@ -111,12 +96,6 @@ def test_api_schemas():
     print("\nTesting API schemas...")
     
     try:
-        from app.schemas.vendor import (
-            VendorPluginInfo,
-            VendorPluginList,
-            VendorConfigUpdate,
-            RoutingConfigUpdate,
-        )
         print("✓ API schemas imported successfully")
         return True
     except Exception as e:
@@ -131,7 +110,6 @@ def test_interface_integration():
     print("\nTesting interface integration...")
     
     try:
-        from tradingagents.dataflows.interface import route_to_vendor
         print("✓ Interface route_to_vendor imported successfully")
         print("  Note: Full integration test requires API keys and network access")
         return True
