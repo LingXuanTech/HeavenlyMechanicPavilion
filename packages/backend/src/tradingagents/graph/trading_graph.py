@@ -11,30 +11,32 @@ from langgraph.prebuilt import ToolNode
 
 from tradingagents.agents import *
 
-# Import the new abstract tool methods from agent_utils
-from tradingagents.agents.utils.agent_utils import (
+# Import the new abstract tool methods from specialized modules
+from tradingagents.agents.utils.core_stock_tools import get_stock_data
+from tradingagents.agents.utils.fundamental_data_tools import (
     get_balance_sheet,
     get_cashflow,
     get_fundamentals,
-    get_global_news,
     get_income_statement,
-    get_indicators,
+)
+from tradingagents.agents.utils.memory import FinancialSituationMemory
+from tradingagents.agents.utils.news_data_tools import (
+    get_global_news,
     get_insider_sentiment,
     get_insider_transactions,
     get_news,
-    get_stock_data,
 )
-from tradingagents.agents.utils.memory import FinancialSituationMemory
+from tradingagents.agents.utils.technical_indicators_tools import get_indicators
 from tradingagents.dataflows.config import set_config
 from tradingagents.default_config import DEFAULT_CONFIG
-
-logger = logging.getLogger(__name__)
 
 from .conditional_logic import ConditionalLogic
 from .propagation import Propagator
 from .reflection import Reflector
 from .setup import GraphSetup
 from .signal_processing import SignalProcessor
+
+logger = logging.getLogger(__name__)
 
 
 class TradingAgentsGraph:
@@ -170,7 +172,6 @@ class TradingAgentsGraph:
         The preferred approach is to inject an LLMRuntimeManager instance.
         """
         defaults: Dict[str, Any] = {}
-        provider = (self.config.get("llm_provider") or "openai").lower()
 
         # Simplified fallback - just create basic OpenAI instances
         try:

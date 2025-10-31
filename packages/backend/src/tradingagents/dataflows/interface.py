@@ -3,15 +3,23 @@
 from tradingagents.plugins import initialize_registry
 from tradingagents.plugins import route_to_vendor as plugin_route_to_vendor
 
-from .alpha_vantage import get_balance_sheet as get_alpha_vantage_balance_sheet
-from .alpha_vantage import get_cashflow as get_alpha_vantage_cashflow
-from .alpha_vantage import get_fundamentals as get_alpha_vantage_fundamentals
-from .alpha_vantage import get_income_statement as get_alpha_vantage_income_statement
-from .alpha_vantage import get_indicator as get_alpha_vantage_indicator
-from .alpha_vantage import get_insider_transactions as get_alpha_vantage_insider_transactions
-from .alpha_vantage import get_news as get_alpha_vantage_news
-from .alpha_vantage import get_stock as get_alpha_vantage_stock
 from .alpha_vantage_common import AlphaVantageRateLimitError
+from .alpha_vantage_fundamentals import (
+    get_balance_sheet as get_alpha_vantage_balance_sheet,
+)
+from .alpha_vantage_fundamentals import get_cashflow as get_alpha_vantage_cashflow
+from .alpha_vantage_fundamentals import (
+    get_fundamentals as get_alpha_vantage_fundamentals,
+)
+from .alpha_vantage_fundamentals import (
+    get_income_statement as get_alpha_vantage_income_statement,
+)
+from .alpha_vantage_indicator import get_indicator as get_alpha_vantage_indicator
+from .alpha_vantage_news import (
+    get_insider_transactions as get_alpha_vantage_insider_transactions,
+)
+from .alpha_vantage_news import get_news as get_alpha_vantage_news
+from .alpha_vantage_stock import get_stock as get_alpha_vantage_stock
 
 # Configuration and routing logic
 from .config import get_config

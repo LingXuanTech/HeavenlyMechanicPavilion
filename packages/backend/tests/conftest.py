@@ -2,18 +2,27 @@
 
 import asyncio
 import os
+import sys
 from collections.abc import AsyncGenerator, Generator
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-import fakeredis.aioredis
-import pytest
-from fastapi.testclient import TestClient
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
+# Add the backend directory to sys.path so 'app' can be imported
+# This must be done before importing app modules to avoid import errors
+BACKEND_DIR = Path(__file__).parent.parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
-from app.cache.redis_client import RedisManager
-from app.db.session import DatabaseManager
+# These imports must come after sys.path manipulation
+import fakeredis.aioredis  # noqa: E402
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
+from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
+
+from app.cache.redis_client import RedisManager  # noqa: E402
+from app.db.session import DatabaseManager  # noqa: E402
 
 
 @pytest.fixture(scope="session")
