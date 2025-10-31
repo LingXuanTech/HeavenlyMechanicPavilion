@@ -1,12 +1,15 @@
-from typing import Annotated
-import pandas as pd
-import os
-from .config import DATA_DIR
-from datetime import datetime
-from dateutil.relativedelta import relativedelta
 import json
-from .reddit_utils import fetch_top_from_category
+import os
+from datetime import datetime
+from typing import Annotated
+
+import pandas as pd
+from dateutil.relativedelta import relativedelta
 from tqdm import tqdm
+
+from .config import DATA_DIR
+from .reddit_utils import fetch_top_from_category
+
 
 def get_YFin_data_window(
     symbol: Annotated[str, "ticker symbol of the company"],
@@ -30,9 +33,7 @@ def get_YFin_data_window(
     data["DateOnly"] = data["Date"].str[:10]
 
     # Filter data between the start and end dates (inclusive)
-    filtered_data = data[
-        (data["DateOnly"] >= start_date) & (data["DateOnly"] <= curr_date)
-    ]
+    filtered_data = data[(data["DateOnly"] >= start_date) & (data["DateOnly"] <= curr_date)]
 
     # Drop the temporary column we created
     filtered_data = filtered_data.drop("DateOnly", axis=1)
@@ -43,10 +44,8 @@ def get_YFin_data_window(
     ):
         df_string = filtered_data.to_string()
 
-    return (
-        f"## Raw Market Data for {symbol} from {start_date} to {curr_date}:\n\n"
-        + df_string
-    )
+    return f"## Raw Market Data for {symbol} from {start_date} to {curr_date}:\n\n" + df_string
+
 
 def get_YFin_data(
     symbol: Annotated[str, "ticker symbol of the company"],
@@ -70,9 +69,7 @@ def get_YFin_data(
     data["DateOnly"] = data["Date"].str[:10]
 
     # Filter data between the start and end dates (inclusive)
-    filtered_data = data[
-        (data["DateOnly"] >= start_date) & (data["DateOnly"] <= end_date)
-    ]
+    filtered_data = data[(data["DateOnly"] >= start_date) & (data["DateOnly"] <= end_date)]
 
     # Drop the temporary column we created
     filtered_data = filtered_data.drop("DateOnly", axis=1)
@@ -81,6 +78,7 @@ def get_YFin_data(
     filtered_data = filtered_data.reset_index(drop=True)
 
     return filtered_data
+
 
 def get_finnhub_news(
     query: Annotated[str, "Search query or ticker symbol"],
@@ -109,9 +107,7 @@ def get_finnhub_news(
         if len(data) == 0:
             continue
         for entry in data:
-            current_news = (
-                "### " + entry["headline"] + f" ({day})" + "\n" + entry["summary"]
-            )
+            current_news = "### " + entry["headline"] + f" ({day})" + "\n" + entry["summary"]
             combined_result += current_news + "\n\n"
 
     return f"## {query} News, from {start_date} to {end_date}:\n" + str(combined_result)
@@ -191,6 +187,7 @@ def get_finnhub_company_insider_transactions(
         + "The change field reflects the variation in share count—here a negative number indicates a reduction in holdings—while share specifies the total number of shares involved. The transactionPrice denotes the per-share price at which the trade was executed, and transactionDate marks when the transaction occurred. The name field identifies the insider making the trade, and transactionCode (e.g., S for sale) clarifies the nature of the transaction. FilingDate records when the transaction was officially reported, and the unique id links to the specific SEC filing, as indicated by the source. Additionally, the symbol ties the transaction to a particular company, isDerivative flags whether the trade involves derivative securities, and currency notes the currency context of the transaction."
     )
 
+
 def get_data_in_range(ticker, start_date, end_date, data_type, data_dir, period=None):
     """
     Gets finnhub data saved and processed on disk.
@@ -223,6 +220,7 @@ def get_data_in_range(ticker, start_date, end_date, data_type, data_dir, period=
         if start_date <= key <= end_date and len(value) > 0:
             filtered_data[key] = value
     return filtered_data
+
 
 def get_simfin_balance_sheet(
     ticker: Annotated[str, "ticker symbol"],

@@ -1,48 +1,39 @@
 # TradingAgents/graph/trading_graph.py
 
+import json
 import logging
 import os
 from pathlib import Path
-import json
-from datetime import date
-from typing import Dict, Any, Tuple, List, Optional
+from typing import Any, Dict, Optional
 
 from langchain_openai import ChatOpenAI
-from langchain_anthropic import ChatAnthropic
-from langchain_google_genai import ChatGoogleGenerativeAI
-
 from langgraph.prebuilt import ToolNode
 
 from tradingagents.agents import *
-from tradingagents.default_config import DEFAULT_CONFIG
-from tradingagents.agents.utils.memory import FinancialSituationMemory
-from tradingagents.agents.utils.agent_states import (
-    AgentState,
-    InvestDebateState,
-    RiskDebateState,
-)
-from tradingagents.dataflows.config import set_config
 
 # Import the new abstract tool methods from agent_utils
 from tradingagents.agents.utils.agent_utils import (
-    get_stock_data,
-    get_indicators,
-    get_fundamentals,
     get_balance_sheet,
     get_cashflow,
+    get_fundamentals,
+    get_global_news,
     get_income_statement,
-    get_news,
+    get_indicators,
     get_insider_sentiment,
     get_insider_transactions,
-    get_global_news
+    get_news,
+    get_stock_data,
 )
+from tradingagents.agents.utils.memory import FinancialSituationMemory
+from tradingagents.dataflows.config import set_config
+from tradingagents.default_config import DEFAULT_CONFIG
 
 logger = logging.getLogger(__name__)
 
 from .conditional_logic import ConditionalLogic
-from .setup import GraphSetup
 from .propagation import Propagator
 from .reflection import Reflector
+from .setup import GraphSetup
 from .signal_processing import SignalProcessor
 
 
@@ -70,7 +61,7 @@ class TradingAgentsGraph:
         self.config = config or DEFAULT_CONFIG
         self.use_plugin_system = use_plugin_system
         self.llm_runtime = llm_runtime
-        
+
         # Log runtime manager status
         if self.llm_runtime:
             logger.info("AgentLLMRuntime available for dynamic LLM configuration")
@@ -79,11 +70,12 @@ class TradingAgentsGraph:
 
         # Update the interface's config
         set_config(self.config)
-        
+
         # Initialize agent registry if using plugin system
         if self.use_plugin_system:
-            from tradingagents.agents.plugin_loader import register_built_in_plugins
             from tradingagents.agents import get_agent_registry
+            from tradingagents.agents.plugin_loader import register_built_in_plugins
+
             self.agent_registry = get_agent_registry()
             register_built_in_plugins(self.agent_registry)
 
@@ -173,21 +165,21 @@ class TradingAgentsGraph:
 
     def _initialize_default_llms(self) -> Dict[str, Any]:
         """Create baseline LLM instances used when runtime configs are unavailable.
-        
+
         Note: This is only used as a last resort fallback when llm_runtime is not provided.
         The preferred approach is to inject an LLMRuntimeManager instance.
         """
         defaults: Dict[str, Any] = {}
         provider = (self.config.get("llm_provider") or "openai").lower()
-        
+
         # Simplified fallback - just create basic OpenAI instances
         try:
             quick_model = self.config.get("quick_think_llm", "gpt-4o-mini")
             deep_model = self.config.get("deep_think_llm", "gpt-4-turbo")
-            
+
             defaults["quick"] = ChatOpenAI(model=quick_model)
             defaults["deep"] = ChatOpenAI(model=deep_model)
-            
+
             logger.info(f"Initialized fallback LLMs: quick={quick_model}, deep={deep_model}")
         except Exception as exc:
             logger.error("Failed to initialize fallback LLMs: %s", exc)
@@ -196,18 +188,18 @@ class TradingAgentsGraph:
 
     def _resolve_llm(self, agent_name: str, llm_type: str = "quick") -> Any:
         """Resolve the LLM instance for a specific agent.
-        
+
         This method follows a priority order:
         1. Try to get agent-specific LLM from runtime manager (if provided)
         2. Fall back to default LLMs based on llm_type
-        
+
         Args:
             agent_name: Name of the agent requesting the LLM
             llm_type: Type of LLM - "quick" or "deep" (used for fallback only)
-            
+
         Returns:
             A LangChain ChatModel instance
-            
+
         Raises:
             ValueError: If no LLM can be resolved
         """
@@ -230,7 +222,7 @@ class TradingAgentsGraph:
                 f"No LLM available for agent '{agent_name}'. "
                 f"llm_runtime not provided and fallback '{llm_type}' not initialized."
             )
-        
+
         logger.debug(f"Using fallback {llm_type} LLM for {agent_name}")
         return fallback
 
@@ -240,9 +232,7 @@ class TradingAgentsGraph:
         self.ticker = company_name
 
         # Initialize state
-        init_agent_state = self.propagator.create_initial_state(
-            company_name, trade_date
-        )
+        init_agent_state = self.propagator.create_initial_state(company_name, trade_date)
         args = self.propagator.get_graph_args()
 
         if self.debug:
@@ -282,12 +272,8 @@ class TradingAgentsGraph:
                 "bull_history": final_state["investment_debate_state"]["bull_history"],
                 "bear_history": final_state["investment_debate_state"]["bear_history"],
                 "history": final_state["investment_debate_state"]["history"],
-                "current_response": final_state["investment_debate_state"][
-                    "current_response"
-                ],
-                "judge_decision": final_state["investment_debate_state"][
-                    "judge_decision"
-                ],
+                "current_response": final_state["investment_debate_state"]["current_response"],
+                "judge_decision": final_state["investment_debate_state"]["judge_decision"],
             },
             "trader_investment_decision": final_state["trader_investment_plan"],
             "risk_debate_state": {
@@ -313,15 +299,9 @@ class TradingAgentsGraph:
 
     def reflect_and_remember(self, returns_losses):
         """Reflect on decisions and update memory based on returns."""
-        self.reflector.reflect_bull_researcher(
-            self.curr_state, returns_losses, self.bull_memory
-        )
-        self.reflector.reflect_bear_researcher(
-            self.curr_state, returns_losses, self.bear_memory
-        )
-        self.reflector.reflect_trader(
-            self.curr_state, returns_losses, self.trader_memory
-        )
+        self.reflector.reflect_bull_researcher(self.curr_state, returns_losses, self.bull_memory)
+        self.reflector.reflect_bear_researcher(self.curr_state, returns_losses, self.bear_memory)
+        self.reflector.reflect_trader(self.curr_state, returns_losses, self.trader_memory)
         self.reflector.reflect_invest_judge(
             self.curr_state, returns_losses, self.invest_judge_memory
         )

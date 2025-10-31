@@ -13,9 +13,9 @@ from typing import Any, Dict, Iterable, List, Optional
 
 import pandas as pd
 
+from tradingagents.dataflows.local import get_YFin_data
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
-from tradingagents.dataflows.local import get_YFin_data
 
 from ..db import get_db_manager
 from ..db.models import (
@@ -127,9 +127,7 @@ class HistoricalReplayEngine:
             end.strftime("%Y-%m-%d"),
         )
         if price_df.empty:
-            raise ValueError(
-                f"No market data found for {self.symbol} between {start} and {end}."
-            )
+            raise ValueError(f"No market data found for {self.symbol} between {start} and {end}.")
 
         if "Date" not in price_df.columns:
             raise ValueError("Recorded market data missing 'Date' column")
@@ -337,10 +335,12 @@ class HistoricalReplayEngine:
             downside = [min(0.0, r - risk_free_daily) for r in daily_returns]
             negative_downside = [abs(x) for x in downside if x < 0]
             if negative_downside:
-                downside_variance = sum(x ** 2 for x in negative_downside) / len(negative_downside)
+                downside_variance = sum(x**2 for x in negative_downside) / len(negative_downside)
                 downside_dev = math.sqrt(downside_variance)
                 if downside_dev > 0:
-                    sortino_ratio = ((mean_return - risk_free_daily) / downside_dev) * math.sqrt(252.0)
+                    sortino_ratio = ((mean_return - risk_free_daily) / downside_dev) * math.sqrt(
+                        252.0
+                    )
 
         win_rate = None
         best_trade_return = None
@@ -661,11 +661,19 @@ class BacktestService:
             return None
 
         artifacts_repo = BacktestArtifactRepository(session.session)
-        decision_artifact = await artifacts_repo.get_by_type(details["run"].id, ARTIFACT_DECISION_LOG)
+        decision_artifact = await artifacts_repo.get_by_type(
+            details["run"].id, ARTIFACT_DECISION_LOG
+        )
         trade_artifact = await artifacts_repo.get_by_type(details["run"].id, ARTIFACT_TRADE_LOG)
 
-        decisions = json.loads(decision_artifact.content) if decision_artifact and decision_artifact.content else []
-        trades = json.loads(trade_artifact.content) if trade_artifact and trade_artifact.content else []
+        decisions = (
+            json.loads(decision_artifact.content)
+            if decision_artifact and decision_artifact.content
+            else []
+        )
+        trades = (
+            json.loads(trade_artifact.content) if trade_artifact and trade_artifact.content else []
+        )
 
         return {
             "run": details["run"],

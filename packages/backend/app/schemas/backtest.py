@@ -16,7 +16,9 @@ class BacktestParameters(BaseModel):
     end_date: date = Field(..., description="Inclusive end date for the replay")
     initial_capital: float = Field(100_000.0, ge=0.0)
     position_size: float = Field(1.0, gt=0.0, description="Number of shares to target per position")
-    risk_free_rate: float = Field(0.0, description="Annualised risk-free rate used for Sharpe calculations")
+    risk_free_rate: float = Field(
+        0.0, description="Annualised risk-free rate used for Sharpe calculations"
+    )
     selected_analysts: Optional[List[str]] = Field(
         default=None,
         description="Override the default analyst lineup in the TradingAgents graph",

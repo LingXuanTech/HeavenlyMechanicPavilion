@@ -1,5 +1,6 @@
 from .alpha_vantage_common import _make_api_request, format_datetime_for_api
 
+
 def get_news(ticker, start_date, end_date) -> dict[str, str] | str:
     """Returns live and historical market news & sentiment data from premier news outlets worldwide.
 
@@ -21,8 +22,9 @@ def get_news(ticker, start_date, end_date) -> dict[str, str] | str:
         "sort": "LATEST",
         "limit": "50",
     }
-    
+
     return _make_api_request("NEWS_SENTIMENT", params)
+
 
 def get_insider_transactions(symbol: str) -> dict[str, str] | str:
     """Returns latest and historical insider transactions by key stakeholders.

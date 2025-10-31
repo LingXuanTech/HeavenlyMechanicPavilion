@@ -17,10 +17,13 @@ from ..schemas.agent_config import (
     AgentConfigResponse,
     AgentConfigUpdate,
 )
-from ..schemas.agent_llm_config import AgentLLMConfigResponse
+
+# NOTE: AgentLLMConfig schema/service not yet implemented
+# from ..schemas.agent_llm_config import AgentLLMConfigResponse
 from ..schemas.agent_llm_usage import AgentLLMUsageQuery, AgentLLMUsageSummary
 from ..services.agent_config import AgentConfigService
-from ..services.agent_llm_config import AgentLLMConfigService
+
+# from ..services.agent_llm_config import AgentLLMConfigService
 from ..services.agent_llm_usage import AgentLLMUsageService
 
 logger = logging.getLogger(__name__)
@@ -28,7 +31,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/agents", tags=["agents"])
 
 
-def _convert_db_to_response(agent, active_llm: Optional[AgentLLMConfigResponse] = None) -> AgentConfigResponse:
+def _convert_db_to_response(agent, active_llm: Optional[dict] = None) -> AgentConfigResponse:
     """Convert database model to response schema."""
     # Parse LLM config from JSON string
     llm_config = {}
@@ -37,7 +40,7 @@ def _convert_db_to_response(agent, active_llm: Optional[AgentLLMConfigResponse] 
             llm_config = json.loads(agent.llm_config_json)
         except json.JSONDecodeError:
             llm_config = {"provider": "openai", "model": "gpt-4o-mini"}
-    
+
     agent_dict = {
         "id": agent.id,
         "name": agent.name,
@@ -56,32 +59,32 @@ def _convert_db_to_response(agent, active_llm: Optional[AgentLLMConfigResponse] 
         "updated_at": agent.updated_at,
         "active_llm_config": active_llm,
     }
-    
+
     # Parse JSON fields
     if agent.capabilities_json:
         try:
             agent_dict["capabilities"] = json.loads(agent.capabilities_json)
         except json.JSONDecodeError:
             agent_dict["capabilities"] = []
-    
+
     if agent.required_tools_json:
         try:
             agent_dict["required_tools"] = json.loads(agent.required_tools_json)
         except json.JSONDecodeError:
             agent_dict["required_tools"] = []
-    
+
     if agent.config_json:
         try:
             agent_dict["config"] = json.loads(agent.config_json)
         except json.JSONDecodeError:
             agent_dict["config"] = {}
-    
+
     if agent.metadata_json:
         try:
             agent_dict["metadata"] = json.loads(agent.metadata_json)
         except json.JSONDecodeError:
             agent_dict["metadata"] = {}
-    
+
     return AgentConfigResponse(**agent_dict)
 
 
@@ -236,7 +239,6 @@ async def reload_agent_registry(
     service = AgentConfigService(session)
     await service._trigger_hot_reload()
     return {"message": "Agent registry reloaded successfully"}
-
 
 
 @router.get("/{agent_id}/llm-usage", response_model=AgentLLMUsageSummary)

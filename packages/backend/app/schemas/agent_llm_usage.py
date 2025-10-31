@@ -42,6 +42,8 @@ class AgentLLMUsageSummary(BaseModel):
 class AgentLLMUsageQuery(BaseModel):
     """Query parameters for usage analytics."""
 
-    start: Optional[datetime] = Field(default=None, description="Filter usage at or after this timestamp")
+    start: Optional[datetime] = Field(
+        default=None, description="Filter usage at or after this timestamp"
+    )
     end: Optional[datetime] = Field(default=None, description="Filter usage before this timestamp")
     limit: int = Field(default=100, ge=1, le=1000)

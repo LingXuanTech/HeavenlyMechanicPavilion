@@ -1,6 +1,8 @@
-from typing import Annotated
 from datetime import datetime
+from typing import Annotated
+
 from dateutil.relativedelta import relativedelta
+
 from .googlenews_utils import getNewsData
 
 
@@ -20,9 +22,7 @@ def get_google_news(
     news_str = ""
 
     for news in news_results:
-        news_str += (
-            f"### {news['title']} (source: {news['source']}) \n\n{news['snippet']}\n\n"
-        )
+        news_str += f"### {news['title']} (source: {news['source']}) \n\n{news['snippet']}\n\n"
 
     if len(news_results) == 0:
         return ""

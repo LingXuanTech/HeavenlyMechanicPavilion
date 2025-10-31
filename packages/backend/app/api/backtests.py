@@ -9,7 +9,6 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..dependencies import get_backtest_service, get_db_session
 from ..repositories import BacktestRunRepository
 from ..schemas.backtest import (
     BacktestArtifactResponse,
@@ -218,12 +217,16 @@ async def compare_backtests(
     service: BacktestService = Depends(get_backtest_service),
 ) -> BacktestComparisonResponse:
     if not run_ids:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least one run id is required")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="At least one run id is required"
+        )
 
     repo = BacktestRunRepository(db)
     comparisons = await service.compare_runs(session=repo, run_ids=run_ids)
     if not comparisons:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No matching backtest runs found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No matching backtest runs found"
+        )
 
     entries: List[BacktestComparisonEntry] = []
     for item in comparisons:
@@ -246,20 +249,16 @@ async def compare_backtests(
 @router.get("/{run_id}/export", response_model=BacktestExportResponse)
 async def export_backtest(
     run_id: str,
-    db: AsyncSession = Depends(get_db_session),
-    service: BacktestService = Depends(get_backtest_service),
+    db: AsyncSession = Depends(get_session),
 ) -> BacktestExportResponse:
+    service = BacktestService()
     repo = BacktestRunRepository(db)
     payload = await service.export_run(session=repo, run_id=run_id)
     if not payload:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Backtest run not found")
 
-    decision_entries = [
-        _decision_from_dict(entry) for entry in payload.get("decisions", [])
-    ]
-    trade_entries = [
-        _trade_from_dict(entry) for entry in payload.get("trades", [])
-    ]
+    decision_entries = [_decision_from_dict(entry) for entry in payload.get("decisions", [])]
+    trade_entries = [_trade_from_dict(entry) for entry in payload.get("trades", [])]
 
     artifacts_response = [
         _artifact_to_response(artifact) for artifact in payload.get("artifacts", [])

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
 from datetime import datetime
+from typing import List, Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession

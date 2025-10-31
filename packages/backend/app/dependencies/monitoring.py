@@ -6,7 +6,7 @@ warnings.warn(
     "Importing from app.dependencies.monitoring is deprecated. "
     "Use 'from app.dependencies import get_monitoring_service' instead.",
     DeprecationWarning,
-    stacklevel=2
+    stacklevel=2,
 )
 
 from .services import get_monitoring_service

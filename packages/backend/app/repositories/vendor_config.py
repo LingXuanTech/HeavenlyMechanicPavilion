@@ -19,10 +19,10 @@ class VendorConfigRepository(BaseRepository[VendorConfig]):
 
     async def get_by_name(self, name: str) -> Optional[VendorConfig]:
         """Get a vendor config by name.
-        
+
         Args:
             name: The config name
-            
+
         Returns:
             The vendor config if found, None otherwise
         """
@@ -32,10 +32,10 @@ class VendorConfigRepository(BaseRepository[VendorConfig]):
 
     async def get_by_type(self, vendor_type: str) -> List[VendorConfig]:
         """Get vendor configs by type.
-        
+
         Args:
             vendor_type: The vendor type
-            
+
         Returns:
             List of vendor configs
         """
@@ -48,7 +48,7 @@ class VendorConfigRepository(BaseRepository[VendorConfig]):
 
     async def get_active(self) -> List[VendorConfig]:
         """Get all active vendor configs.
-        
+
         Returns:
             List of active vendor configs
         """

@@ -20,7 +20,7 @@ class RedisManager:
         decode_responses: bool = True,
     ):
         """Initialize the Redis manager.
-        
+
         Args:
             host: Redis host
             port: Redis port
@@ -64,7 +64,7 @@ class RedisManager:
 
     async def ping(self) -> bool:
         """Check if Redis is accessible.
-        
+
         Returns:
             True if Redis responds to ping, False otherwise
         """
@@ -85,10 +85,10 @@ class RedisManager:
     # Cache operations
     async def get(self, key: str) -> Optional[str]:
         """Get a value from cache.
-        
+
         Args:
             key: Cache key
-            
+
         Returns:
             The cached value or None if not found
         """
@@ -101,12 +101,12 @@ class RedisManager:
         expire: Optional[int] = None,
     ) -> bool:
         """Set a value in cache.
-        
+
         Args:
             key: Cache key
             value: Value to cache
             expire: Expiration time in seconds
-            
+
         Returns:
             True if successful
         """
@@ -114,10 +114,10 @@ class RedisManager:
 
     async def delete(self, key: str) -> int:
         """Delete a key from cache.
-        
+
         Args:
             key: Cache key
-            
+
         Returns:
             Number of keys deleted
         """
@@ -125,10 +125,10 @@ class RedisManager:
 
     async def exists(self, key: str) -> bool:
         """Check if a key exists.
-        
+
         Args:
             key: Cache key
-            
+
         Returns:
             True if key exists
         """
@@ -137,10 +137,10 @@ class RedisManager:
     # JSON operations
     async def get_json(self, key: str) -> Optional[Any]:
         """Get a JSON value from cache.
-        
+
         Args:
             key: Cache key
-            
+
         Returns:
             The deserialized value or None if not found
         """
@@ -159,12 +159,12 @@ class RedisManager:
         expire: Optional[int] = None,
     ) -> bool:
         """Set a JSON value in cache.
-        
+
         Args:
             key: Cache key
             value: Value to cache (will be JSON serialized)
             expire: Expiration time in seconds
-            
+
         Returns:
             True if successful
         """
@@ -174,11 +174,11 @@ class RedisManager:
     # Pub/Sub operations (placeholder for future implementation)
     async def publish(self, channel: str, message: str) -> int:
         """Publish a message to a channel.
-        
+
         Args:
             channel: Channel name
             message: Message to publish
-            
+
         Returns:
             Number of subscribers that received the message
         """
@@ -186,10 +186,10 @@ class RedisManager:
 
     async def subscribe(self, *channels: str):
         """Subscribe to channels (placeholder).
-        
+
         Args:
             channels: Channel names to subscribe to
-            
+
         Returns:
             PubSub object for receiving messages
         """
@@ -209,13 +209,13 @@ def init_redis(
     password: Optional[str] = None,
 ) -> RedisManager:
     """Initialize the global Redis manager.
-    
+
     Args:
         host: Redis host
         port: Redis port
         db: Redis database number
         password: Redis password (if required)
-        
+
     Returns:
         RedisManager: The initialized Redis manager
     """
@@ -226,7 +226,7 @@ def init_redis(
 
 def get_redis_manager() -> Optional[RedisManager]:
     """Get the global Redis manager instance.
-    
+
     Returns:
         RedisManager: The Redis manager or None if not initialized
     """

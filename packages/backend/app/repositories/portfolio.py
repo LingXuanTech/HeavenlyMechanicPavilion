@@ -19,10 +19,10 @@ class PortfolioRepository(BaseRepository[Portfolio]):
 
     async def get_by_name(self, name: str) -> Optional[Portfolio]:
         """Get a portfolio by name.
-        
+
         Args:
             name: The portfolio name
-            
+
         Returns:
             The portfolio if found, None otherwise
         """

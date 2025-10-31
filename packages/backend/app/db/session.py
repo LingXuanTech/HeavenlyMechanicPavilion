@@ -14,7 +14,7 @@ class DatabaseManager:
 
     def __init__(self, database_url: str, echo: bool = False):
         """Initialize the database manager.
-        
+
         Args:
             database_url: Database connection URL (e.g., postgresql+asyncpg://...)
             echo: Whether to echo SQL statements for debugging
@@ -65,7 +65,7 @@ class DatabaseManager:
 
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
         """Get an async database session.
-        
+
         Yields:
             AsyncSession: A database session
         """
@@ -86,11 +86,11 @@ _db_manager: DatabaseManager | None = None
 
 def init_db(database_url: str, echo: bool = False) -> DatabaseManager:
     """Initialize the global database manager.
-    
+
     Args:
         database_url: Database connection URL
         echo: Whether to echo SQL statements
-        
+
     Returns:
         DatabaseManager: The initialized database manager
     """
@@ -101,23 +101,21 @@ def init_db(database_url: str, echo: bool = False) -> DatabaseManager:
 
 def get_db_manager() -> DatabaseManager:
     """Get the global database manager instance.
-    
+
     Returns:
         DatabaseManager: The database manager
-        
+
     Raises:
         RuntimeError: If the database manager has not been initialized
     """
     if _db_manager is None:
-        raise RuntimeError(
-            "Database manager not initialized. Call init_db() first."
-        )
+        raise RuntimeError("Database manager not initialized. Call init_db() first.")
     return _db_manager
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     """Dependency to get a database session in FastAPI.
-    
+
     Yields:
         AsyncSession: A database session
     """

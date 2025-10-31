@@ -21,12 +21,12 @@ class RiskMetricsRepository(BaseRepository[RiskMetrics]):
         self, portfolio_id: int, *, skip: int = 0, limit: int = 100
     ) -> List[RiskMetrics]:
         """Get risk metrics for a portfolio.
-        
+
         Args:
             portfolio_id: The portfolio ID
             skip: Number of records to skip
             limit: Maximum number of records to return
-            
+
         Returns:
             List of risk metrics
         """
@@ -40,14 +40,12 @@ class RiskMetricsRepository(BaseRepository[RiskMetrics]):
         result = await self.session.execute(statement)
         return list(result.scalars().all())
 
-    async def get_latest_by_portfolio(
-        self, portfolio_id: int
-    ) -> Optional[RiskMetrics]:
+    async def get_latest_by_portfolio(self, portfolio_id: int) -> Optional[RiskMetrics]:
         """Get the latest risk metrics for a portfolio.
-        
+
         Args:
             portfolio_id: The portfolio ID
-            
+
         Returns:
             Latest risk metrics if found, None otherwise
         """
@@ -64,12 +62,12 @@ class RiskMetricsRepository(BaseRepository[RiskMetrics]):
         self, session_id: int, *, skip: int = 0, limit: int = 100
     ) -> List[RiskMetrics]:
         """Get risk metrics for a trading session.
-        
+
         Args:
             session_id: The trading session ID
             skip: Number of records to skip
             limit: Maximum number of records to return
-            
+
         Returns:
             List of risk metrics
         """

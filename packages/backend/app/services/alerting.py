@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import smtplib
 from collections import deque
+from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Any, Deque, Dict, Optional
 from enum import Enum
-from datetime import datetime
-import json
+from typing import Any, Deque, Dict, Optional
 
 import aiohttp
-from pydantic import BaseModel
 
 from ..config.settings import Settings
 
@@ -34,7 +33,7 @@ class AlertingService:
 
     def __init__(self, settings: Settings):
         """初始化告警服务.
-        
+
         Args:
             settings: 应用配置
         """
@@ -71,16 +70,12 @@ class AlertingService:
         success = True
         if self.settings.alerting_enabled:
             if self.settings.alert_email_to:
-                email_sent = await self._send_email_alert(
-                    title, message, level, metadata
-                )
+                email_sent = await self._send_email_alert(title, message, level, metadata)
                 if not email_sent:
                     success = False
 
             if self.settings.alert_webhook_url:
-                webhook_sent = await self._send_webhook_alert(
-                    title, message, level, metadata
-                )
+                webhook_sent = await self._send_webhook_alert(title, message, level, metadata)
                 if not webhook_sent:
                     success = False
         else:
@@ -272,10 +267,10 @@ class AlertingService:
 
     def get_alert_history(self, limit: int = 50) -> list[Dict[str, Any]]:
         """Get recent alert history.
-        
+
         Args:
             limit: Maximum number of alerts to return
-            
+
         Returns:
             List of recent alerts
         """

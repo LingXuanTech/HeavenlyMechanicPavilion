@@ -19,10 +19,10 @@ class ExecutionRepository(BaseRepository[Execution]):
 
     async def get_by_trade(self, trade_id: int) -> List[Execution]:
         """Get all executions for a trade.
-        
+
         Args:
             trade_id: The trade ID
-            
+
         Returns:
             List of executions
         """
