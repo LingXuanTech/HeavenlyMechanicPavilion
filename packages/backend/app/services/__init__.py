@@ -1,6 +1,6 @@
 """Service layer for the FastAPI backend."""
 
-from .alerting import AlertingService, AlertLevel, get_alerting_service
+from .alerting import AlertingService, AlertLevel
 from .backtest import BacktestService
 from .broker_adapter import (
     BrokerAdapter,
@@ -12,7 +12,7 @@ from .broker_adapter import (
     SimulatedBroker,
 )
 from .execution import ExecutionService
-from .monitoring import MonitoringService, get_monitoring_service
+from .monitoring import MonitoringService
 from .position_sizing import PositionSizingMethod, PositionSizingService
 from .risk_management import (
     RiskConstraints,
@@ -40,6 +40,4 @@ __all__ = [
     "RiskManagementService",
     "SimulatedBroker",
     "TradingSessionService",
-    "get_alerting_service",
-    "get_monitoring_service",
 ]

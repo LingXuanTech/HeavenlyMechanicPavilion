@@ -30,17 +30,21 @@ router = APIRouter(prefix="/agents", tags=["agents"])
 
 def _convert_db_to_response(agent, active_llm: Optional[AgentLLMConfigResponse] = None) -> AgentConfigResponse:
     """Convert database model to response schema."""
+    # Parse LLM config from JSON string
+    llm_config = {}
+    if agent.llm_config_json:
+        try:
+            llm_config = json.loads(agent.llm_config_json)
+        except json.JSONDecodeError:
+            llm_config = {"provider": "openai", "model": "gpt-4o-mini"}
+    
     agent_dict = {
         "id": agent.id,
         "name": agent.name,
         "agent_type": agent.agent_type,
         "role": agent.role,
         "description": agent.description,
-        "llm_provider": agent.llm_provider,
-        "llm_model": agent.llm_model,
-        "llm_type": agent.llm_type,
-        "temperature": agent.temperature,
-        "max_tokens": agent.max_tokens,
+        "llm_config": llm_config,
         "prompt_template": agent.prompt_template,
         "requires_memory": agent.requires_memory,
         "memory_name": agent.memory_name,

@@ -119,4 +119,15 @@ export const api = {
       return fetchAPI<any>(`/api/agents/llm-configs${query ? `?${query}` : ""}`);
     },
   },
+
+  // Session endpoints
+  sessions: {
+    list: () => fetchAPI<any[]>("/api/sessions"),
+    get: (sessionId: string) => fetchAPI<any>(`/api/sessions/${sessionId}`),
+    run: (data: { ticker: string; trade_date?: string; selected_analysts?: string[] }) =>
+      fetchAPI<any>("/api/sessions/run", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+  },
 };

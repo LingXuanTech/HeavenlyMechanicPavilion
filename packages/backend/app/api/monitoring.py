@@ -3,11 +3,12 @@
 import logging
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Response, Depends
 from fastapi.responses import PlainTextResponse
 
-from ..services.alerting import get_alerting_service
-from ..services.monitoring import get_monitoring_service
+from ..dependencies import get_alerting_service, get_monitoring_service
+from ..services.alerting import AlertingService, AlertLevel
+from ..services.monitoring import MonitoringService
 from ..workers.watchdog import get_watchdog
 
 logger = logging.getLogger(__name__)
@@ -16,7 +17,9 @@ router = APIRouter()
 
 
 @router.get("/health", response_model=Dict[str, Any])
-async def get_comprehensive_health():
+async def get_comprehensive_health(
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+):
     """Get comprehensive health status of all services.
     
     Returns detailed health information for:
@@ -25,12 +28,13 @@ async def get_comprehensive_health():
     - Vendor plugins
     - Background workers
     """
-    monitoring_service = get_monitoring_service()
     return await monitoring_service.get_health_status()
 
 
 @router.get("/metrics")
-async def get_prometheus_metrics():
+async def get_prometheus_metrics(
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+):
     """Get Prometheus-formatted metrics.
     
     Returns metrics in Prometheus exposition format including:
@@ -42,14 +46,15 @@ async def get_prometheus_metrics():
     - Queue sizes
     - Service availability
     """
-    monitoring_service = get_monitoring_service()
     metrics_bytes, content_type = monitoring_service.get_prometheus_metrics()
     
     return Response(content=metrics_bytes, media_type=content_type)
 
 
 @router.get("/vendors", response_model=Dict[str, Any])
-async def get_vendor_status():
+async def get_vendor_status(
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+):
     """Get vendor availability and error rates.
     
     Returns detailed information about each vendor plugin including:
@@ -58,13 +63,14 @@ async def get_vendor_status():
     - Error rates
     - Rate limits
     """
-    monitoring_service = get_monitoring_service()
     health_status = await monitoring_service.get_health_status()
     return health_status.get("services", {}).get("vendors", {})
 
 
 @router.get("/workers", response_model=Dict[str, Any])
-async def get_worker_status():
+async def get_worker_status(
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+):
     """Get background worker status.
     
     Returns information about:
@@ -73,7 +79,6 @@ async def get_worker_status():
     - Tasks processed
     - Watchdog status
     """
-    monitoring_service = get_monitoring_service()
     health_status = await monitoring_service.get_health_status()
     
     # Also get watchdog status
@@ -90,19 +95,22 @@ async def get_worker_status():
 
 
 @router.get("/queues", response_model=Dict[str, Any])
-async def get_queue_metrics():
+async def get_queue_metrics(
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+):
     """Get queue backlog metrics.
     
     Returns information about:
     - Queue sizes
     - Total items across all queues
     """
-    monitoring_service = get_monitoring_service()
     return await monitoring_service.get_queue_metrics()
 
 
 @router.get("/database", response_model=Dict[str, Any])
-async def get_database_metrics():
+async def get_database_metrics(
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+):
     """Get database health and metrics.
     
     Returns:
@@ -110,13 +118,14 @@ async def get_database_metrics():
     - Query latency
     - Health status
     """
-    monitoring_service = get_monitoring_service()
     health_status = await monitoring_service.get_health_status()
     return health_status.get("services", {}).get("database", {})
 
 
 @router.get("/redis", response_model=Dict[str, Any])
-async def get_redis_metrics():
+async def get_redis_metrics(
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+):
     """Get Redis health and metrics.
     
     Returns:
@@ -125,13 +134,15 @@ async def get_redis_metrics():
     - Memory usage
     - Connected clients
     """
-    monitoring_service = get_monitoring_service()
     health_status = await monitoring_service.get_health_status()
     return health_status.get("services", {}).get("redis", {})
 
 
 @router.get("/alerts/history", response_model=List[Dict[str, Any]])
-async def get_alert_history(limit: int = 50):
+async def get_alert_history(
+    limit: int = 50,
+    alerting_service: AlertingService = Depends(get_alerting_service),
+):
     """Get recent alert history.
     
     Args:
@@ -140,12 +151,13 @@ async def get_alert_history(limit: int = 50):
     Returns:
         List of recent alerts with timestamps and details
     """
-    alerting_service = get_alerting_service()
     return alerting_service.get_alert_history(limit)
 
 
 @router.post("/alerts/test", response_model=Dict[str, Any])
-async def send_test_alert():
+async def send_test_alert(
+    alerting_service: AlertingService = Depends(get_alerting_service),
+):
     """Send a test alert to verify alerting configuration.
     
     Returns:
@@ -153,13 +165,11 @@ async def send_test_alert():
     """
     from ..services.alerting import AlertLevel
     
-    alerting_service = get_alerting_service()
-    
     success = await alerting_service.send_alert(
         title="Test Alert",
         message="This is a test alert from TradingAgents monitoring system.",
         level=AlertLevel.INFO,
-        details={
+        metadata={
             "source": "API test endpoint",
             "purpose": "Configuration verification",
         },
@@ -172,13 +182,14 @@ async def send_test_alert():
 
 
 @router.get("/uptime", response_model=Dict[str, Any])
-async def get_uptime():
+async def get_uptime(
+    monitoring_service: MonitoringService = Depends(get_monitoring_service),
+):
     """Get system uptime information.
     
     Returns:
         Uptime in seconds and formatted string
     """
-    monitoring_service = get_monitoring_service()
     import time
     
     uptime_seconds = time.time() - monitoring_service._start_time

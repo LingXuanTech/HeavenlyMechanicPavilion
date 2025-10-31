@@ -425,17 +425,3 @@ class MonitoringService:
         return generate_latest(), CONTENT_TYPE_LATEST
 
 
-# Global monitoring service instance
-_monitoring_service: Optional[MonitoringService] = None
-
-
-def get_monitoring_service() -> MonitoringService:
-    """Get or create the global monitoring service instance.
-    
-    Returns:
-        MonitoringService instance
-    """
-    global _monitoring_service
-    if _monitoring_service is None:
-        _monitoring_service = MonitoringService()
-    return _monitoring_service

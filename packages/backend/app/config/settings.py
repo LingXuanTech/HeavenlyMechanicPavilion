@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
@@ -11,11 +11,30 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     """Application settings with database, Redis, and environment configuration."""
 
-    # TradingAgents configuration
-    llm_provider: Optional[str] = Field(default=None, alias="TRADINGAGENTS_LLM_PROVIDER")
-    deep_think_llm: Optional[str] = Field(default=None, alias="TRADINGAGENTS_DEEP_THINK_LLM")
-    quick_think_llm: Optional[str] = Field(default=None, alias="TRADINGAGENTS_QUICK_THINK_LLM")
-    results_dir: Optional[str] = Field(default=None, alias="TRADINGAGENTS_RESULTS_DIR")
+    # ===== TradingAgents 核心配置 =====
+    llm_provider: str = Field(default="openai", alias="TRADINGAGENTS_LLM_PROVIDER")
+    deep_think_llm: str = Field(default="o4-mini", alias="TRADINGAGENTS_DEEP_THINK_LLM")
+    quick_think_llm: str = Field(default="gpt-4o-mini", alias="TRADINGAGENTS_QUICK_THINK_LLM")
+    results_dir: str = Field(default="./results", alias="TRADINGAGENTS_RESULTS_DIR")
+    
+    # TradingAgents 路径配置
+    project_dir: str = Field(default=".", alias="TRADINGAGENTS_PROJECT_DIR")
+    data_dir: str = Field(default="./data", alias="TRADINGAGENTS_DATA_DIR")
+    data_cache_dir: str = Field(default="./data_cache", alias="TRADINGAGENTS_DATA_CACHE_DIR")
+    
+    # LLM Backend URL
+    backend_url: str = Field(default="https://api.openai.com/v1", alias="TRADINGAGENTS_BACKEND_URL")
+    
+    # 辩论和讨论设置
+    max_debate_rounds: int = Field(default=1, alias="TRADINGAGENTS_MAX_DEBATE_ROUNDS")
+    max_risk_discuss_rounds: int = Field(default=1, alias="TRADINGAGENTS_MAX_RISK_DISCUSS_ROUNDS")
+    max_recur_limit: int = Field(default=100, alias="TRADINGAGENTS_MAX_RECUR_LIMIT")
+    
+    # 数据供应商配置
+    vendor_core_stock_apis: str = Field(default="yfinance", alias="VENDOR_CORE_STOCK_APIS")
+    vendor_technical_indicators: str = Field(default="yfinance", alias="VENDOR_TECHNICAL_INDICATORS")
+    vendor_fundamental_data: str = Field(default="alpha_vantage", alias="VENDOR_FUNDAMENTAL_DATA")
+    vendor_news_data: str = Field(default="alpha_vantage", alias="VENDOR_NEWS_DATA")
 
     # LLM Provider API Keys
     openai_api_key: Optional[str] = Field(default=None, alias="OPENAI_API_KEY")
@@ -117,3 +136,40 @@ class Settings(BaseSettings):
     def is_postgresql(self) -> bool:
         """Check if the database is PostgreSQL."""
         return "postgresql" in self.database_url.lower()
+    
+    @property
+    def data_vendors(self) -> Dict[str, str]:
+        """获取数据供应商配置字典.
+        
+        Returns:
+            数据供应商配置
+        """
+        return {
+            "core_stock_apis": self.vendor_core_stock_apis,
+            "technical_indicators": self.vendor_technical_indicators,
+            "fundamental_data": self.vendor_fundamental_data,
+            "news_data": self.vendor_news_data,
+        }
+    
+    @property
+    def tradingagents_config(self) -> Dict[str, Any]:
+        """获取 TradingAgents 完整配置字典 (兼容旧的 default_config.py 格式).
+        
+        Returns:
+            完整的 TradingAgents 配置
+        """
+        return {
+            "project_dir": self.project_dir,
+            "results_dir": self.results_dir,
+            "data_dir": self.data_dir,
+            "data_cache_dir": self.data_cache_dir,
+            "llm_provider": self.llm_provider,
+            "deep_think_llm": self.deep_think_llm,
+            "quick_think_llm": self.quick_think_llm,
+            "backend_url": self.backend_url,
+            "max_debate_rounds": self.max_debate_rounds,
+            "max_risk_discuss_rounds": self.max_risk_discuss_rounds,
+            "max_recur_limit": self.max_recur_limit,
+            "data_vendors": self.data_vendors,
+            "tool_vendors": {},  # 可以后续扩展为工具级别的配置
+        }

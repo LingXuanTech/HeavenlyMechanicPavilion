@@ -70,6 +70,12 @@ class TradingAgentsGraph:
         self.config = config or DEFAULT_CONFIG
         self.use_plugin_system = use_plugin_system
         self.llm_runtime = llm_runtime
+        
+        # Log runtime manager status
+        if self.llm_runtime:
+            logger.info("AgentLLMRuntime available for dynamic LLM configuration")
+        else:
+            logger.info("No runtime manager provided, using default LLMs only")
 
         # Update the interface's config
         set_config(self.config)
@@ -166,61 +172,66 @@ class TradingAgentsGraph:
         }
 
     def _initialize_default_llms(self) -> Dict[str, Any]:
-        """Create baseline LLM instances used when runtime configs are unavailable."""
+        """Create baseline LLM instances used when runtime configs are unavailable.
+        
+        Note: This is only used as a last resort fallback when llm_runtime is not provided.
+        The preferred approach is to inject an LLMRuntimeManager instance.
+        """
         defaults: Dict[str, Any] = {}
         provider = (self.config.get("llm_provider") or "openai").lower()
-        backend_url = self.config.get("backend_url")
-        quick_model = self.config.get("quick_think_llm")
-        deep_model = self.config.get("deep_think_llm")
-
+        
+        # Simplified fallback - just create basic OpenAI instances
         try:
-            if provider in {"openai", "ollama", "openrouter"}:
-                if deep_model:
-                    kwargs: Dict[str, Any] = {"model": deep_model}
-                    if backend_url:
-                        kwargs["base_url"] = backend_url
-                    defaults["deep"] = ChatOpenAI(**kwargs)
-                if quick_model:
-                    kwargs = {"model": quick_model}
-                    if backend_url:
-                        kwargs["base_url"] = backend_url
-                    defaults["quick"] = ChatOpenAI(**kwargs)
-            elif provider == "anthropic":
-                if deep_model:
-                    kwargs = {"model": deep_model}
-                    if backend_url:
-                        kwargs["base_url"] = backend_url
-                    defaults["deep"] = ChatAnthropic(**kwargs)
-                if quick_model:
-                    kwargs = {"model": quick_model}
-                    if backend_url:
-                        kwargs["base_url"] = backend_url
-                    defaults["quick"] = ChatAnthropic(**kwargs)
-            elif provider == "google":
-                if deep_model:
-                    defaults["deep"] = ChatGoogleGenerativeAI(model=deep_model)
-                if quick_model:
-                    defaults["quick"] = ChatGoogleGenerativeAI(model=quick_model)
-            else:
-                logger.warning("Unsupported LLM provider configured: %s", provider)
-        except Exception as exc:  # pragma: no cover - defensive
-            logger.error("Failed to initialize default LLMs: %s", exc)
+            quick_model = self.config.get("quick_think_llm", "gpt-4o-mini")
+            deep_model = self.config.get("deep_think_llm", "gpt-4-turbo")
+            
+            defaults["quick"] = ChatOpenAI(model=quick_model)
+            defaults["deep"] = ChatOpenAI(model=deep_model)
+            
+            logger.info(f"Initialized fallback LLMs: quick={quick_model}, deep={deep_model}")
+        except Exception as exc:
+            logger.error("Failed to initialize fallback LLMs: %s", exc)
 
         return defaults
 
-    def _resolve_llm(self, agent_name: str, llm_type: str) -> Any:
-        """Resolve the LLM instance for a specific agent."""
+    def _resolve_llm(self, agent_name: str, llm_type: str = "quick") -> Any:
+        """Resolve the LLM instance for a specific agent.
+        
+        This method follows a priority order:
+        1. Try to get agent-specific LLM from runtime manager (if provided)
+        2. Fall back to default LLMs based on llm_type
+        
+        Args:
+            agent_name: Name of the agent requesting the LLM
+            llm_type: Type of LLM - "quick" or "deep" (used for fallback only)
+            
+        Returns:
+            A LangChain ChatModel instance
+            
+        Raises:
+            ValueError: If no LLM can be resolved
+        """
+        # First priority: Use runtime manager if available
         if self.llm_runtime:
             try:
-                managed = self.llm_runtime.get_llm(agent_name, llm_type)
-                if managed is not None:
-                    return managed
-            except Exception as exc:  # pragma: no cover - defensive logging
-                logger.error("LLM runtime resolution failed for %s: %s", agent_name, exc)
+                llm = self.llm_runtime.get_llm(agent_name, llm_type)
+                logger.debug(f"Resolved LLM for {agent_name} via runtime manager")
+                return llm
+            except Exception as exc:
+                logger.warning(
+                    f"Runtime LLM resolution failed for {agent_name}: {exc}. "
+                    f"Falling back to default {llm_type} LLM"
+                )
 
+        # Fallback: Use default LLMs
         fallback = self._default_llms.get(llm_type)
         if fallback is None:
-            raise ValueError(f"No fallback LLM configured for type '{llm_type}'")
+            raise ValueError(
+                f"No LLM available for agent '{agent_name}'. "
+                f"llm_runtime not provided and fallback '{llm_type}' not initialized."
+            )
+        
+        logger.debug(f"Using fallback {llm_type} LLM for {agent_name}")
         return fallback
 
     def propagate(self, company_name, trade_date):

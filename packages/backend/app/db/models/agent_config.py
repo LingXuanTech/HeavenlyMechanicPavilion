@@ -18,15 +18,20 @@ class AgentConfig(SQLModel, table=True):
     agent_type: str = Field(index=True, max_length=50)  # analyst, trader, risk_manager, etc.
     role: str = Field(index=True, max_length=50)  # Role from AgentRole enum
     
-    # LLM Configuration
-    llm_provider: str = Field(default="openai", max_length=50)
-    llm_model: str = Field(default="gpt-4o-mini", max_length=100)
-    llm_type: str = Field(default="quick", max_length=20)  # 'quick' or 'deep'
-    temperature: float = Field(default=0.7)
-    max_tokens: Optional[int] = Field(default=None)
+    # LLM Configuration (JSON format for maximum flexibility)
+    # Structure: {
+    #   "provider": "openai" | "anthropic" | "deepseek" | "google",
+    #   "model": "gpt-4o" | "claude-3-opus" | "deepseek-chat",
+    #   "api_key_env": "OPENAI_API_KEY",  # Environment variable name
+    #   "base_url": "https://api.example.com/v1",  # Optional custom endpoint
+    #   "temperature": 0.7,
+    #   "max_tokens": 4000,
+    #   ... additional provider-specific parameters
+    # }
+    llm_config_json: str = Field(default='{"provider": "openai", "model": "gpt-4o-mini"}')
     
     # Agent configuration
-    prompt_template: Optional[str] = Field(default=None)  # Agent's prompt template
+    prompt_template: str = Field(default="You are a helpful AI assistant.")  # Agent's prompt template
     capabilities_json: Optional[str] = Field(default=None)  # JSON list of capabilities
     required_tools_json: Optional[str] = Field(default=None)  # JSON list of required tools
     

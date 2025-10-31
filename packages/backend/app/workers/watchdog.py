@@ -8,8 +8,9 @@ import time
 from datetime import datetime, timezone
 from typing import Dict, Optional
 
-from ..dependencies import get_settings
-from ..services.alerting import AlertLevel, get_alerting_service
+from ..config.settings import get_settings
+from ..dependencies import get_alerting_service
+from ..services.alerting import AlertLevel
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,9 @@ class WorkerWatchdog:
             logger.error(f"Watchdog monitoring loop error: {e}")
             # Try to send alert about watchdog failure
             try:
-                alerting_service = get_alerting_service()
+                from ..config.settings import get_settings
+                settings = get_settings()
+                alerting_service = get_alerting_service(settings)
                 await alerting_service.send_alert(
                     title="Worker Watchdog Failure",
                     message=f"Watchdog monitoring loop encountered an error: {str(e)}",
@@ -85,7 +88,9 @@ class WorkerWatchdog:
                 return
 
             current_time = time.time()
-            alerting_service = get_alerting_service()
+            from ..config.settings import get_settings
+            settings = get_settings()
+            alerting_service = get_alerting_service(settings)
 
             for worker_name, worker in worker_manager._workers.items():
                 # Check if worker is running

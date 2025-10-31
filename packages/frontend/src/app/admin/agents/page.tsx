@@ -49,28 +49,27 @@ import { api, APIError } from "@/lib/api/client";
 import { useToast } from "@/components/ui/toast";
 import { formatDate } from "@tradingagents/shared/utils/format";
 
+interface LLMConfig {
+  provider: string;
+  model: string;
+  temperature?: number;
+  max_tokens?: number;
+  base_url?: string;
+  api_key_env?: string;
+}
+
 interface Agent {
   id: number;
   name: string;
   agent_type: string;
   role: string;
   description: string | null;
-  llm_provider: string;
-  llm_model: string;
-  llm_type: string;
-  temperature: number;
-  max_tokens: number | null;
   prompt_template: string | null;
   capabilities: string[];
   required_tools: string[];
-  requires_memory: boolean;
-  memory_name: string | null;
-  is_reserved: boolean;
-  slot_name: string | null;
   is_active: boolean;
   version: string;
-  config: Record<string, any> | null;
-  metadata: Record<string, any> | null;
+  llm_config: LLMConfig;
   created_at: string;
   updated_at: string;
 }
@@ -80,19 +79,12 @@ interface AgentFormData {
   agent_type: string;
   role: string;
   description: string;
-  llm_provider: string;
-  llm_model: string;
-  llm_type: string;
-  temperature: number;
-  max_tokens: number | null;
   prompt_template: string;
   capabilities: string[];
   required_tools: string[];
-  requires_memory: boolean;
-  memory_name: string;
-  slot_name: string;
   is_active: boolean;
   version: string;
+  llm_config: LLMConfig;
 }
 
 interface AuditLogEntry {
@@ -113,8 +105,7 @@ const AGENT_ROLES = [
   "custom",
 ];
 
-const LLM_PROVIDERS = ["openai", "anthropic", "google", "local"];
-const LLM_TYPES = ["quick", "deep"];
+const LLM_PROVIDERS = ["openai", "anthropic", "google", "deepseek", "local"];
 
 export default function AgentMarketplacePage() {
   const [agents, setAgents] = React.useState<Agent[]>([]);
@@ -363,16 +354,11 @@ export default function AgentMarketplacePage() {
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">{agent.role}</Badge>
-                    {agent.is_reserved && (
-                      <Badge variant="muted" className="ml-2 text-xs">
-                        Reserved
-                      </Badge>
-                    )}
                   </TableCell>
                   <TableCell className="text-xs">
-                    <div>{agent.llm_provider}/{agent.llm_model}</div>
+                    <div>{agent.llm_config.provider}/{agent.llm_config.model}</div>
                     <div className="text-muted-foreground">
-                      {agent.llm_type} · T={agent.temperature}
+                      T={(agent.llm_config.temperature ?? 0).toFixed(1)}
                     </div>
                   </TableCell>
                   <TableCell>
@@ -427,15 +413,13 @@ export default function AgentMarketplacePage() {
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      {!agent.is_reserved && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteClick(agent)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteClick(agent)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -530,19 +514,16 @@ function CreateAgentDialog({ open, onOpenChange, onSuccess, onAudit }: CreateAge
     agent_type: "custom",
     role: "custom",
     description: "",
-    llm_provider: "openai",
-    llm_model: "gpt-4o-mini",
-    llm_type: "quick",
-    temperature: 0.7,
-    max_tokens: null,
     prompt_template: "",
     capabilities: [],
     required_tools: [],
-    requires_memory: false,
-    memory_name: "",
-    slot_name: "",
     is_active: true,
     version: "1.0.0",
+    llm_config: {
+      provider: "openai",
+      model: "gpt-4o-mini",
+      temperature: 0.7,
+    },
   };
 
   const [formData, setFormData] = React.useState<AgentFormData>(initialState);
@@ -629,19 +610,12 @@ function EditAgentDialog({ agent, open, onOpenChange, onSuccess, onAudit }: Edit
     agent_type: agent.agent_type,
     role: agent.role,
     description: agent.description || "",
-    llm_provider: agent.llm_provider,
-    llm_model: agent.llm_model,
-    llm_type: agent.llm_type,
-    temperature: agent.temperature,
-    max_tokens: agent.max_tokens,
     prompt_template: agent.prompt_template || "",
     capabilities: agent.capabilities || [],
     required_tools: agent.required_tools || [],
-    requires_memory: agent.requires_memory,
-    memory_name: agent.memory_name || "",
-    slot_name: agent.slot_name || "",
     is_active: agent.is_active,
     version: agent.version,
+    llm_config: agent.llm_config,
   });
   const [saving, setSaving] = React.useState(false);
   const { showToast } = useToast();
@@ -653,19 +627,12 @@ function EditAgentDialog({ agent, open, onOpenChange, onSuccess, onAudit }: Edit
         agent_type: agent.agent_type,
         role: agent.role,
         description: agent.description || "",
-        llm_provider: agent.llm_provider,
-        llm_model: agent.llm_model,
-        llm_type: agent.llm_type,
-        temperature: agent.temperature,
-        max_tokens: agent.max_tokens,
         prompt_template: agent.prompt_template || "",
         capabilities: agent.capabilities || [],
         required_tools: agent.required_tools || [],
-        requires_memory: agent.requires_memory,
-        memory_name: agent.memory_name || "",
-        slot_name: agent.slot_name || "",
         is_active: agent.is_active,
         version: agent.version,
+        llm_config: agent.llm_config,
       });
     }
   }, [open, agent]);
@@ -694,11 +661,6 @@ function EditAgentDialog({ agent, open, onOpenChange, onSuccess, onAudit }: Edit
     }
   };
 
-  const metadata = agent.metadata || {};
-  const recentOutputs: string[] = React.useMemo(() => {
-    const outputs = metadata.recent_outputs || metadata.recentOutputs;
-    return Array.isArray(outputs) ? outputs : [];
-  }, [metadata]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -710,23 +672,6 @@ function EditAgentDialog({ agent, open, onOpenChange, onSuccess, onAudit }: Edit
       </DialogHeader>
       <DialogContent className="max-h-[75vh] space-y-6 overflow-y-auto">
         <AgentForm formData={formData} setFormData={setFormData} isEdit />
-
-        <div className="space-y-3 rounded-lg border border-border/60 bg-surface-muted/40 p-4">
-          <h3 className="text-sm font-semibold">Recent Outputs</h3>
-          {recentOutputs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No recent outputs captured for this agent.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {recentOutputs.slice(0, 5).map((output, idx) => (
-                <div key={idx} className="rounded-md bg-background/60 p-3 text-sm text-muted-foreground">
-                  {output}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
       </DialogContent>
       <DialogFooter>
         <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -804,12 +749,11 @@ function AgentForm({ formData, setFormData, isEdit = false }: AgentFormProps) {
           </Select>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="slot_name">Slot Name</Label>
+          <Label htmlFor="version">Version</Label>
           <Input
-            id="slot_name"
-            value={formData.slot_name}
-            onChange={(e) => handleChange("slot_name", e.target.value)}
-            placeholder="risk_manager_primary"
+            id="version"
+            value={formData.version}
+            onChange={(e) => handleChange("version", e.target.value)}
           />
         </div>
       </div>
@@ -823,87 +767,6 @@ function AgentForm({ formData, setFormData, isEdit = false }: AgentFormProps) {
         />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="space-y-2">
-          <Label htmlFor="llm_provider">LLM Provider</Label>
-          <Select
-            value={formData.llm_provider}
-            onValueChange={(value) => handleChange("llm_provider", value)}
-          >
-            <SelectTrigger id="llm_provider">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LLM_PROVIDERS.map((provider) => (
-                <SelectItem key={provider} value={provider}>
-                  {provider}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="llm_model">LLM Model</Label>
-          <Input
-            id="llm_model"
-            value={formData.llm_model}
-            onChange={(e) => handleChange("llm_model", e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="llm_type">LLM Type</Label>
-          <Select
-            value={formData.llm_type}
-            onValueChange={(value) => handleChange("llm_type", value)}
-          >
-            <SelectTrigger id="llm_type">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {LLM_TYPES.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="temperature">Temperature</Label>
-          <Input
-            id="temperature"
-            type="number"
-            min="0"
-            max="2"
-            step="0.1"
-            value={formData.temperature}
-            onChange={(e) =>
-              handleChange(
-                "temperature",
-                e.target.value === "" ? 0 : parseFloat(e.target.value)
-              )
-            }
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="max_tokens">Max Tokens</Label>
-          <Input
-            id="max_tokens"
-            type="number"
-            value={formData.max_tokens ?? ""}
-            onChange={(e) =>
-              handleChange(
-                "max_tokens",
-                e.target.value === "" ? null : parseInt(e.target.value, 10)
-              )
-            }
-          />
-        </div>
-      </div>
-
       <div className="space-y-2">
         <Label htmlFor="prompt_template">Prompt Template</Label>
         <Textarea
@@ -914,63 +777,6 @@ function AgentForm({ formData, setFormData, isEdit = false }: AgentFormProps) {
           placeholder="Enter the agent's system prompt template..."
         />
       </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor="capabilities">Capabilities (comma-separated)</Label>
-          <Input
-            id="capabilities"
-            value={formData.capabilities.join(", ")}
-            onChange={(e) =>
-              handleChange(
-                "capabilities",
-                e.target.value
-                  .split(",")
-                  .map((cap) => cap.trim())
-                  .filter(Boolean)
-              )
-            }
-            placeholder="technical_analysis, macro_scout"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="required_tools">Tool Bindings (comma-separated)</Label>
-          <Input
-            id="required_tools"
-            value={formData.required_tools.join(", ")}
-            onChange={(e) =>
-              handleChange(
-                "required_tools",
-                e.target.value
-                  .split(",")
-                  .map((tool) => tool.trim())
-                  .filter(Boolean)
-              )
-            }
-            placeholder="get_stock_price, get_news, analyze_sentiment"
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center space-x-2">
-        <Switch
-          id="requires_memory"
-          checked={formData.requires_memory}
-          onCheckedChange={(checked) => handleChange("requires_memory", checked)}
-        />
-        <Label htmlFor="requires_memory">Requires Memory</Label>
-      </div>
-
-      {formData.requires_memory && (
-        <div className="space-y-2">
-          <Label htmlFor="memory_name">Memory Name</Label>
-          <Input
-            id="memory_name"
-            value={formData.memory_name}
-            onChange={(e) => handleChange("memory_name", e.target.value)}
-          />
-        </div>
-      )}
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">

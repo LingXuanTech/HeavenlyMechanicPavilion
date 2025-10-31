@@ -40,42 +40,24 @@ import { Slider } from "@/components/ui/slider";
 import { api, APIError } from "@/lib/api/client";
 import { useToast } from "@/components/ui/toast";
 
+interface LLMConfig {
+  provider: string;
+  model: string;
+  temperature?: number;
+  max_tokens?: number;
+  base_url?: string;
+  api_key_env?: string;
+}
+
 interface Agent {
   id: number;
   name: string;
   role: string;
+  llm_config: LLMConfig;
+  is_active: boolean;
 }
 
-interface AgentLLMConfig {
-  id: number;
-  agent_id: number;
-  provider: string;
-  model_name: string;
-  temperature: number;
-  max_tokens: number | null;
-  top_p: number | null;
-  fallback_provider: string | null;
-  fallback_model: string | null;
-  enabled: boolean;
-  has_api_key_override: boolean;
-  cost_per_1k_input_tokens: number;
-  cost_per_1k_output_tokens: number;
-  created_at: string;
-  updated_at: string;
-  metadata: Record<string, any> | null;
-}
-
-interface AgentLLMConfigWithAgent extends AgentLLMConfig {
-  agent_name?: string;
-  agent_role?: string;
-}
-
-interface LLMConfigFormData {
-  provider: string;
-  model_name: string;
-  temperature: number;
-  max_tokens: number | null;
-}
+type LLMConfigFormData = LLMConfig;
 
 const OPENAI_MODELS = [
   { value: "gpt-4", label: "GPT-4" },
@@ -84,42 +66,23 @@ const OPENAI_MODELS = [
 ];
 
 export default function AgentLLMConfigPage() {
-  const [configs, setConfigs] = React.useState<AgentLLMConfigWithAgent[]>([]);
   const [agents, setAgents] = React.useState<Agent[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [editConfig, setEditConfig] = React.useState<AgentLLMConfigWithAgent | null>(null);
+  const [editingAgent, setEditingAgent] = React.useState<Agent | null>(null);
   const [editDialogOpen, setEditDialogOpen] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [formData, setFormData] = React.useState<LLMConfigFormData>({
     provider: "openai",
-    model_name: "gpt-4",
+    model: "gpt-4o-mini",
     temperature: 0.7,
-    max_tokens: 2000,
   });
   const { showToast } = useToast();
 
   const loadData = React.useCallback(async () => {
     try {
       setLoading(true);
-      const [configsResponse, agentsResponse] = await Promise.all([
-        api.agents.listLLMConfigs({ limit: 1000 }),
-        api.agents.list({ limit: 1000 }),
-      ]);
-      
-      const agentsList = agentsResponse?.agents || [];
-      const configsList = configsResponse || [];
-      
-      const configsWithAgentInfo = configsList.map((config: AgentLLMConfig) => {
-        const agent = agentsList.find((a: Agent) => a.id === config.agent_id);
-        return {
-          ...config,
-          agent_name: agent?.name || `Agent ${config.agent_id}`,
-          agent_role: agent?.role || "unknown",
-        };
-      });
-
-      setAgents(agentsList);
-      setConfigs(configsWithAgentInfo);
+      const response = await api.agents.list({ limit: 1000 });
+      setAgents(response || []);
     } catch (error) {
       showToast({
         type: "error",
@@ -135,28 +98,23 @@ export default function AgentLLMConfigPage() {
     loadData();
   }, [loadData]);
 
-  const handleEdit = (config: AgentLLMConfigWithAgent) => {
-    setEditConfig(config);
-    setFormData({
-      provider: config.provider,
-      model_name: config.model_name,
-      temperature: config.temperature,
-      max_tokens: config.max_tokens,
-    });
+  const handleEdit = (agent: Agent) => {
+    setEditingAgent(agent);
+    setFormData(agent.llm_config);
     setEditDialogOpen(true);
   };
 
   const handleSave = async () => {
-    if (!editConfig) return;
+    if (!editingAgent) return;
 
     try {
       setSaving(true);
-      await api.agents.updateLLMConfig(editConfig.agent_id, formData);
+      await api.agents.update(editingAgent.id, { llm_config: formData });
       
       showToast({
         type: "success",
         title: "Configuration updated",
-        description: `LLM config for ${editConfig.agent_name} has been updated`,
+        description: `LLM config for ${editingAgent.name} has been updated`,
       });
       
       setEditDialogOpen(false);
@@ -195,7 +153,7 @@ export default function AgentLLMConfigPage() {
         <CardHeader>
           <CardTitle>LLM Configurations</CardTitle>
           <CardDescription>
-            {configs.length} agent{configs.length !== 1 ? "s" : ""} configured · {configs.filter((c) => c.enabled).length} enabled
+            {agents.length} agent{agents.length !== 1 ? "s" : ""} configured · {agents.filter((a) => a.is_active).length} active
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -213,45 +171,45 @@ export default function AgentLLMConfigPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {configs.map((config) => (
-                <TableRow key={config.id}>
+              {agents.map((agent) => (
+                <TableRow key={agent.id}>
                   <TableCell>
-                    <p className="font-medium">{config.agent_name}</p>
+                    <p className="font-medium">{agent.name}</p>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{config.agent_role}</Badge>
+                    <Badge variant="outline">{agent.role}</Badge>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm">{config.provider}</span>
+                    <span className="text-sm">{agent.llm_config.provider}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm font-mono">{config.model_name}</span>
+                    <span className="text-sm font-mono">{agent.llm_config.model}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm">{config.temperature.toFixed(1)}</span>
+                    <span className="text-sm">{(agent.llm_config.temperature ?? 0).toFixed(1)}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm">{config.max_tokens || "N/A"}</span>
+                    <span className="text-sm">{agent.llm_config.max_tokens || "N/A"}</span>
                   </TableCell>
                   <TableCell>
-                    {config.enabled ? (
-                      <Badge variant="default" className="bg-green-500">Enabled</Badge>
+                    {agent.is_active ? (
+                      <Badge variant="default" className="bg-green-500">Active</Badge>
                     ) : (
-                      <Badge variant="secondary">Disabled</Badge>
+                      <Badge variant="secondary">Inactive</Badge>
                     )}
                   </TableCell>
                   <TableCell>
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleEdit(config)}
+                      onClick={() => handleEdit(agent)}
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
                   </TableCell>
                 </TableRow>
               ))}
-              {configs.length === 0 && (
+              {agents.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center text-muted-foreground">
                     No configurations found
@@ -263,22 +221,22 @@ export default function AgentLLMConfigPage() {
         </CardContent>
       </Card>
 
-      {editConfig && (
+      {editingAgent && (
         <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Edit LLM Configuration</DialogTitle>
               <DialogDescription>
-                Update LLM settings for {editConfig.agent_name}
+                Update LLM settings for {editingAgent.name}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="model">Model</Label>
                 <Select
-                  value={formData.model_name}
+                  value={formData.model}
                   onValueChange={(value) =>
-                    setFormData((prev) => ({ ...prev, model_name: value }))
+                    setFormData((prev) => ({ ...prev, model: value }))
                   }
                 >
                   <SelectTrigger id="model">
@@ -298,7 +256,7 @@ export default function AgentLLMConfigPage() {
                 <div className="flex items-center justify-between">
                   <Label htmlFor="temperature">Temperature</Label>
                   <span className="text-sm text-muted-foreground">
-                    {formData.temperature.toFixed(1)}
+                    {(formData.temperature ?? 0).toFixed(1)}
                   </span>
                 </div>
                 <Slider
@@ -306,7 +264,7 @@ export default function AgentLLMConfigPage() {
                   min={0}
                   max={2}
                   step={0.1}
-                  value={[formData.temperature]}
+                  value={[formData.temperature ?? 0.7]}
                   onValueChange={(value) =>
                     setFormData((prev) => ({ ...prev, temperature: value[0] }))
                   }
@@ -322,18 +280,18 @@ export default function AgentLLMConfigPage() {
                   id="max_tokens"
                   type="number"
                   min={100}
-                  max={8000}
+                  max={16000}
                   value={formData.max_tokens || ""}
                   onChange={(e) =>
                     setFormData((prev) => ({
                       ...prev,
-                      max_tokens: e.target.value ? parseInt(e.target.value) : null,
+                      max_tokens: e.target.value ? parseInt(e.target.value) : undefined,
                     }))
                   }
                   placeholder="e.g., 2000"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Maximum number of tokens to generate (100-8000)
+                  Maximum number of tokens to generate (100-16000)
                 </p>
               </div>
             </div>

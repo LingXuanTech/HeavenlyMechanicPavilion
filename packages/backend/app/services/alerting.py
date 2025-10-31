@@ -2,25 +2,27 @@
 
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
 import smtplib
-from datetime import datetime, timezone
+from collections import deque
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Any, Deque, Dict, Optional
 from enum import Enum
-from typing import Any, Dict, Optional
+from datetime import datetime
+import json
 
 import aiohttp
+from pydantic import BaseModel
 
-from ..dependencies import get_settings
+from ..config.settings import Settings
 
 logger = logging.getLogger(__name__)
 
 
 class AlertLevel(str, Enum):
-    """Alert severity levels."""
+    """Alert level enumeration."""
+
     INFO = "info"
     WARNING = "warning"
     ERROR = "error"
@@ -30,72 +32,60 @@ class AlertLevel(str, Enum):
 class AlertingService:
     """Service for sending alerts via email and webhooks."""
 
-    def __init__(self):
-        """Initialize the alerting service."""
-        self.settings = get_settings()
-        self._alert_history: list[Dict[str, Any]] = []
-        self._max_history = 100
+    def __init__(self, settings: Settings):
+        """初始化告警服务.
+        
+        Args:
+            settings: 应用配置
+        """
+        self.settings = settings
+        self._alert_history: Deque[Dict[str, Any]] = deque(maxlen=100)
 
     async def send_alert(
         self,
         title: str,
         message: str,
         level: AlertLevel = AlertLevel.ERROR,
-        details: Optional[Dict[str, Any]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> bool:
-        """Send an alert via configured channels.
-        
+        """Send an alert.
+
         Args:
             title: Alert title
             message: Alert message
-            level: Alert severity level
-            details: Additional details dictionary
-            
-        Returns:
-            True if alert was sent successfully
-        """
-        if not self.settings.alerting_enabled:
-            logger.debug(f"Alerting disabled, skipping alert: {title}")
-            return False
+            level: Alert level
+            metadata: Optional metadata
 
-        # Record in history
+        Returns:
+            True if alert was sent successfully, False otherwise
+        """
         alert_data = {
             "title": title,
             "message": message,
-            "level": level,
-            "details": details or {},
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": level.value,
+            "metadata": metadata or {},
+            "timestamp": datetime.utcnow().isoformat(),
         }
         self._alert_history.append(alert_data)
-        
-        # Trim history
-        if len(self._alert_history) > self._max_history:
-            self._alert_history = self._alert_history[-self._max_history:]
 
-        # Send via configured channels
-        tasks = []
-        
-        if self.settings.alert_email_enabled:
-            tasks.append(self._send_email_alert(title, message, level, details))
-        
-        if self.settings.alert_webhook_enabled:
-            tasks.append(self._send_webhook_alert(title, message, level, details))
+        success = True
+        if self.settings.alerting_enabled:
+            if self.settings.alert_email_to:
+                email_sent = await self._send_email_alert(
+                    title, message, level, metadata
+                )
+                if not email_sent:
+                    success = False
 
-        if not tasks:
-            logger.warning("No alert channels configured")
-            return False
+            if self.settings.alert_webhook_url:
+                webhook_sent = await self._send_webhook_alert(
+                    title, message, level, metadata
+                )
+                if not webhook_sent:
+                    success = False
+        else:
+            logger.info(f"Alerting disabled, skipping alert: {title}")
 
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Return True if at least one channel succeeded
-        success = any(r is True for r in results if not isinstance(r, Exception))
-        
-        if not success:
-            logger.error(f"All alert channels failed for alert: {title}")
-            for result in results:
-                if isinstance(result, Exception):
-                    logger.error(f"Alert channel error: {result}")
-        
         return success
 
     async def _send_email_alert(
@@ -103,71 +93,53 @@ class AlertingService:
         title: str,
         message: str,
         level: AlertLevel,
-        details: Optional[Dict[str, Any]],
+        metadata: Optional[Dict[str, Any]],
     ) -> bool:
         """Send alert via email.
-        
+
         Args:
             title: Alert title
             message: Alert message
-            level: Alert severity level
-            details: Additional details
-            
+            level: Alert level
+            metadata: Optional metadata
+
         Returns:
-            True if email was sent successfully
+            True if email was sent successfully, False otherwise
         """
-        if not all([
-            self.settings.alert_email_to,
-            self.settings.alert_email_from,
-            self.settings.smtp_host,
-        ]):
-            logger.warning("Email alerting not fully configured")
+        if not self.settings.smtp_host or not self.settings.alert_email_to:
             return False
 
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"[{level.value.upper()}] {title}"
+        msg["From"] = self.settings.smtp_from
+        msg["To"] = self.settings.alert_email_to
+
+        text_part = self._format_email_text(title, message, level, metadata)
+        html_part = self._format_email_html(title, message, level, metadata)
+
+        msg.attach(MIMEText(text_part, "plain"))
+        msg.attach(MIMEText(html_part, "html"))
+
         try:
-            # Create message
-            msg = MIMEMultipart("alternative")
-            msg["Subject"] = f"[TradingAgents {level.upper()}] {title}"
-            msg["From"] = self.settings.alert_email_from
-            msg["To"] = self.settings.alert_email_to
-
-            # Create email body
-            text_body = self._format_email_text(title, message, level, details)
-            html_body = self._format_email_html(title, message, level, details)
-
-            msg.attach(MIMEText(text_body, "plain"))
-            msg.attach(MIMEText(html_body, "html"))
-
-            # Send email (run in thread pool to avoid blocking)
-            await asyncio.get_event_loop().run_in_executor(
-                None,
-                self._send_smtp_email,
-                msg,
-            )
-
-            logger.info(f"Alert email sent: {title}")
+            self._send_smtp_email(msg)
             return True
-
         except Exception as e:
             logger.error(f"Failed to send email alert: {e}")
             return False
 
     def _send_smtp_email(self, msg: MIMEMultipart):
-        """Send email via SMTP (synchronous).
-        
+        """Send email using SMTP.
+
         Args:
-            msg: Email message to send
+            msg: Email message
         """
-        if self.settings.smtp_use_tls:
+        if self.settings.smtp_tls:
             with smtplib.SMTP(self.settings.smtp_host, self.settings.smtp_port) as server:
                 server.starttls()
-                if self.settings.smtp_username and self.settings.smtp_password:
-                    server.login(self.settings.smtp_username, self.settings.smtp_password)
+                server.login(self.settings.smtp_user, self.settings.smtp_password)
                 server.send_message(msg)
         else:
             with smtplib.SMTP(self.settings.smtp_host, self.settings.smtp_port) as server:
-                if self.settings.smtp_username and self.settings.smtp_password:
-                    server.login(self.settings.smtp_username, self.settings.smtp_password)
                 server.send_message(msg)
 
     def _format_email_text(
@@ -175,104 +147,72 @@ class AlertingService:
         title: str,
         message: str,
         level: AlertLevel,
-        details: Optional[Dict[str, Any]],
+        metadata: Optional[Dict[str, Any]],
     ) -> str:
-        """Format alert as plain text email.
-        
+        """Format email as plain text.
+
         Args:
             title: Alert title
             message: Alert message
-            level: Alert severity level
-            details: Additional details
-            
+            level: Alert level
+            metadata: Optional metadata
+
         Returns:
-            Formatted text body
+            Plain text email body
         """
-        lines = [
-            f"TradingAgents Alert - {level.upper()}",
-            "=" * 50,
-            "",
-            f"Title: {title}",
-            f"Level: {level.upper()}",
-            f"Time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}",
-            "",
-            "Message:",
-            message,
-        ]
+        body = f"ALERT: {title}\n"
+        body += f"Level: {level.value.upper()}\n"
+        body += f"Time: {datetime.utcnow().isoformat()}\n\n"
+        body += f"{message}\n\n"
 
-        if details:
-            lines.extend([
-                "",
-                "Additional Details:",
-                json.dumps(details, indent=2),
-            ])
+        if metadata:
+            body += "Metadata:\n"
+            for key, value in metadata.items():
+                body += f"- {key}: {value}\n"
 
-        return "\n".join(lines)
+        return body
 
     def _format_email_html(
         self,
         title: str,
         message: str,
         level: AlertLevel,
-        details: Optional[Dict[str, Any]],
+        metadata: Optional[Dict[str, Any]],
     ) -> str:
-        """Format alert as HTML email.
-        
+        """Format email as HTML.
+
         Args:
             title: Alert title
             message: Alert message
-            level: Alert severity level
-            details: Additional details
-            
+            level: Alert level
+            metadata: Optional metadata
+
         Returns:
-            Formatted HTML body
+            HTML email body
         """
-        level_colors = {
-            AlertLevel.INFO: "#0ea5e9",
-            AlertLevel.WARNING: "#f59e0b",
-            AlertLevel.ERROR: "#ef4444",
-            AlertLevel.CRITICAL: "#991b1b",
-        }
-        
-        color = level_colors.get(level, "#6b7280")
-        
+        level_color = {
+            AlertLevel.INFO: "#3b82f6",
+            AlertLevel.WARNING: "#f59f00",
+            AlertLevel.ERROR: "#ef476f",
+            AlertLevel.CRITICAL: "#ef476f",
+        }.get(level, "#6b7280")
+
         html = f"""
         <html>
-            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <div style="background-color: {color}; color: white; padding: 15px; border-radius: 5px;">
-                        <h2 style="margin: 0;">TradingAgents Alert - {level.upper()}</h2>
-                    </div>
-                    
-                    <div style="padding: 20px; background-color: #f9fafb; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 5px 5px;">
-                        <h3 style="margin-top: 0;">{title}</h3>
-                        <p><strong>Time:</strong> {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}</p>
-                        
-                        <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                            <h4 style="margin-top: 0;">Message:</h4>
-                            <p>{message}</p>
-                        </div>
+            <body style="font-family: sans-serif; color: #111827;">
+                <div style="max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+                    <h1 style="color: {level_color}; font-size: 24px;">{level.value.upper()}: {title}</h1>
+                    <p><strong>Time:</strong> {datetime.utcnow().isoformat()}</p>
+                    <p>{message}</p>
         """
-        
-        if details:
-            html += """
-                        <div style="background-color: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
-                            <h4 style="margin-top: 0;">Additional Details:</h4>
-                            <pre style="background-color: #f3f4f6; padding: 10px; border-radius: 3px; overflow-x: auto;">
-            """
-            html += json.dumps(details, indent=2)
-            html += """
-                            </pre>
-                        </div>
-            """
-        
-        html += """
-                    </div>
-                </div>
-            </body>
-        </html>
-        """
-        
+
+        if metadata:
+            html += "<h2>Metadata</h2><ul>"
+            for key, value in metadata.items():
+                html += f"<li><strong>{key}:</strong> {value}</li>"
+            html += "</ul>"
+
+        html += "</div></body></html>"
         return html
 
     async def _send_webhook_alert(
@@ -280,36 +220,31 @@ class AlertingService:
         title: str,
         message: str,
         level: AlertLevel,
-        details: Optional[Dict[str, Any]],
+        metadata: Optional[Dict[str, Any]],
     ) -> bool:
         """Send alert via webhook.
-        
+
         Args:
             title: Alert title
             message: Alert message
-            level: Alert severity level
-            details: Additional details
-            
+            level: Alert level
+            metadata: Optional metadata
+
         Returns:
-            True if webhook was sent successfully
+            True if webhook was sent successfully, False otherwise
         """
         if not self.settings.alert_webhook_url:
-            logger.warning("Webhook URL not configured")
             return False
 
         try:
             payload = {
                 "title": title,
                 "message": message,
-                "level": level,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "details": details or {},
-                "source": "TradingAgents",
+                "level": level.value,
+                "metadata": metadata or {},
             }
 
             headers = {"Content-Type": "application/json"}
-            
-            # Parse custom headers if provided
             if self.settings.alert_webhook_headers:
                 try:
                     custom_headers = json.loads(self.settings.alert_webhook_headers)
@@ -344,20 +279,4 @@ class AlertingService:
         Returns:
             List of recent alerts
         """
-        return self._alert_history[-limit:]
-
-
-# Global alerting service instance
-_alerting_service: Optional[AlertingService] = None
-
-
-def get_alerting_service() -> AlertingService:
-    """Get or create the global alerting service instance.
-    
-    Returns:
-        AlertingService instance
-    """
-    global _alerting_service
-    if _alerting_service is None:
-        _alerting_service = AlertingService()
-    return _alerting_service
+        return list(self._alert_history)[-limit:]

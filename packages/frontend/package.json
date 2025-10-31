@@ -31,7 +31,8 @@
     "react-dom": "^18.2.0",
     "recharts": "^3.3.0",
     "tailwind-merge": "^2.5.3",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.2",

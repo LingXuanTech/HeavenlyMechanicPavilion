@@ -19,15 +19,18 @@ class AgentConfigBase(BaseModel):
     role: str = Field(..., description="Agent role from AgentRole enum")
     description: Optional[str] = Field(None, description="Human-readable description")
     
-    # LLM Configuration
-    llm_provider: str = Field(default="openai", description="LLM provider")
-    llm_model: str = Field(default="gpt-4o-mini", description="LLM model name")
-    llm_type: str = Field(default="quick", description="LLM type: 'quick' or 'deep'")
-    temperature: float = Field(default=0.7, ge=0.0, le=2.0)
-    max_tokens: Optional[int] = Field(None, gt=0)
+    # LLM Configuration (JSON format for flexibility)
+    # Structure: {provider, model, api_key_env, base_url?, temperature?, max_tokens?, ...}
+    llm_config: dict = Field(
+        default={"provider": "openai", "model": "gpt-4o-mini"},
+        description="LLM configuration in JSON format"
+    )
     
     # Agent configuration
-    prompt_template: Optional[str] = Field(None, description="Agent's prompt template")
+    prompt_template: str = Field(
+        default="You are a helpful AI assistant.",
+        description="Agent's prompt template"
+    )
     capabilities: Optional[List[str]] = Field(None, description="List of agent capabilities")
     required_tools: Optional[List[str]] = Field(None, description="List of required tool names")
     
@@ -61,11 +64,7 @@ class AgentConfigUpdate(BaseModel):
     description: Optional[str] = None
     
     # LLM Configuration
-    llm_provider: Optional[str] = None
-    llm_model: Optional[str] = None
-    llm_type: Optional[str] = None
-    temperature: Optional[float] = Field(None, ge=0.0, le=2.0)
-    max_tokens: Optional[int] = Field(None, gt=0)
+    llm_config: Optional[dict] = Field(None, description="LLM configuration in JSON format")
     
     # Agent configuration
     prompt_template: Optional[str] = None

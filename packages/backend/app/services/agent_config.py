@@ -49,6 +49,10 @@ class AgentConfigService:
         # Prepare data for database
         agent_dict = agent_data.model_dump(exclude_none=True)
         
+        # Convert llm_config dict to JSON string
+        if "llm_config" in agent_dict:
+            agent_dict["llm_config_json"] = json.dumps(agent_dict.pop("llm_config"))
+        
         # Convert lists to JSON
         if "capabilities" in agent_dict:
             agent_dict["capabilities_json"] = json.dumps(agent_dict.pop("capabilities"))
@@ -142,6 +146,10 @@ class AgentConfigService:
         
         # Prepare update data
         update_dict = agent_data.model_dump(exclude_none=True, exclude_unset=True)
+        
+        # Convert llm_config dict to JSON string
+        if "llm_config" in update_dict:
+            update_dict["llm_config_json"] = json.dumps(update_dict.pop("llm_config"))
         
         # Convert lists to JSON
         if "capabilities" in update_dict:

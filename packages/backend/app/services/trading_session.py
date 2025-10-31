@@ -35,6 +35,9 @@ class TradingSessionService:
         self,
         session: AsyncSession,
         portfolio_id: int,
+        broker: BrokerAdapter,
+        execution_service: ExecutionService,
+        risk_management: RiskManagementService,
         session_type: str = "PAPER",
         name: Optional[str] = None,
         description: Optional[str] = None,
@@ -42,13 +45,15 @@ class TradingSessionService:
         max_portfolio_exposure: Optional[float] = None,
         stop_loss_percentage: Optional[float] = None,
         take_profit_percentage: Optional[float] = None,
-        position_sizing_method: PositionSizingMethod = PositionSizingMethod.FIXED_PERCENTAGE,
     ) -> TradingSession:
         """Start a new trading session.
         
         Args:
             session: Database session
             portfolio_id: Portfolio ID
+            broker: Broker adapter instance (injected)
+            execution_service: Execution service instance (injected)
+            risk_management: Risk management service instance (injected)
             session_type: Session type (PAPER or LIVE)
             name: Session name
             description: Session description
@@ -56,7 +61,6 @@ class TradingSessionService:
             max_portfolio_exposure: Max portfolio exposure
             stop_loss_percentage: Stop loss percentage
             take_profit_percentage: Take profit percentage
-            position_sizing_method: Position sizing method
             
         Returns:
             Created trading session
@@ -67,30 +71,6 @@ class TradingSessionService:
         
         if not portfolio:
             raise ValueError(f"Portfolio {portfolio_id} not found")
-        
-        # Create risk constraints
-        constraints = RiskConstraints(
-            max_position_weight=max_position_size or 0.20,
-            max_portfolio_exposure=max_portfolio_exposure or 1.0,
-            default_stop_loss_pct=stop_loss_percentage or 0.10,
-            default_take_profit_pct=take_profit_percentage or 0.20,
-        )
-        
-        # Create broker adapter
-        if session_type == "PAPER":
-            broker = SimulatedBroker(
-                initial_capital=portfolio.current_capital,
-                commission_per_trade=0.0,
-                slippage_percent=0.001,
-            )
-        else:
-            # TODO: Implement live broker adapter
-            raise NotImplementedError("Live trading not yet implemented")
-        
-        # Create services
-        position_sizing = PositionSizingService(method=position_sizing_method)
-        risk_management = RiskManagementService(constraints=constraints)
-        execution_service = ExecutionService(broker, position_sizing, risk_management)
         
         # Create session record
         session_repo = TradingSessionRepository(session)
@@ -112,7 +92,7 @@ class TradingSessionService:
         created_session = await session_repo.create(trading_session)
         await session.commit()
         
-        # Store active session
+        # Store active session with injected services
         self.active_sessions[created_session.id] = {
             "session": created_session,
             "broker": broker,
