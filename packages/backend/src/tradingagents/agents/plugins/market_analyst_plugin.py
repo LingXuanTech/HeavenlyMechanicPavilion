@@ -6,7 +6,8 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from ..plugin_base import AgentCapability, AgentPlugin, AgentRole
-from ..utils.agent_utils import get_indicators, get_stock_data
+from ..utils.core_stock_tools import get_stock_data
+from ..utils.technical_indicators_tools import get_indicators
 
 
 class MarketAnalystPlugin(AgentPlugin):

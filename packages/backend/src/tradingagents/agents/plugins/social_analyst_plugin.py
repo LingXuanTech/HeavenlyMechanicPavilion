@@ -6,7 +6,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 from ..plugin_base import AgentCapability, AgentPlugin, AgentRole
-from ..utils.agent_utils import get_news
+from ..utils.news_data_tools import get_news
 
 
 class SocialAnalystPlugin(AgentPlugin):
