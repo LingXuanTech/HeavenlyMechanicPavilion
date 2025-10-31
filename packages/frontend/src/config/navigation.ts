@@ -11,6 +11,7 @@ import {
   Settings,
   Boxes,
   BarChart3,
+  Brain,
 } from "lucide-react";
 
 export type NavItem = {
@@ -109,6 +110,12 @@ export const navigation: NavSection[] = [
         href: "/admin/agents",
         description: "Manage plugin inventory and prompts",
         icon: Boxes,
+      },
+      {
+        label: "Agent LLM Config",
+        href: "/admin/agents/llm-config",
+        description: "Configure LLM settings for each agent",
+        icon: Brain,
       },
     ],
   },
