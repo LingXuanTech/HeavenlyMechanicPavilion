@@ -6,6 +6,8 @@ from sqlmodel import SQLModel
 
 from .models.agent_config import AgentConfig  # noqa: F401
 from .models.agent_llm_usage import AgentLLMUsage  # noqa: F401
+from .models.api_key import APIKey  # noqa: F401
+from .models.audit_log import AuditLog  # noqa: F401
 from .models.backtest import (  # noqa: F401
     BacktestArtifact,
     BacktestEquityCurvePoint,
@@ -20,6 +22,7 @@ from .models.portfolio import Portfolio  # noqa: F401
 from .models.position import Position  # noqa: F401
 from .models.run_log import RunLog  # noqa: F401
 from .models.trade import Trade  # noqa: F401
+from .models.user import User  # noqa: F401
 from .models.vendor_config import VendorConfig  # noqa: F401
 
 __all__ = [
@@ -30,6 +33,9 @@ __all__ = [
     "Execution",
     "AgentConfig",
     "AgentLLMUsage",
+    "APIKey",
+    "AuditLog",
+    "User",
     "VendorConfig",
     "RunLog",
     "BacktestRun",

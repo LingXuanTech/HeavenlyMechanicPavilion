@@ -11,13 +11,13 @@ from pathlib import Path
 # Add the parent directory to the path to import app modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from app.db.models.agent_llm_config import AgentLLMConfig
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.db.models.agent_config import AgentConfig
-from app.db.models.agent_llm_config import AgentLLMConfig
 from app.config.settings import settings
+from app.db.models.agent_config import AgentConfig
 
 
 async def seed_agent_llm_configs():
@@ -61,7 +61,7 @@ async def seed_agent_llm_configs():
         
         # Commit all changes
         await session.commit()
-        print(f"\n✨ Seed data created successfully!")
+        print("\n✨ Seed data created successfully!")
     
     await engine.dispose()
 

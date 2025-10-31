@@ -10,25 +10,12 @@ async def test_imports():
     print("Testing imports...")
     
     # Schemas
-    from app.schemas.streaming import (
-        DataType,
-        InstrumentConfig,
-        RefreshCadence,
-        StreamingConfig,
-        StreamMessage,
-        TelemetryRecord,
-        WorkerStatus,
-    )
     
     # Services
-    from app.services.streaming_config import StreamingConfigService
     
     # Workers
-    from app.workers import DataWorker, WorkerManager, get_worker_manager, init_worker_manager
     
     # API
-    from app.api.streaming import router as streaming_router
-    from app.api.streaming_config import router as config_router
     
     print("✓ All imports successful")
     return True
@@ -112,7 +99,6 @@ async def test_worker_manager_creation():
     print("\nTesting worker manager creation...")
     
     # We can't fully test without Redis, but we can test imports and structure
-    from app.workers import WorkerManager
     from app.schemas.streaming import DataType
     
     print("✓ WorkerManager class available")

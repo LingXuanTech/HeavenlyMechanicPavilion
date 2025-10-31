@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from tradingagents.llm_providers.registry import (
     PROVIDER_REGISTRY,
     ProviderType,

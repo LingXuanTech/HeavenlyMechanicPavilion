@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from .agent_config import AgentConfig
 from .agent_llm_usage import AgentLLMUsage
+from .api_key import APIKey
+from .audit_log import AuditLog
 from .backtest import (
     BacktestArtifact,
     BacktestEquityCurvePoint,
@@ -17,11 +19,14 @@ from .risk_metrics import RiskMetrics
 from .run_log import RunLog
 from .trade import Trade
 from .trading_session import TradingSession
+from .user import User, UserRole
 from .vendor_config import VendorConfig
 
 __all__ = [
     "AgentConfig",
     "AgentLLMUsage",
+    "APIKey",
+    "AuditLog",
     "Execution",
     "Portfolio",
     "Position",
@@ -29,6 +34,8 @@ __all__ = [
     "RunLog",
     "Trade",
     "TradingSession",
+    "User",
+    "UserRole",
     "VendorConfig",
     "BacktestRun",
     "BacktestMetrics",

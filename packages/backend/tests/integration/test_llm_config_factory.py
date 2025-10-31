@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 
 import pytest
@@ -17,7 +16,7 @@ from tradingagents.llm_providers import (
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
-    from app.db.session import DatabaseManager
+
 
 
 pytestmark = pytest.mark.asyncio

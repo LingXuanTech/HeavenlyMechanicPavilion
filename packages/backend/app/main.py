@@ -12,7 +12,7 @@ from .api import get_api_router
 from .cache import init_redis
 from .db import init_db
 from .dependencies import get_settings
-from .middleware import MetricsMiddleware
+from .middleware import AuthMiddleware, MetricsMiddleware, RateLimitMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,11 @@ app = FastAPI(
         "workflow with persistence and caching support."
     ),
 )
+
+# Add authentication and rate limiting middleware
+app.add_middleware(AuthMiddleware)
+if settings.rate_limit_enabled:
+    app.add_middleware(RateLimitMiddleware)
 
 # Add metrics middleware if enabled
 if settings.metrics_enabled:

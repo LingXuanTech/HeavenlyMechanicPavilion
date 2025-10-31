@@ -2,7 +2,6 @@
 """Simple test script for the persistence layer."""
 
 import asyncio
-from datetime import datetime
 
 from app.config import Settings
 from app.db import init_db

@@ -5,13 +5,13 @@ from __future__ import annotations
 from uuid import uuid4
 
 import pytest
+from app.schemas.agent_llm_config import AgentLLMConfigCreate
+from app.services.agent_llm_config import AgentLLMConfigService
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models.agent_config import AgentConfig
 from app.db.session import get_session
-from app.schemas.agent_llm_config import AgentLLMConfigCreate
-from app.services.agent_llm_config import AgentLLMConfigService
 
 
 @pytest.fixture
