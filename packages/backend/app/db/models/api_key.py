@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, SQLModel
 
 if TYPE_CHECKING:
-    from .user import User
+    pass
 
 
 class APIKey(SQLModel, table=True):
@@ -37,4 +37,5 @@ class APIKey(SQLModel, table=True):
     last_used_at: Optional[datetime] = Field(default=None)
 
     # Relationships
-    user: "User" = Relationship(back_populates="api_keys")
+    # Commented out to avoid SQLAlchemy 2.0 relationship resolution issues
+    # user: "User" = Relationship(back_populates="api_keys")

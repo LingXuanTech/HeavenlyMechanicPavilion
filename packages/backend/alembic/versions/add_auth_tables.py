@@ -1,7 +1,7 @@
 """add auth tables users api_keys audit_logs
 
 Revision ID: add_auth_tables
-Revises: add_trading_session_and_risk_metrics
+Revises: add_trading_session_risk
 Create Date: 2024-01-15 00:00:00.000000
 
 """
@@ -14,7 +14,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "add_auth_tables"
-down_revision: Union[str, None] = "add_trading_session_and_risk_metrics"
+down_revision: Union[str, None] = "add_trading_session_risk"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
