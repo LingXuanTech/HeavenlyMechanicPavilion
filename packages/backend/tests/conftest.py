@@ -22,6 +22,9 @@ from httpx import ASGITransport, AsyncClient  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
 from app.cache.redis_client import RedisManager  # noqa: E402
+
+# Import all models to ensure they're registered with SQLModel
+from app.db import base  # noqa: E402, F401
 from app.db.session import DatabaseManager  # noqa: E402
 
 

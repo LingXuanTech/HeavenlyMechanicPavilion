@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from .agent_config import AgentConfig
+from .agent_llm_config import AgentLLMConfig
 from .agent_llm_usage import AgentLLMUsage
 from .api_key import APIKey
 from .audit_log import AuditLog
@@ -19,11 +20,14 @@ from .risk_metrics import RiskMetrics
 from .run_log import RunLog
 from .trade import Trade
 from .trading_session import TradingSession
+
+# Import models in dependency order to avoid relationship resolution issues
 from .user import User, UserRole
 from .vendor_config import VendorConfig
 
 __all__ = [
     "AgentConfig",
+    "AgentLLMConfig",
     "AgentLLMUsage",
     "APIKey",
     "AuditLog",

@@ -6,11 +6,10 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, SQLModel
 
 if TYPE_CHECKING:
-    from .api_key import APIKey
-    from .audit_log import AuditLog
+    pass
 
 
 class UserRole(str, Enum):
@@ -52,6 +51,7 @@ class User(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     last_login_at: Optional[datetime] = Field(default=None)
 
-    # Relationships
-    api_keys: list["APIKey"] = Relationship(back_populates="user")
-    audit_logs: list["AuditLog"] = Relationship(back_populates="user")
+    # Relationships - using lowercase list for SQLModel compatibility
+    # These will be populated automatically by SQLModel
+    # api_keys: list["APIKey"] = Relationship(back_populates="user")
+    # audit_logs: list["AuditLog"] = Relationship(back_populates="user")
