@@ -2,8 +2,9 @@
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 
+from app.core.errors import ResourceNotFoundError, ValidationError, VendorAPIError
 from app.schemas.vendor import (
     AllRoutingConfigResponse,
     ConfigReloadResponse,
@@ -47,7 +48,10 @@ async def list_vendors():
         return VendorPluginList(plugins=plugin_infos, count=len(plugin_infos))
     except Exception as e:
         logger.error(f"Failed to list vendors: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise VendorAPIError(
+            "Failed to list vendors",
+            details={"error": str(e)},
+        ) from e
 
 
 @router.get("/{vendor_name}", response_model=VendorPluginInfo)
@@ -58,7 +62,10 @@ async def get_vendor(vendor_name: str):
         plugin = registry.get_plugin(vendor_name)
 
         if not plugin:
-            raise HTTPException(status_code=404, detail=f"Vendor '{vendor_name}' not found")
+            raise ResourceNotFoundError(
+                f"Vendor '{vendor_name}' not found",
+                details={"vendor": vendor_name},
+            )
 
         return VendorPluginInfo(
             name=plugin.name,
@@ -70,11 +77,14 @@ async def get_vendor(vendor_name: str):
             rate_limits=plugin.get_rate_limits(),
             is_active=True,
         )
-    except HTTPException:
+    except ResourceNotFoundError:
         raise
     except Exception as e:
         logger.error(f"Failed to get vendor {vendor_name}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise VendorAPIError(
+            f"Failed to get vendor {vendor_name}",
+            details={"vendor": vendor_name, "error": str(e)},
+        ) from e
 
 
 @router.get("/{vendor_name}/config", response_model=VendorConfigResponse)
@@ -87,7 +97,10 @@ async def get_vendor_config(vendor_name: str):
         return VendorConfigResponse(vendor_name=vendor_name, config=config)
     except Exception as e:
         logger.error(f"Failed to get vendor config for {vendor_name}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise VendorAPIError(
+            f"Failed to get vendor config for {vendor_name}",
+            details={"vendor": vendor_name, "error": str(e)},
+        ) from e
 
 
 @router.put("/{vendor_name}/config", response_model=VendorConfigResponse)

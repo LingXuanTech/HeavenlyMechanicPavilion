@@ -8,6 +8,7 @@ from typing import List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..core.errors import InsufficientFundsError, ResourceNotFoundError, RiskConstraintViolation
 from ..db.models import Execution, Portfolio, Position, Trade
 from ..repositories import (
     ExecutionRepository,
@@ -92,8 +93,10 @@ class ExecutionService:
 
         portfolio = await portfolio_repo.get(portfolio_id)
         if not portfolio:
-            logger.error(f"Portfolio {portfolio_id} not found")
-            return None
+            raise ResourceNotFoundError(
+                f"Portfolio {portfolio_id} not found",
+                details={"portfolio_id": portfolio_id},
+            )
 
         # Get current position
         current_position = await position_repo.get_by_symbol(portfolio_id, symbol)
@@ -129,13 +132,18 @@ class ExecutionService:
             return None
 
         # Pre-execution risk checks
-        risk_check_passed = await self._check_risk_constraints(
-            session, portfolio, order_action, symbol, quantity, current_price
-        )
-
-        if not risk_check_passed:
-            logger.warning(f"Risk check failed for {symbol} {order_action.value}")
-            return None
+        try:
+            await self._check_risk_constraints(
+                session, portfolio, order_action, symbol, quantity, current_price
+            )
+        except (RiskConstraintViolation, InsufficientFundsError) as exc:
+            logger.warning(
+                "Risk check failed for %s %s: %s",
+                symbol,
+                order_action.value,
+                exc.message,
+            )
+            raise
 
         # Create order request
         order_request = OrderRequest(
@@ -205,7 +213,7 @@ class ExecutionService:
         symbol: str,
         quantity: float,
         price: float,
-    ) -> bool:
+    ) -> None:
         """Check if order meets risk constraints.
 
         Args:
@@ -216,8 +224,9 @@ class ExecutionService:
             quantity: Order quantity
             price: Current price
 
-        Returns:
-            True if constraints are met, False otherwise
+        Raises:
+            InsufficientFundsError: If the portfolio lacks buying power for the order.
+            RiskConstraintViolation: If the trade breaches configured risk limits.
         """
         # Check if we have enough capital for buy orders
         if action in [OrderAction.BUY, OrderAction.COVER]:
@@ -225,11 +234,15 @@ class ExecutionService:
             buying_power = await self.broker.get_buying_power()
 
             if order_value > buying_power:
-                logger.warning(
-                    f"Insufficient buying power: need ${order_value:,.2f}, "
-                    f"have ${buying_power:,.2f}"
+                raise InsufficientFundsError(
+                    "Insufficient buying power for order.",
+                    details={
+                        "required": round(order_value, 2),
+                        "available": round(buying_power, 2),
+                        "symbol": symbol,
+                        "action": action.value,
+                    },
                 )
-                return False
 
         # Check position size constraints
         position_repo = PositionRepository(session)
@@ -254,13 +267,17 @@ class ExecutionService:
         )
 
         if new_position_value > max_position_value:
-            logger.warning(
-                f"Position size ${new_position_value:,.0f} would exceed maximum "
-                f"${max_position_value:,.0f}"
+            raise RiskConstraintViolation(
+                "Position size would exceed configured maximum.",
+                details={
+                    "symbol": symbol,
+                    "projected_value": round(new_position_value, 2),
+                    "max_allowed": round(max_position_value, 2),
+                    "portfolio_id": portfolio.id,
+                },
             )
-            return False
 
-        return True
+        return None
 
     async def _handle_fill(
         self,

@@ -8,6 +8,7 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..core.errors import ResourceNotFoundError
 from ..db.models import RiskMetrics, TradingSession
 from ..repositories import (
     PortfolioRepository,
@@ -69,7 +70,10 @@ class TradingSessionService:
         portfolio = await portfolio_repo.get(portfolio_id)
 
         if not portfolio:
-            raise ValueError(f"Portfolio {portfolio_id} not found")
+            raise ResourceNotFoundError(
+                f"Portfolio {portfolio_id} not found",
+                details={"portfolio_id": portfolio_id},
+            )
 
         # Create session record
         session_repo = TradingSessionRepository(session)
@@ -124,7 +128,10 @@ class TradingSessionService:
         trading_session = await session_repo.get(session_id)
 
         if not trading_session:
-            raise ValueError(f"Trading session {session_id} not found")
+            raise ResourceNotFoundError(
+                f"Trading session {session_id} not found",
+                details={"session_id": session_id},
+            )
 
         if trading_session.status != "ACTIVE":
             logger.warning(f"Session {session_id} is not active")
@@ -199,7 +206,10 @@ class TradingSessionService:
         trading_session = await session_repo.get(session_id)
 
         if not trading_session:
-            raise ValueError(f"Trading session {session_id} not found")
+            raise ResourceNotFoundError(
+                f"Trading session {session_id} not found",
+                details={"session_id": session_id},
+            )
 
         # Get portfolio
         portfolio_repo = PortfolioRepository(session)

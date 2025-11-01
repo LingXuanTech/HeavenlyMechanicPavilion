@@ -90,9 +90,26 @@ class Settings(BaseSettings):
     watchdog_task_timeout: int = Field(default=300, alias="WATCHDOG_TASK_TIMEOUT")
 
     # Application configuration
+    environment: str = Field(default="development", alias="ENVIRONMENT")
     debug: bool = Field(default=False, alias="DEBUG")
     api_title: str = Field(default="TradingAgents Backend", alias="API_TITLE")
     api_version: str = Field(default="0.1.0", alias="API_VERSION")
+
+    # Error tracking / observability
+    error_tracking_enabled: bool = Field(default=False, alias="ERROR_TRACKING_ENABLED")
+    sentry_dsn: Optional[str] = Field(default=None, alias="SENTRY_DSN")
+    sentry_traces_sample_rate: float = Field(default=0.0, alias="SENTRY_TRACES_SAMPLE_RATE")
+    sentry_profiles_sample_rate: float = Field(default=0.0, alias="SENTRY_PROFILES_SAMPLE_RATE")
+
+    # Resilience defaults
+    retry_default_attempts: int = Field(default=3, alias="RETRY_DEFAULT_ATTEMPTS")
+    retry_default_backoff_seconds: float = Field(default=0.5, alias="RETRY_DEFAULT_BACKOFF_SECONDS")
+    retry_max_backoff_seconds: float = Field(default=30.0, alias="RETRY_MAX_BACKOFF_SECONDS")
+    circuit_breaker_failure_threshold: int = Field(default=5, alias="CIRCUIT_BREAKER_FAILURE_THRESHOLD")
+    circuit_breaker_recovery_seconds: int = Field(default=60, alias="CIRCUIT_BREAKER_RECOVERY_SECONDS")
+    circuit_breaker_half_open_successes: int = Field(
+        default=1, alias="CIRCUIT_BREAKER_HALF_OPEN_SUCCESSES"
+    )
 
     # Authentication configuration
     jwt_secret_key: str = Field(

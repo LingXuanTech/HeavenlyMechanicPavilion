@@ -9,6 +9,14 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
+from ..core.errors import (
+    ExternalServiceError,
+    InsufficientFundsError,
+    ResourceNotFoundError,
+    TradingAgentsError,
+    ValidationError,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -204,6 +212,23 @@ class SimulatedBroker(BrokerAdapter):
             # Get market price
             market_price = await self.get_market_price(order.symbol)
 
+            # Pre-trade capital check for buy-side orders
+            if order.action in [OrderAction.BUY, OrderAction.COVER]:
+                estimated_price = market_price.ask if order.order_type != OrderType.LIMIT else (
+                    order.limit_price or market_price.ask
+                )
+                required_capital = order.quantity * estimated_price
+                if required_capital > self.current_capital:
+                    raise InsufficientFundsError(
+                        f"Insufficient capital to execute order {order_id}.",
+                        details={
+                            "symbol": order.symbol,
+                            "required": round(required_capital, 2),
+                            "available": round(self.current_capital, 2),
+                            "order_type": order.order_type.value,
+                        },
+                    )
+
             # Determine fill price based on order type
             if order.order_type == OrderType.MARKET:
                 # Market orders execute immediately with slippage
@@ -220,7 +245,10 @@ class SimulatedBroker(BrokerAdapter):
                 # Limit orders require price to be met
                 # For simulation, we'll execute if limit price is reasonable
                 if order.limit_price is None:
-                    raise ValueError("Limit price required for LIMIT orders")
+                    raise ValidationError(
+                        "Limit price required for LIMIT orders",
+                        details={"symbol": order.symbol, "order_type": order.order_type.value},
+                    )
 
                 if order.action in [OrderAction.BUY, OrderAction.COVER]:
                     if order.limit_price >= market_price.ask:
@@ -290,22 +318,21 @@ class SimulatedBroker(BrokerAdapter):
             self.orders[order_id] = response
             return response
 
-        except Exception as e:
-            logger.error(f"Error submitting order {order_id}: {e}")
-            return OrderResponse(
-                order_id=order_id,
-                status=OrderStatus.REJECTED,
-                symbol=order.symbol,
-                action=order.action,
-                quantity=order.quantity,
-                filled_quantity=0.0,
-                average_fill_price=None,
-                commission=0.0,
-                fees=0.0,
-                message=f"Rejected: {str(e)}",
-                submitted_at=datetime.utcnow(),
-                filled_at=None,
+        except TradingAgentsError:
+            raise
+        except Exception as e:  # pragma: no cover - defensive
+            logger.error(
+                f"Error submitting order {order_id}: {e}",
+                exc_info=True,
             )
+            raise ExternalServiceError(
+                f"Broker failed to submit order {order_id}",
+                details={
+                    "symbol": order.symbol,
+                    "action": order.action.value,
+                    "order_type": order.order_type.value,
+                },
+            ) from e
 
     async def cancel_order(self, order_id: str) -> OrderResponse:
         """Cancel an order.
@@ -317,7 +344,10 @@ class SimulatedBroker(BrokerAdapter):
             Updated order response
         """
         if order_id not in self.orders:
-            raise ValueError(f"Order {order_id} not found")
+            raise ResourceNotFoundError(
+                f"Order {order_id} not found",
+                details={"order_id": order_id},
+            )
 
         order = self.orders[order_id]
 
@@ -341,7 +371,10 @@ class SimulatedBroker(BrokerAdapter):
             Order response
         """
         if order_id not in self.orders:
-            raise ValueError(f"Order {order_id} not found")
+            raise ResourceNotFoundError(
+                f"Order {order_id} not found",
+                details={"order_id": order_id},
+            )
 
         return self.orders[order_id]
 
