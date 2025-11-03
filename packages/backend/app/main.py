@@ -15,6 +15,7 @@ from .db import init_db
 from .dependencies import get_settings
 from .middleware import (
     AuthMiddleware,
+    CompressionMiddleware,
     ErrorHandlingMiddleware,
     MetricsMiddleware,
     RateLimitMiddleware,
@@ -36,6 +37,9 @@ app = FastAPI(
 
 # Add global error handling middleware
 app.add_middleware(ErrorHandlingMiddleware)
+
+# Add compression middleware for response optimization
+app.add_middleware(CompressionMiddleware, minimum_size=500, compression_level=6)
 
 # Add authentication and rate limiting middleware
 app.add_middleware(AuthMiddleware)

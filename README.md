@@ -30,6 +30,8 @@ TradingAgents orchestrates a team of specialist LLM-driven agents – analysts, 
 | [DEPLOYMENT](docs/DEPLOYMENT.md) | Docker Compose stacks, production hardening, scaling, and maintenance. |
 | [DEVELOPMENT](docs/DEVELOPMENT.md) | Conventions, testing matrix, tooling, and contribution workflow. |
 | [DATABASE PERFORMANCE TUNING](docs/DATABASE_PERFORMANCE_TUNING.md) | Connection pooling, query optimization, indexes, and read replica support. |
+| [PERFORMANCE OPTIMIZATIONS](PERFORMANCE_OPTIMIZATIONS.md) | Comprehensive guide to frontend, backend, and infrastructure optimizations. |
+| [OPTIMIZATION QUICK START](OPTIMIZATION_QUICK_START.md) | Quick reference for developers to leverage performance optimizations. |
 
 ### 📊 Project Status & Roadmap
 
@@ -46,8 +48,9 @@ Additional operational guidance (e.g., Kubernetes manifests) lives under [`docs/
 - **Multi-agent trading workflow** built on LangGraph with specialized analyst, researcher, trader, and risk-management roles.
 - **Extensible plugin ecosystems** for both data vendors and agents, including hot-reloadable routing and registry APIs.
 - **FastAPI backend** with SSE/WebSocket streaming, persistence, monitoring endpoints, and optional workers.
+- **Production-optimized performance** with response compression, connection pooling, intelligent caching, and code splitting.
 - **Optimized database layer** with connection pooling, query performance monitoring, and read replica support for scaling.
-- **Next.js Control Center** for configuring and observing sessions in real time.
+- **Next.js Control Center** with advanced bundle optimization, lazy loading, and caching strategies.
 - **ChromaDB-backed memory** and reflection loops for iterative research and trading decisions.
 
 ## ⚡ Quick Start

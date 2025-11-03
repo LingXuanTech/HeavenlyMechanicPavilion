@@ -1,9 +1,12 @@
 # Multi-stage Dockerfile for TradingAgents Backend
+# Optimized for layer caching and smaller image size
 # Stage 1: Base image with uv
 FROM python:3.13-slim AS base
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies in a single layer
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gcc \
     g++ \
@@ -15,22 +18,25 @@ RUN apt-get update && apt-get install -y \
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Set environment variables
+# Set environment variables for optimization
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    UV_SYSTEM_PYTHON=1
+    UV_SYSTEM_PYTHON=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
 WORKDIR /app
 
 # Stage 2: Dependencies
 FROM base AS dependencies
 
-# Copy dependency files
+# Copy dependency files (layer caching optimization)
 COPY pyproject.toml uv.lock ./
 COPY requirements.txt ./
 
-# Install dependencies using uv
-RUN uv pip install --system --no-cache -r requirements.txt
+# Install dependencies using uv with cache mount for faster rebuilds
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system -r requirements.txt
 
 # Stage 3: Build
 FROM dependencies AS builder
@@ -38,14 +44,17 @@ FROM dependencies AS builder
 # Copy source code
 COPY . .
 
-# Install the package
-RUN uv pip install --system --no-cache -e .
+# Install the package with cache mount
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system -e .
 
 # Stage 4: Production
 FROM python:3.13-slim AS production
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
+# Install runtime dependencies with cache mount
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     curl \
     netcat-openbsd \

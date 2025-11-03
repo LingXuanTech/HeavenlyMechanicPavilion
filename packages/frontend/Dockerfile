@@ -1,4 +1,5 @@
 # Multi-stage Dockerfile for TradingAgents Frontend (Next.js)
+# Optimized for layer caching and smaller image size
 # Stage 1: Dependencies
 FROM node:20-alpine AS dependencies
 
@@ -14,8 +15,9 @@ COPY ../../package.json ../../pnpm-workspace.yaml ../../pnpm-lock.yaml* ./
 COPY package.json ./packages/frontend/
 COPY ../shared/package.json ./packages/shared/
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies with cache mount for faster rebuilds
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile --prefer-offline
 
 # Stage 2: Builder
 FROM node:20-alpine AS builder
@@ -39,8 +41,11 @@ WORKDIR /app/packages/frontend
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
-# Build the application with standalone output
-ENV NEXT_TELEMETRY_DISABLED=1
+# Build the application with standalone output and optimizations
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NODE_ENV=production \
+    NODE_OPTIONS="--max-old-space-size=4096"
+
 RUN pnpm build
 
 # Stage 3: Production runner
