@@ -22,6 +22,7 @@ class Trade(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     portfolio_id: int = Field(foreign_key="portfolios.id", index=True)
+    session_id: Optional[int] = Field(default=None, foreign_key="trading_sessions.id", index=True)
 
     symbol: str = Field(index=True, max_length=20)
     action: str = Field(max_length=10)  # BUY, SELL, SHORT, COVER

@@ -53,6 +53,22 @@ class Settings(BaseSettings):
         alias="DATABASE_URL",
     )
     database_echo: bool = Field(default=False, alias="DATABASE_ECHO")
+    
+    # Database connection pooling configuration
+    db_pool_size: int = Field(default=5, alias="DB_POOL_SIZE")
+    db_max_overflow: int = Field(default=10, alias="DB_MAX_OVERFLOW")
+    db_pool_timeout: float = Field(default=30.0, alias="DB_POOL_TIMEOUT")
+    db_pool_recycle: int = Field(default=3600, alias="DB_POOL_RECYCLE")
+    db_pool_pre_ping: bool = Field(default=True, alias="DB_POOL_PRE_PING")
+    db_echo_pool: bool = Field(default=False, alias="DB_ECHO_POOL")
+    
+    # Database query performance monitoring
+    db_enable_query_logging: bool = Field(default=False, alias="DB_ENABLE_QUERY_LOGGING")
+    db_slow_query_threshold: float = Field(default=1.0, alias="DB_SLOW_QUERY_THRESHOLD")
+    
+    # Read replica configuration (feature-flagged)
+    db_enable_read_replica: bool = Field(default=False, alias="DB_ENABLE_READ_REPLICA")
+    db_read_replica_url: Optional[str] = Field(default=None, alias="DB_READ_REPLICA_URL")
 
     # Redis configuration
     redis_enabled: bool = Field(default=False, alias="REDIS_ENABLED")
