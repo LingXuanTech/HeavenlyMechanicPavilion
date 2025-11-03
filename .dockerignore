@@ -1,0 +1,74 @@
+# Git
+.git
+.gitignore
+.github
+
+# Documentation
+*.md
+!README.md
+docs/
+assets/
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Build artifacts
+**/.next
+**/dist
+**/build
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.Python
+**/*.so
+**/*.egg
+**/*.egg-info
+
+# Dependencies
+**/node_modules
+**/.pnpm-store
+**/.venv
+**/venv
+**/env
+
+# Test and coverage
+**/.pytest_cache
+**/.coverage
+**/coverage
+**/.nyc_output
+**/htmlcov
+**/.vitest
+
+# Logs
+**/*.log
+**/logs
+
+# Environment
+.env
+.env.*
+!.env.example
+!.env.docker
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache
+**/.cache
+**/__pycache__
+
+# Temporary files
+**/tmp
+**/temp
+**/.tmp

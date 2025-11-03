@@ -9,7 +9,7 @@ import redis.asyncio as redis
 
 
 class RedisManager:
-    """Manages Redis connections for caching and pub/sub."""
+    """Manages Redis connections for caching and pub/sub with connection pooling."""
 
     def __init__(
         self,
@@ -18,8 +18,12 @@ class RedisManager:
         db: int = 0,
         password: Optional[str] = None,
         decode_responses: bool = True,
+        max_connections: int = 50,
+        socket_keepalive: bool = True,
+        socket_connect_timeout: int = 5,
+        retry_on_timeout: bool = True,
     ):
-        """Initialize the Redis manager.
+        """Initialize the Redis manager with connection pooling.
 
         Args:
             host: Redis host
@@ -27,32 +31,45 @@ class RedisManager:
             db: Redis database number
             password: Redis password (if required)
             decode_responses: Whether to decode responses as strings
+            max_connections: Maximum number of connections in the pool
+            socket_keepalive: Enable TCP keepalive
+            socket_connect_timeout: Socket connection timeout in seconds
+            retry_on_timeout: Retry operations on timeout
         """
         self.host = host
         self.port = port
         self.db = db
         self.password = password
         self.decode_responses = decode_responses
+        
+        # Create connection pool for better performance
+        self._pool = redis.ConnectionPool(
+            host=host,
+            port=port,
+            db=db,
+            password=password,
+            decode_responses=decode_responses,
+            max_connections=max_connections,
+            socket_keepalive=socket_keepalive,
+            socket_connect_timeout=socket_connect_timeout,
+            retry_on_timeout=retry_on_timeout,
+        )
+        
         self._client: Optional[redis.Redis] = None
         self._pubsub_client: Optional[redis.Redis] = None
 
     @property
     def client(self) -> redis.Redis:
-        """Get or create the Redis client."""
+        """Get or create the Redis client with connection pooling."""
         if self._client is None:
-            self._client = redis.Redis(
-                host=self.host,
-                port=self.port,
-                db=self.db,
-                password=self.password,
-                decode_responses=self.decode_responses,
-            )
+            self._client = redis.Redis(connection_pool=self._pool)
         return self._client
 
     @property
     def pubsub_client(self) -> redis.Redis:
         """Get or create a separate Redis client for pub/sub."""
         if self._pubsub_client is None:
+            # Pub/sub uses a separate connection not from the pool
             self._pubsub_client = redis.Redis(
                 host=self.host,
                 port=self.port,
@@ -74,13 +91,16 @@ class RedisManager:
             return False
 
     async def close(self) -> None:
-        """Close Redis connections."""
+        """Close Redis connections and connection pool."""
         if self._client is not None:
             await self._client.close()
             self._client = None
         if self._pubsub_client is not None:
             await self._pubsub_client.close()
             self._pubsub_client = None
+        if self._pool is not None:
+            await self._pool.disconnect()
+            self._pool = None
 
     # Cache operations
     async def get(self, key: str) -> Optional[str]:
