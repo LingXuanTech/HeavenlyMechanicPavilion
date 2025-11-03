@@ -10,10 +10,15 @@ from fastapi import FastAPI
 
 from .api import get_api_router
 from .cache import init_redis
+from .core.sentry import init_sentry
 from .db import init_db
 from .dependencies import get_settings
-from .core.sentry import init_sentry
-from .middleware import AuthMiddleware, ErrorHandlingMiddleware, MetricsMiddleware, RateLimitMiddleware
+from .middleware import (
+    AuthMiddleware,
+    ErrorHandlingMiddleware,
+    MetricsMiddleware,
+    RateLimitMiddleware,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -47,13 +52,29 @@ async def startup_event() -> None:
     """Initialize application resources on startup."""
     logger.info("Starting TradingAgents backend...")
 
-    # Initialize database
+    # Initialize database with connection pooling and performance monitoring
     try:
         db_manager = init_db(
             database_url=settings.database_url,
             echo=settings.database_echo,
+            pool_size=settings.db_pool_size,
+            max_overflow=settings.db_max_overflow,
+            pool_timeout=settings.db_pool_timeout,
+            pool_recycle=settings.db_pool_recycle,
+            pool_pre_ping=settings.db_pool_pre_ping,
+            echo_pool=settings.db_echo_pool,
+            enable_query_logging=settings.db_enable_query_logging,
+            slow_query_threshold=settings.db_slow_query_threshold,
+            enable_read_replica=settings.db_enable_read_replica,
+            read_replica_url=settings.db_read_replica_url,
         )
         logger.info(f"Database initialized: {settings.database_url}")
+        if settings.db_enable_read_replica and settings.db_read_replica_url:
+            logger.info(f"Read replica configured: {settings.db_read_replica_url}")
+        if settings.db_enable_query_logging:
+            logger.info(
+                f"Query performance monitoring enabled (slow query threshold: {settings.db_slow_query_threshold}s)"
+            )
 
         # Create tables if they don't exist (for development)
         # In production, use Alembic migrations instead

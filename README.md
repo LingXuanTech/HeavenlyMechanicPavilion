@@ -29,6 +29,7 @@ TradingAgents orchestrates a team of specialist LLM-driven agents – analysts, 
 | [CONFIGURATION](docs/CONFIGURATION.md) | Environment variables, vendor routing, agent options, and default overrides. |
 | [DEPLOYMENT](docs/DEPLOYMENT.md) | Docker Compose stacks, production hardening, scaling, and maintenance. |
 | [DEVELOPMENT](docs/DEVELOPMENT.md) | Conventions, testing matrix, tooling, and contribution workflow. |
+| [DATABASE PERFORMANCE TUNING](docs/DATABASE_PERFORMANCE_TUNING.md) | Connection pooling, query optimization, indexes, and read replica support. |
 
 ### 📊 Project Status & Roadmap
 
@@ -45,6 +46,7 @@ Additional operational guidance (e.g., Kubernetes manifests) lives under [`docs/
 - **Multi-agent trading workflow** built on LangGraph with specialized analyst, researcher, trader, and risk-management roles.
 - **Extensible plugin ecosystems** for both data vendors and agents, including hot-reloadable routing and registry APIs.
 - **FastAPI backend** with SSE/WebSocket streaming, persistence, monitoring endpoints, and optional workers.
+- **Optimized database layer** with connection pooling, query performance monitoring, and read replica support for scaling.
 - **Next.js Control Center** for configuring and observing sessions in real time.
 - **ChromaDB-backed memory** and reflection loops for iterative research and trading decisions.
 
