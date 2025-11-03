@@ -5,10 +5,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, SQLModel
 
 if TYPE_CHECKING:
-    from .user import User
+    pass
 
 
 class AuditLog(SQLModel, table=True):
@@ -41,4 +41,5 @@ class AuditLog(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
     # Relationships
-    user: Optional["User"] = Relationship(back_populates="audit_logs")
+    # Commented out to avoid SQLAlchemy 2.0 relationship resolution issues
+    # user: Optional["User"] = Relationship(back_populates="audit_logs")
