@@ -212,10 +212,10 @@ def get_provider_info(provider_type: ProviderType | str) -> ProviderInfo:
     """Get information about a provider."""
     if isinstance(provider_type, str):
         provider_type = ProviderType(provider_type.lower())
-    
+
     if provider_type not in PROVIDER_REGISTRY:
         raise ValueError(f"Unknown provider: {provider_type}")
-    
+
     return PROVIDER_REGISTRY[provider_type]
 
 
@@ -225,18 +225,16 @@ def list_models(provider_type: ProviderType | str) -> list[str]:
     return list(info.models.keys())
 
 
-def get_model_info(
-    provider_type: ProviderType | str, model_name: str
-) -> ModelInfo:
+def get_model_info(provider_type: ProviderType | str, model_name: str) -> ModelInfo:
     """Get information about a specific model."""
     info = get_provider_info(provider_type)
-    
+
     if model_name not in info.models:
         raise ValueError(
             f"Model '{model_name}' not found in {info.name}. "
             f"Available models: {list(info.models.keys())}"
         )
-    
+
     return info.models[model_name]
 
 
@@ -248,8 +246,8 @@ def calculate_cost(
 ) -> float:
     """Calculate the cost of a request."""
     model_info = get_model_info(provider_type, model_name)
-    
+
     input_cost = (input_tokens / 1000) * model_info.cost_per_1k_input_tokens
     output_cost = (output_tokens / 1000) * model_info.cost_per_1k_output_tokens
-    
+
     return input_cost + output_cost

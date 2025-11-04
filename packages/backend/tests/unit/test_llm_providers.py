@@ -32,9 +32,7 @@ class TestOpenAIProvider:
     @pytest.fixture
     def provider(self, mock_chat_openai):
         """Create OpenAI provider instance."""
-        return OpenAIProvider(
-            api_key="test-key", model_name="gpt-4o-mini", temperature=0.7
-        )
+        return OpenAIProvider(api_key="test-key", model_name="gpt-4o-mini", temperature=0.7)
 
     def test_init_without_api_key(self):
         """Test initialization without API key raises error."""
@@ -71,6 +69,7 @@ class TestOpenAIProvider:
     @pytest.mark.asyncio
     async def test_stream(self, provider, mock_chat_openai):
         """Test streaming completion."""
+
         # Mock stream chunks
         async def mock_astream(*args, **kwargs):
             for text in ["Hello", " ", "World"]:
@@ -120,9 +119,7 @@ class TestDeepSeekProvider:
     @pytest.fixture
     def provider(self, mock_chat_openai):
         """Create DeepSeek provider instance."""
-        return DeepSeekProvider(
-            api_key="test-key", model_name="deepseek-chat", temperature=0.7
-        )
+        return DeepSeekProvider(api_key="test-key", model_name="deepseek-chat", temperature=0.7)
 
     def test_init_without_api_key(self):
         """Test initialization without API key raises error."""
@@ -196,9 +193,7 @@ class TestClaudeProvider:
     @pytest.fixture
     def mock_async_anthropic(self):
         """Mock AsyncAnthropic client."""
-        with patch(
-            "tradingagents.llm_providers.claude_provider.AsyncAnthropic"
-        ) as mock:
+        with patch("tradingagents.llm_providers.claude_provider.AsyncAnthropic") as mock:
             yield mock
 
     @pytest.fixture
@@ -226,9 +221,7 @@ class TestClaudeProvider:
         """Test chat completion."""
         mock_response = Mock()
         mock_response.content = "Test response"
-        mock_response.response_metadata = {
-            "usage": {"input_tokens": 10, "output_tokens": 5}
-        }
+        mock_response.response_metadata = {"usage": {"input_tokens": 10, "output_tokens": 5}}
         mock_chat_anthropic.ainvoke = AsyncMock(return_value=mock_response)
 
         messages = [LLMMessage(role="user", content="Hello")]
@@ -244,15 +237,14 @@ class TestProviderFactory:
     @pytest.fixture
     def mock_providers(self):
         """Mock all provider classes."""
-        with patch(
-            "tradingagents.llm_providers.factory.OpenAIProvider"
-        ) as mock_openai, patch(
-            "tradingagents.llm_providers.factory.DeepSeekProvider"
-        ) as mock_deepseek, patch(
-            "tradingagents.llm_providers.factory.GrokProvider"
-        ) as mock_grok, patch(
-            "tradingagents.llm_providers.factory.ClaudeProvider"
-        ) as mock_claude:
+        with (
+            patch("tradingagents.llm_providers.openai_provider.OpenAIProvider") as mock_openai,
+            patch(
+                "tradingagents.llm_providers.deepseek_provider.DeepSeekProvider"
+            ) as mock_deepseek,
+            patch("tradingagents.llm_providers.grok_provider.GrokProvider") as mock_grok,
+            patch("tradingagents.llm_providers.claude_provider.ClaudeProvider") as mock_claude,
+        ):
             yield {
                 "openai": mock_openai,
                 "deepseek": mock_deepseek,
@@ -262,7 +254,7 @@ class TestProviderFactory:
 
     def test_create_openai_provider(self, mock_providers):
         """Test creating OpenAI provider."""
-        provider = ProviderFactory.create_provider(
+        ProviderFactory.create_provider(
             provider_type=ProviderType.OPENAI,
             api_key="test-key",
             model_name="gpt-4o-mini",
@@ -271,7 +263,7 @@ class TestProviderFactory:
 
     def test_create_provider_from_string(self, mock_providers):
         """Test creating provider from string."""
-        provider = ProviderFactory.create_provider(
+        ProviderFactory.create_provider(
             provider_type="openai", api_key="test-key", model_name="gpt-4o-mini"
         )
         mock_providers["openai"].assert_called_once()
