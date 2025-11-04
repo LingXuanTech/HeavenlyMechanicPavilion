@@ -1,49 +1,82 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Search, Bot } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/toast";
 import { tradingAgentsGradients } from "@tradingagents/shared/theme";
 import { api } from "@/lib/api/client";
 import type { TradingSession } from "@tradingagents/shared/domain";
 import { formatDate } from "@tradingagents/shared/utils/format";
 
+const SKELETON_COUNT = 3;
+
 export function SessionManager() {
   const [sessions, setSessions] = useState<TradingSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [newTicker, setNewTicker] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
+  const { showToast } = useToast();
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     async function fetchSessions() {
       try {
         setIsLoading(true);
         const response = await api.sessions.list();
-        setSessions(response);
+        if (!controller.signal.aborted) {
+          setSessions(response);
+        }
       } catch (err) {
-        setError("Failed to fetch trading sessions.");
-        console.error(err);
+        if (!controller.signal.aborted) {
+          showToast({
+            type: "error",
+            title: "Failed to fetch sessions",
+            description: err instanceof Error ? err.message : "An error occurred while loading sessions.",
+          });
+          console.error(err);
+        }
       } finally {
-        setIsLoading(false);
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
       }
     }
+
     fetchSessions();
-  }, []);
+
+    return () => {
+      controller.abort();
+    };
+  }, [showToast]);
 
   const handleStartSession = async () => {
     if (!newTicker.trim()) return;
+
+    setIsSubmitting(true);
     try {
       const response = await api.sessions.run({
         ticker: newTicker.trim().toUpperCase(),
       });
+      setNewTicker("");
       router.push(`/sessions/${response.session_id}`);
     } catch (err) {
-      setError(`Failed to start session for ${newTicker}.`);
+      showToast({
+        type: "error",
+        title: `Failed to start session for ${newTicker}`,
+        description: err instanceof Error ? err.message : "An error occurred while starting the session.",
+      });
       console.error(err);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -70,24 +103,40 @@ export function SessionManager() {
                 value={newTicker}
                 onChange={(e) => setNewTicker(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleStartSession()}
+                disabled={isSubmitting}
               />
             </div>
-            <Button onClick={handleStartSession} disabled={!newTicker.trim()}>
+            <Button 
+              onClick={handleStartSession} 
+              disabled={!newTicker.trim() || isSubmitting}
+            >
               <Plus className="mr-2 h-4 w-4" />
-              Start New Session
+              {isSubmitting ? "Starting..." : "Start New Session"}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {error && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-center">
-          <p className="text-sm font-semibold text-destructive">{error}</p>
-        </div>
-      )}
-
       {isLoading ? (
-        <div className="text-center text-muted-foreground">Loading sessions...</div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+            <Card key={i} className="overflow-hidden">
+              <CardHeader>
+                <div className="flex justify-between items-start gap-4">
+                  <Skeleton className="h-6 w-24" />
+                  <Skeleton className="h-6 w-16" />
+                </div>
+                <Skeleton className="h-4 w-40 mt-2" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-40" />
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       ) : sessions.length === 0 ? (
         <div className="text-center py-12">
           <Bot className="mx-auto h-12 w-12 text-muted-foreground" />
