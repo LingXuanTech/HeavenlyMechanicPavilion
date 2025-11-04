@@ -14,6 +14,11 @@ from .backtest import (
     BacktestMetrics,
     BacktestRun,
 )
+
+# Import models in dependency order to avoid relationship resolution issues
+# Portfolio and TradingSession must come before Trade
+# Trade must come before Execution
+# User must come before APIKey and AuditLog
 from .execution import Execution
 from .portfolio import Portfolio
 from .position import Position
@@ -21,8 +26,6 @@ from .risk_metrics import RiskMetrics
 from .run_log import RunLog
 from .trade import Trade
 from .trading_session import TradingSession
-
-# Import models in dependency order to avoid relationship resolution issues
 from .user import User, UserRole
 from .vendor_config import VendorConfig
 
