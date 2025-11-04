@@ -8,8 +8,9 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect, status
 from fastapi.responses import StreamingResponse
 
-from ..dependencies import get_graph_service
-from ..schemas.sessions import SessionEvent
+from ..dependencies import get_event_manager, get_graph_service
+from ..schemas.sessions import SessionEvent, SessionEventsHistoryResponse
+from ..services.events import SessionEventManager
 from ..services.graph import TradingGraphService
 
 router = APIRouter()
@@ -42,6 +43,33 @@ async def session_sse(
         _event_generator(queue),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache"},
+    )
+
+
+@router.get("/{session_id}/events-history", response_model=SessionEventsHistoryResponse)
+async def session_recent_events(
+    session_id: str,
+    event_manager: SessionEventManager = Depends(get_event_manager),
+) -> SessionEventsHistoryResponse:
+    """Retrieve recent events buffered for a completed session.
+    
+    This endpoint allows REST clients to retrieve event history after a session
+    has completed and the stream has closed. Events are stored in a bounded
+    buffer with the most recent events preserved up to a configurable limit.
+    
+    Args:
+        session_id: The session identifier
+        event_manager: The session event manager instance
+        
+    Returns:
+        A response containing the session_id and a list of recent events with timestamps
+    """
+    recent_events = event_manager.get_recent_events(session_id)
+    
+    return SessionEventsHistoryResponse(
+        session_id=session_id,
+        events=recent_events,
+        count=len(recent_events),
     )
 
 

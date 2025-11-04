@@ -37,3 +37,21 @@ class SessionEvent(BaseModel):
     def from_raw(cls, raw: Dict[str, Any]) -> "SessionEvent":
         payload = {k: v for k, v in raw.items() if k not in {"type", "message"}}
         return cls(type=raw.get("type", "event"), message=raw.get("message"), payload=payload)
+
+
+class BufferedSessionEvent(BaseModel):
+    """Represents a buffered event with timestamp from event history."""
+
+    timestamp: str = Field(..., description="ISO format timestamp of when the event was enqueued")
+    event: Dict[str, Any] = Field(..., description="The raw event payload")
+
+
+class SessionEventsHistoryResponse(BaseModel):
+    """Response containing recent events buffered for a session."""
+
+    session_id: str = Field(..., description="The session identifier")
+    events: List[BufferedSessionEvent] = Field(
+        default_factory=list,
+        description="List of buffered events with timestamps, ordered from oldest to newest"
+    )
+    count: int = Field(..., description="Number of events in the buffer")
