@@ -2,15 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowUpRight, Brain, Cable, CircleDot } from "lucide-react";
+import { ArrowUpRight, CircleDot } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useToast } from "@/components/ui/toast";
 import { tradingAgentsGradients } from "@tradingagents/shared/theme";
 import { api } from "@/lib/api/client";
 import type { TradingSession } from "@tradingagents/shared/domain";
 import { formatDate, formatPercent } from "@tradingagents/shared/utils/format";
-import { useRealtimeStore } from "@/lib/store/use-realtime-store";
+import { SessionEventTimeline, type SessionEvent } from "@/components/sessions/session-event-timeline";
+import { useSessionStream } from "@/hooks/use-session-stream";
 
 export default function SessionDetailPage() {
   const params = useParams();
@@ -19,36 +21,77 @@ export default function SessionDetailPage() {
   const [session, setSession] = useState<TradingSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
-  const agentActivities = useRealtimeStore((state) => state.agentActivities);
-  const connectAgentActivities = useRealtimeStore((state) => state.connectAgentActivities);
-  const disconnectAgentActivities = useRealtimeStore((state) => state.disconnectAgentActivities);
+  // Session stream for real-time updates
+  const {
+    events: streamEvents,
+    isConnected,
+    error: streamError,
+    addBufferedEvents,
+  } = useSessionStream({
+    sessionId,
+    enabled: !!sessionId && !!session,
+  });
 
   useEffect(() => {
     async function fetchSession() {
       if (!sessionId) return;
       try {
         setIsLoading(true);
+        
+        // Fetch session details
         const response = await api.sessions.get(sessionId);
         setSession(response);
+        
+        // Fetch buffered events separately
+        try {
+          const eventsResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/sessions/${sessionId}/events-history`
+          );
+          
+          if (eventsResponse.ok) {
+            const eventsData = await eventsResponse.json();
+            if (eventsData.events && eventsData.events.length > 0) {
+              const bufferedEvents: SessionEvent[] = eventsData.events.map((e: { timestamp: string; event: Record<string, unknown> }) => ({
+                type: (e.event.type as string) || "event",
+                message: e.event.message as string | undefined,
+                payload: e.event.payload as Record<string, unknown> | undefined,
+                timestamp: e.timestamp,
+              }));
+              addBufferedEvents(bufferedEvents);
+            }
+          }
+        } catch (eventsErr) {
+          // Non-critical error - just log it
+          console.warn("Failed to fetch buffered events:", eventsErr);
+        }
       } catch (err) {
         setError("Failed to fetch session details.");
+        showToast({
+          type: "error",
+          title: "Error",
+          description: "Failed to load session details. Please try again.",
+        });
         console.error(err);
       } finally {
         setIsLoading(false);
       }
     }
     fetchSession();
-  }, [sessionId]);
+  }, [sessionId, showToast, addBufferedEvents]);
 
+  // Show toast on stream errors
   useEffect(() => {
-    if (sessionId) {
-      connectAgentActivities(sessionId);
+    if (streamError) {
+      showToast({
+        type: "error",
+        title: "Connection Error",
+        description: "Lost connection to live session updates. Reconnecting...",
+        duration: 3000,
+      });
     }
-    return () => {
-      disconnectAgentActivities();
-    };
-  }, [sessionId, connectAgentActivities, disconnectAgentActivities]);
+  }, [streamError, showToast]);
 
   if (isLoading) {
     return <div className="text-center p-12">Loading session...</div>;
@@ -103,11 +146,37 @@ export default function SessionDetailPage() {
           </div>
         </CardHeader>
         <CardContent className="relative z-10 grid gap-4 pt-6 text-sm text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
-          {/* Meta data can be added here */}
+          {session.agents.length > 0 && (
+            <div>
+              <p className="font-medium text-foreground">Active Agents</p>
+              <p className="text-2xl font-bold text-foreground">{activeAgents.length}</p>
+            </div>
+          )}
+          {session.insights.length > 0 && (
+            <div>
+              <p className="font-medium text-foreground">Insights</p>
+              <p className="text-2xl font-bold text-foreground">{session.insights.length}</p>
+            </div>
+          )}
+          {session.decision && (
+            <div>
+              <p className="font-medium text-foreground">Decision</p>
+              <p className="text-2xl font-bold text-foreground uppercase">{session.decision.action}</p>
+            </div>
+          )}
+          <div>
+            <p className="font-medium text-foreground">Events</p>
+            <p className="text-2xl font-bold text-foreground">{streamEvents.length}</p>
+          </div>
         </CardContent>
       </Card>
       
-      {/* Agent Activity Stream would go here */}
+      {/* Session Event Timeline */}
+      <SessionEventTimeline 
+        events={streamEvents} 
+        isConnected={isConnected}
+        error={streamError}
+      />
     </div>
   );
 }
