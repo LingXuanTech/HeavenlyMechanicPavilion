@@ -6,12 +6,23 @@ from ..config.settings import Settings, get_settings
 from ..services.alerting import AlertingService
 from ..services.broker_adapter import BrokerAdapter, SimulatedBroker
 from ..services.execution import ExecutionService
+from ..services.market_data import MarketDataService
 from ..services.monitoring import MonitoringService
 from ..services.position_sizing import PositionSizingMethod, PositionSizingService
 from ..services.risk_management import RiskConstraints, RiskManagementService
 from ..services.trading_session import TradingSessionService
 
 # ============= 应用级单例服务 =============
+
+_market_data_service: MarketDataService | None = None
+
+
+def get_market_data_service() -> MarketDataService:
+    """获取行情数据服务实例 (应用级单例)."""
+    global _market_data_service
+    if _market_data_service is None:
+        _market_data_service = MarketDataService()
+    return _market_data_service
 
 
 def get_alerting_service(settings: Settings = Depends(get_settings)) -> AlertingService:
@@ -42,6 +53,7 @@ def get_broker_adapter(
     settings: Settings = Depends(get_settings),
     session_type: str = "PAPER",
     initial_capital: float = 100000.0,
+    market_data_service: MarketDataService = Depends(get_market_data_service),
 ) -> BrokerAdapter:
     """获取券商适配器实例 (会话级).
 
@@ -49,6 +61,7 @@ def get_broker_adapter(
         settings: 应用配置
         session_type: 会话类型 (PAPER/LIVE)
         initial_capital: 初始资金
+        market_data_service: 行情数据服务实例
 
     Returns:
         BrokerAdapter 实例
@@ -61,6 +74,7 @@ def get_broker_adapter(
             initial_capital=initial_capital,
             commission_per_trade=0.0,
             slippage_percent=0.001,
+            market_data_service=market_data_service,
         )
     else:
         # TODO: 实现实盘券商适配器
