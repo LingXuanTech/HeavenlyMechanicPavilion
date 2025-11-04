@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .agent_llm_factory import clear_llm_cache, get_llm_for_agent, get_llm_for_agent_by_name
 from .base import BaseLLMProvider, LLMMessage, LLMResponse
 from .claude_provider import ClaudeProvider
 from .deepseek_provider import DeepSeekProvider
@@ -41,6 +42,10 @@ __all__ = [
     "GrokProvider",
     "ClaudeProvider",
     "ProviderFactory",
+    # Agent helpers
+    "get_llm_for_agent",
+    "get_llm_for_agent_by_name",
+    "clear_llm_cache",
     # Registry
     "ProviderType",
     "ProviderInfo",
