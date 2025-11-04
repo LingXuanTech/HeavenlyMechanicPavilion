@@ -52,6 +52,33 @@ export class HttpClient {
     return (await response.json()) as T;
   }
 
+  async put<T, TBody = unknown>(path: string, body?: TBody): Promise<T> {
+    const response = await this.fetcher(this.buildUrl(path), {
+      method: "PUT",
+      headers: this.headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (!response.ok) {
+      throw await this.toError(response);
+    }
+    return (await response.json()) as T;
+  }
+
+  async delete<T = void>(path: string): Promise<T> {
+    const response = await this.fetcher(this.buildUrl(path), {
+      method: "DELETE",
+      headers: this.headers,
+    });
+    if (!response.ok) {
+      throw await this.toError(response);
+    }
+    // Handle 204 No Content responses
+    if (response.status === 204) {
+      return undefined as T;
+    }
+    return (await response.json()) as T;
+  }
+
   async stream(path: string, init?: RequestInit): Promise<Response> {
     const response = await this.fetcher(this.buildUrl(path), {
       method: "GET",

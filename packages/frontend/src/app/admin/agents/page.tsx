@@ -65,11 +65,11 @@ interface Agent {
   role: string;
   description: string | null;
   prompt_template: string | null;
-  capabilities: string[];
-  required_tools: string[];
+  capabilities?: string[];
+  required_tools?: string[];
   is_active: boolean;
   version: string;
-  llm_config: LLMConfig;
+  llm_config: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }
@@ -356,41 +356,41 @@ export default function AgentMarketplacePage() {
                     <Badge variant="outline">{agent.role}</Badge>
                   </TableCell>
                   <TableCell className="text-xs">
-                    <div>{agent.llm_config.provider}/{agent.llm_config.model}</div>
+                    <div>{(agent.llm_config as unknown as LLMConfig).provider}/{(agent.llm_config as unknown as LLMConfig).model}</div>
                     <div className="text-muted-foreground">
-                      T={(agent.llm_config.temperature ?? 0).toFixed(1)}
+                      T={((agent.llm_config as unknown as LLMConfig).temperature ?? 0).toFixed(1)}
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {agent.capabilities.slice(0, 3).map((cap) => (
+                      {agent.capabilities?.slice(0, 3).map((cap) => (
                         <Badge key={cap} variant="muted" className="text-xs">
                           {cap}
                         </Badge>
                       ))}
-                      {agent.capabilities.length > 3 && (
+                      {(agent.capabilities?.length ?? 0) > 3 && (
                         <Badge variant="muted" className="text-xs">
-                          +{agent.capabilities.length - 3}
+                          +{(agent.capabilities?.length ?? 0) - 3}
                         </Badge>
                       )}
-                      {agent.capabilities.length === 0 && (
+                      {(agent.capabilities?.length ?? 0) === 0 && (
                         <span className="text-xs text-muted-foreground">None</span>
                       )}
                     </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
-                      {agent.required_tools.slice(0, 2).map((tool) => (
+                      {agent.required_tools?.slice(0, 2).map((tool) => (
                         <Badge key={tool} variant="muted" className="text-xs">
                           {tool}
                         </Badge>
                       ))}
-                      {agent.required_tools.length > 2 && (
+                      {(agent.required_tools?.length ?? 0) > 2 && (
                         <Badge variant="muted" className="text-xs">
-                          +{agent.required_tools.length - 2}
+                          +{(agent.required_tools?.length ?? 0) - 2}
                         </Badge>
                       )}
-                      {agent.required_tools.length === 0 && (
+                      {(agent.required_tools?.length ?? 0) === 0 && (
                         <span className="text-xs text-muted-foreground">None</span>
                       )}
                     </div>
@@ -542,7 +542,10 @@ function CreateAgentDialog({ open, onOpenChange, onSuccess, onAudit }: CreateAge
 
     try {
       setSaving(true);
-      await api.agents.create(formData);
+      await api.agents.create({
+        ...formData,
+        llm_config: formData.llm_config as unknown as Record<string, unknown>
+      });
       showToast({
         type: "success",
         title: "Agent created",
@@ -615,7 +618,7 @@ function EditAgentDialog({ agent, open, onOpenChange, onSuccess, onAudit }: Edit
     required_tools: agent.required_tools || [],
     is_active: agent.is_active,
     version: agent.version,
-    llm_config: agent.llm_config,
+    llm_config: agent.llm_config as unknown as LLMConfig,
   });
   const [saving, setSaving] = React.useState(false);
   const { showToast } = useToast();
@@ -632,7 +635,7 @@ function EditAgentDialog({ agent, open, onOpenChange, onSuccess, onAudit }: Edit
         required_tools: agent.required_tools || [],
         is_active: agent.is_active,
         version: agent.version,
-        llm_config: agent.llm_config,
+        llm_config: agent.llm_config as unknown as LLMConfig,
       });
     }
   }, [open, agent]);
@@ -641,7 +644,10 @@ function EditAgentDialog({ agent, open, onOpenChange, onSuccess, onAudit }: Edit
     try {
       setSaving(true);
       const { name: _name, ...payload } = formData;
-      await api.agents.update(agent.id, payload);
+      await api.agents.update(agent.id, {
+        ...payload,
+        llm_config: payload.llm_config as unknown as Record<string, unknown>
+      });
       showToast({
         type: "success",
         title: "Agent updated",
