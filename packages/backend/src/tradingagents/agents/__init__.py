@@ -1,13 +1,19 @@
+# Legacy functions
 from .analysts.fundamentals_analyst import create_fundamentals_analyst
 from .analysts.market_analyst import create_market_analyst
 from .analysts.news_analyst import create_news_analyst
 from .analysts.social_media_analyst import create_social_media_analyst
-from .managers.research_manager import create_research_manager
-from .managers.risk_manager import create_risk_manager
 
 # New plugin system
+from .database_plugin import DatabaseAgentPlugin, create_plugin_from_db_config
+from .managers.research_manager import create_research_manager
+from .managers.risk_manager import create_risk_manager
 from .plugin_base import AgentCapability, AgentPlugin, AgentRole
-from .plugin_registry import AgentPluginRegistry, get_agent_registry, initialize_agent_registry
+from .plugin_registry import (
+    AgentPluginRegistry,
+    get_agent_registry,
+    initialize_agent_registry,
+)
 from .plugins import (
     BearResearcherPlugin,
     BullResearcherPlugin,
@@ -57,6 +63,8 @@ __all__ = [
     "AgentPluginRegistry",
     "get_agent_registry",
     "initialize_agent_registry",
+    "DatabaseAgentPlugin",
+    "create_plugin_from_db_config",
     "MarketAnalystPlugin",
     "SocialAnalystPlugin",
     "NewsAnalystPlugin",
