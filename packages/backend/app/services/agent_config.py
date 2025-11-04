@@ -230,19 +230,77 @@ class AgentConfigService:
         """
         try:
             from tradingagents.agents import get_agent_registry
+            from tradingagents.agents.database_plugin import create_plugin_from_db_config
             from tradingagents.agents.plugin_loader import register_built_in_plugins
 
             # Get the registry
             registry = get_agent_registry()
 
             # Clear and re-register built-in plugins
-            # Note: Custom plugins from DB would be loaded here
             logger.info("Reloading agent registry...")
+            registry.clear()
             register_built_in_plugins(registry)
 
-            # TODO: Load custom agents from database
-            # This would involve dynamically creating plugin instances from DB configs
+            # Load custom agents from database
+            logger.info("Loading custom agents from database...")
+            custom_agents = await self.repository.get_active()
+            
+            # Filter to only non-reserved agents (custom agents)
+            custom_agents = [agent for agent in custom_agents if not agent.is_reserved]
+            
+            loaded_count = 0
+            failed_count = 0
+            
+            for db_config in custom_agents:
+                try:
+                    # Create plugin from database config
+                    plugin = create_plugin_from_db_config(db_config)
+                    
+                    if plugin is None:
+                        logger.warning(
+                            f"Skipping agent '{db_config.name}' due to malformed configuration"
+                        )
+                        failed_count += 1
+                        continue
+                    
+                    # Check if this would conflict with a reserved plugin
+                    existing_plugin = registry.get_plugin(plugin.name)
+                    if existing_plugin and existing_plugin.is_reserved:
+                        logger.warning(
+                            f"Skipping custom agent '{db_config.name}': "
+                            f"name conflicts with reserved agent"
+                        )
+                        failed_count += 1
+                        continue
+                    
+                    # Register plugin, allowing override of existing custom plugins
+                    try:
+                        from tradingagents.agents.database_plugin import DatabaseAgentPlugin
+                        
+                        registry.register_plugin(
+                            DatabaseAgentPlugin,
+                            config=plugin.config,
+                            override=True
+                        )
+                        loaded_count += 1
+                        logger.info(
+                            f"Loaded custom agent '{plugin.name}' "
+                            f"(role={plugin.role.value}, slot={plugin.slot_name})"
+                        )
+                    except ValueError as e:
+                        logger.warning(f"Failed to register agent '{db_config.name}': {e}")
+                        failed_count += 1
+                        
+                except Exception as e:
+                    logger.warning(
+                        f"Error loading agent '{db_config.name}' from database: {e}",
+                        exc_info=True
+                    )
+                    failed_count += 1
 
-            logger.info("Agent registry reloaded successfully")
+            logger.info(
+                f"Agent registry reloaded successfully: "
+                f"{loaded_count} custom agents loaded, {failed_count} failed"
+            )
         except Exception as e:
-            logger.error(f"Failed to reload agent registry: {e}")
+            logger.error(f"Failed to reload agent registry: {e}", exc_info=True)
