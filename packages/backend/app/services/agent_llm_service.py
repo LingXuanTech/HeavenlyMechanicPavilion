@@ -9,7 +9,14 @@ from cryptography.fernet import Fernet
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..config.settings import settings
+from tradingagents.llm_providers import (
+    ProviderFactory,
+    ProviderType,
+    get_model_info,
+    list_models,
+)
+
+from ..config.settings import get_settings
 from ..db.models.agent_config import AgentConfig
 from ..db.models.agent_llm_config import AgentLLMConfig
 from ..schemas.agent_llm_config import (
@@ -20,15 +27,6 @@ from ..schemas.agent_llm_config import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Supported providers and their models
-SUPPORTED_PROVIDERS = {
-    "openai": ["gpt-4", "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo", "gpt-4-turbo"],
-    "anthropic": ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
-    "claude": ["claude-3-5-sonnet-20241022", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
-    "deepseek": ["deepseek-chat", "deepseek-coder"],
-    "grok": ["grok-beta"],
-}
 
 
 class AgentNotFoundError(Exception):
@@ -53,6 +51,7 @@ class AgentLLMService:
     def _init_encryption(self):
         """Initialize encryption cipher if encryption key is available."""
         try:
+            settings = get_settings()
             encryption_key = getattr(settings, "encryption_key", None)
             if encryption_key:
                 self._cipher = Fernet(encryption_key.encode())
@@ -79,16 +78,49 @@ class AgentLLMService:
             logger.error(f"Failed to decrypt API key: {e}")
             return None
 
-    def _validate_provider_and_model(self, provider: str, model_name: str):
-        """Validate provider and model combination."""
-        if provider not in SUPPORTED_PROVIDERS:
-            raise ValueError(f"Invalid provider: {provider}. Supported providers: {list(SUPPORTED_PROVIDERS.keys())}")
+    def _coerce_provider_type(self, provider: str) -> ProviderType:
+        """Coerce provider string to ProviderType, handling legacy aliases."""
+        # Handle legacy "anthropic" alias for "claude"
+        if provider.lower() == "anthropic":
+            provider = "claude"
         
-        if model_name not in SUPPORTED_PROVIDERS[provider]:
+        try:
+            return ProviderType(provider.lower())
+        except ValueError:
+            supported = [pt.value for pt in ProviderType]
             raise ValueError(
-                f"Invalid provider or model: {provider}/{model_name}. "
-                f"Supported models for {provider}: {SUPPORTED_PROVIDERS[provider]}"
+                f"Invalid provider: {provider}. Supported providers: {supported}"
             )
+
+    def _validate_provider_and_model(self, provider: str, model_name: str):
+        """Validate provider and model combination using registry."""
+        # Coerce to ProviderType
+        try:
+            provider_type = self._coerce_provider_type(provider)
+        except ValueError as e:
+            raise e
+        
+        # Validate model exists for this provider
+        available_models = list_models(provider_type)
+        if model_name not in available_models:
+            raise ValueError(
+                f"Invalid model: {model_name} for provider {provider}. "
+                f"Available models: {available_models}"
+            )
+
+    def _get_cost_defaults(self, provider: str, model_name: str) -> tuple[float, float]:
+        """Get default cost values from registry for a provider/model combination."""
+        try:
+            provider_type = self._coerce_provider_type(provider)
+            model_info = get_model_info(provider_type, model_name)
+            return (
+                model_info.cost_per_1k_input_tokens,
+                model_info.cost_per_1k_output_tokens,
+            )
+        except ValueError as e:
+            logger.warning(f"Failed to get cost defaults from registry: {e}")
+            # Return sensible defaults if registry lookup fails
+            return (0.0, 0.0)
 
     async def _agent_exists(self, agent_id: int) -> bool:
         """Check if agent exists."""
@@ -142,6 +174,19 @@ class AgentLLMService:
         # Validate provider and model
         self._validate_provider_and_model(payload.provider, payload.model_name)
 
+        # Default cost values from registry if not provided
+        input_cost = payload.cost_per_1k_input_tokens
+        output_cost = payload.cost_per_1k_output_tokens
+        
+        if input_cost is None or output_cost is None:
+            default_input, default_output = self._get_cost_defaults(
+                payload.provider, payload.model_name
+            )
+            if input_cost is None:
+                input_cost = default_input
+            if output_cost is None:
+                output_cost = default_output
+
         # Check if config exists
         result = await self.session.execute(
             select(AgentLLMConfig).where(AgentLLMConfig.agent_id == agent_id)
@@ -157,8 +202,8 @@ class AgentLLMService:
             existing_config.top_p = payload.top_p
             existing_config.fallback_provider = payload.fallback_provider
             existing_config.fallback_model = payload.fallback_model
-            existing_config.cost_per_1k_input_tokens = payload.cost_per_1k_input_tokens
-            existing_config.cost_per_1k_output_tokens = payload.cost_per_1k_output_tokens
+            existing_config.cost_per_1k_input_tokens = input_cost
+            existing_config.cost_per_1k_output_tokens = output_cost
             existing_config.enabled = payload.enabled
             existing_config.metadata_json = payload.metadata_json
 
@@ -181,8 +226,8 @@ class AgentLLMService:
                 api_key=payload.api_key,
                 fallback_provider=payload.fallback_provider,
                 fallback_model=payload.fallback_model,
-                cost_per_1k_input_tokens=payload.cost_per_1k_input_tokens,
-                cost_per_1k_output_tokens=payload.cost_per_1k_output_tokens,
+                cost_per_1k_input_tokens=input_cost,
+                cost_per_1k_output_tokens=output_cost,
                 enabled=payload.enabled,
                 metadata_json=payload.metadata_json,
             )
@@ -210,6 +255,19 @@ class AgentLLMService:
         if config_data.api_key:
             encrypted_key = self._encrypt_api_key(config_data.api_key)
 
+        # Default cost values from registry if not provided
+        input_cost = config_data.cost_per_1k_input_tokens
+        output_cost = config_data.cost_per_1k_output_tokens
+        
+        if input_cost is None or output_cost is None:
+            default_input, default_output = self._get_cost_defaults(
+                config_data.provider, config_data.model_name
+            )
+            if input_cost is None:
+                input_cost = default_input
+            if output_cost is None:
+                output_cost = default_output
+
         # Create new config
         new_config = AgentLLMConfig(
             agent_id=config_data.agent_id,
@@ -221,8 +279,8 @@ class AgentLLMService:
             api_key_encrypted=encrypted_key,
             fallback_provider=config_data.fallback_provider,
             fallback_model=config_data.fallback_model,
-            cost_per_1k_input_tokens=config_data.cost_per_1k_input_tokens,
-            cost_per_1k_output_tokens=config_data.cost_per_1k_output_tokens,
+            cost_per_1k_input_tokens=input_cost,
+            cost_per_1k_output_tokens=output_cost,
             enabled=config_data.enabled,
             metadata_json=config_data.metadata_json,
         )
@@ -318,10 +376,34 @@ class AgentLLMService:
         if not config:
             return False, "Configuration not found"
 
-        # For now, just validate that the config is well-formed
-        # In the future, this could make actual API calls to validate
+        # Validate provider and model structure
         try:
             self._validate_provider_and_model(config.provider, config.model_name)
-            return True, None
         except ValueError as e:
             return False, str(e)
+
+        # Attempt to create provider instance and perform health check
+        try:
+            provider_type = self._coerce_provider_type(config.provider)
+            
+            # Decrypt API key if available
+            api_key = None
+            if config.api_key_encrypted:
+                api_key = self._decrypt_api_key(config.api_key_encrypted)
+            
+            # Create provider instance using factory
+            provider = ProviderFactory.create_provider(
+                provider_type=provider_type,
+                api_key=api_key,
+                model_name=config.model_name,
+            )
+            
+            # Perform health check
+            health_ok = await provider.health_check()
+            if not health_ok:
+                return False, "Provider health check failed"
+            
+            return True, None
+        except Exception as e:
+            logger.warning(f"Failed to validate provider config {config_id}: {e}")
+            return False, f"Provider validation failed: {str(e)}"
