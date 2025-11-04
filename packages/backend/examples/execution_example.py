@@ -27,6 +27,7 @@ async def main():
     from app.repositories import PortfolioRepository
     from app.services import (
         ExecutionService,
+        MarketDataService,
         PositionSizingMethod,
         PositionSizingService,
         RiskConstraints,
@@ -78,6 +79,7 @@ async def main():
             initial_capital=portfolio.current_capital,
             commission_per_trade=0.0,
             slippage_percent=0.001,
+            market_data_service=MarketDataService(),
         )
         logger.info("✓ Initialized SimulatedBroker")
         

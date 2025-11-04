@@ -12,6 +12,7 @@ from .broker_adapter import (
     SimulatedBroker,
 )
 from .execution import ExecutionService
+from .market_data import MarketDataService
 from .monitoring import MonitoringService
 from .position_sizing import PositionSizingMethod, PositionSizingService
 from .risk_management import (
@@ -27,6 +28,7 @@ __all__ = [
     "BacktestService",
     "BrokerAdapter",
     "ExecutionService",
+    "MarketDataService",
     "MonitoringService",
     "OrderAction",
     "OrderRequest",

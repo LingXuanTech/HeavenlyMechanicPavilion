@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from ..core.errors import (
     ExternalServiceError,
@@ -18,6 +18,10 @@ from ..core.errors import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+if TYPE_CHECKING:
+    from .market_data import MarketDataService
 
 
 class OrderStatus(str, Enum):
@@ -170,6 +174,7 @@ class SimulatedBroker(BrokerAdapter):
         initial_capital: float = 100000.0,
         commission_per_trade: float = 0.0,
         slippage_percent: float = 0.001,
+        market_data_service: Optional["MarketDataService"] = None,
     ):
         """Initialize simulated broker.
 
@@ -177,11 +182,19 @@ class SimulatedBroker(BrokerAdapter):
             initial_capital: Initial capital for simulation
             commission_per_trade: Commission per trade
             slippage_percent: Slippage as percentage (0.001 = 0.1%)
+            market_data_service: Service used to source deterministic market quotes.
         """
         self.initial_capital = initial_capital
         self.current_capital = initial_capital
         self.commission_per_trade = commission_per_trade
         self.slippage_percent = slippage_percent
+
+        if market_data_service is None:
+            from .market_data import MarketDataService
+
+            self.market_data_service = MarketDataService()
+        else:
+            self.market_data_service = market_data_service
 
         self.orders = {}
         self.order_counter = 0
@@ -379,35 +392,17 @@ class SimulatedBroker(BrokerAdapter):
         return self.orders[order_id]
 
     async def get_market_price(self, symbol: str) -> MarketPrice:
-        """Get simulated market price.
-
-        For simulation, we'll use a simple mock price.
-        In production, this would integrate with real market data.
-
-        Args:
-            symbol: Stock symbol
-
-        Returns:
-            Market price data
-        """
-        # TODO: Integrate with actual market data service
-        # For now, return mock data
-        import random
-
-        base_price = 100.0
-        spread = 0.10
-
-        last = base_price + random.uniform(-5, 5)
-        bid = last - spread / 2
-        ask = last + spread / 2
-
-        return MarketPrice(
-            symbol=symbol,
-            bid=bid,
-            ask=ask,
-            last=last,
-            timestamp=datetime.utcnow(),
-        )
+        """Get the current market price using the market data service."""
+        try:
+            return await self.market_data_service.get_latest_price(symbol)
+        except ValueError as exc:
+            raise ValidationError(str(exc), details={"symbol": symbol}) from exc
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.error("Failed to retrieve market data for %s: %s", symbol, exc)
+            raise ExternalServiceError(
+                f"Broker failed to fetch market data for {symbol}",
+                details={"symbol": symbol},
+            ) from exc
 
     async def get_buying_power(self) -> float:
         """Get available buying power.
