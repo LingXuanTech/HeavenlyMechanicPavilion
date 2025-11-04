@@ -16,6 +16,10 @@ from .models.backtest import (  # noqa: F401
     BacktestRun,
 )
 from .models.execution import Execution  # noqa: F401
+
+# Import models in dependency order to resolve relationships properly
+# Portfolio and TradingSession must come before Trade
+# Trade must be before Execution
 from .models.portfolio import Portfolio  # noqa: F401
 from .models.position import Position  # noqa: F401
 from .models.risk_metrics import RiskMetrics  # noqa: F401
@@ -23,9 +27,7 @@ from .models.run_log import RunLog  # noqa: F401
 from .models.trade import Trade  # noqa: F401
 from .models.trading_session import TradingSession  # noqa: F401
 
-# Import models in dependency order to resolve relationships properly
 # User must be before APIKey and AuditLog
-# Trade must be before Execution
 from .models.user import User  # noqa: F401
 from .models.vendor_config import VendorConfig  # noqa: F401
 
