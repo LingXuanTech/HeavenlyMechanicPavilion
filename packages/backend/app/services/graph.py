@@ -13,6 +13,8 @@ from uuid import uuid4
 from tradingagents.default_config import DEFAULT_CONFIG
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 
+from ..db.session import DatabaseManager
+from .analysis_session import AnalysisSessionService
 from .events import SessionEventManager
 from .llm_runtime import AgentLLMRuntime
 
@@ -25,11 +27,13 @@ class TradingGraphService:
     def __init__(
         self,
         event_manager: SessionEventManager,
+        db_manager: DatabaseManager,
         *,
         config_overrides: Optional[Dict[str, Any]] = None,
         max_workers: int = 2,
     ) -> None:
         self._event_manager = event_manager
+        self._db_manager = db_manager
         self._base_config = deepcopy(DEFAULT_CONFIG)
         if config_overrides:
             self._base_config.update(config_overrides)
@@ -77,6 +81,21 @@ class TradingGraphService:
         loop = asyncio.get_running_loop()
         analysts = list(selected_analysts) if selected_analysts else DEFAULT_ANALYSTS
 
+        # Create the persisted analysis session record
+        async with self._db_manager.session_factory() as db_session:
+            try:
+                analysis_service = AnalysisSessionService(db_session, self._event_manager)
+                await analysis_service.create_session(
+                    session_id=session_id,
+                    ticker=ticker,
+                    trade_date=trade_date.isoformat(),
+                    selected_analysts=analysts,
+                )
+                await db_session.commit()
+            except Exception:
+                await db_session.rollback()
+                raise
+
         def _execute() -> None:
             self._event_manager.publish(
                 session_id,
@@ -115,6 +134,9 @@ class TradingGraphService:
                         "message": "session_completed",
                     },
                 )
+                
+                # Update session status to completed
+                asyncio.run(self._update_session_status(session_id, "completed"))
             except Exception as exc:  # pragma: no cover - defensive guard
                 self._event_manager.publish(
                     session_id,
@@ -123,6 +145,9 @@ class TradingGraphService:
                         "message": str(exc),
                     },
                 )
+                
+                # Update session status to failed
+                asyncio.run(self._update_session_status(session_id, "failed"))
             finally:
                 self._event_manager.close(session_id)
 
@@ -134,6 +159,21 @@ class TradingGraphService:
             "session_id": session_id,
             "stream_endpoint": f"/sessions/{session_id}/events",
         }
+
+    async def _update_session_status(self, session_id: str, status: str) -> None:
+        """Update the status of an analysis session.
+        
+        Args:
+            session_id: The session UUID string
+            status: New status (completed or failed)
+        """
+        async with self._db_manager.session_factory() as db_session:
+            try:
+                analysis_service = AnalysisSessionService(db_session, self._event_manager)
+                await analysis_service.update_status(session_id, status)
+                await db_session.commit()
+            except Exception:
+                await db_session.rollback()
 
     async def ensure_session_stream(self, session_id: str) -> "asyncio.Queue[Any]":
         """Return the queue for an existing session."""

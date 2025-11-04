@@ -55,3 +55,36 @@ class SessionEventsHistoryResponse(BaseModel):
         description="List of buffered events with timestamps, ordered from oldest to newest"
     )
     count: int = Field(..., description="Number of events in the buffer")
+
+
+class SessionSummary(BaseModel):
+    """Lightweight summary of a persisted analysis session.
+    
+    Maps to the shared SessionSummary DTO from the frontend.
+    """
+
+    id: str = Field(..., description="Session UUID")
+    ticker: str = Field(..., description="Ticker symbol analyzed")
+    asOfDate: str = Field(..., description="Trading date in ISO format")
+    status: str = Field(..., description="Session status: pending, running, completed, failed")
+    createdAt: str = Field(..., description="ISO timestamp of when session was created")
+    updatedAt: Optional[str] = Field(None, description="ISO timestamp of last update")
+
+
+class SessionListResponse(BaseModel):
+    """Response for listing analysis sessions."""
+
+    sessions: List[SessionSummary] = Field(default_factory=list)
+    total: int = Field(..., description="Total number of sessions in result")
+    skip: int = Field(..., description="Number of records skipped")
+    limit: int = Field(..., description="Maximum records returned")
+
+
+class SessionDetailResponse(BaseModel):
+    """Response for a single analysis session with events."""
+
+    session: SessionSummary
+    events: List[BufferedSessionEvent] = Field(
+        default_factory=list,
+        description="Recent events for this session"
+    )

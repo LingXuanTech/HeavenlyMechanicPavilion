@@ -22,10 +22,11 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     """Add database optimization indexes for improved query performance."""
     
-    # Add session_id column to trades table to track which trading session a trade belongs to
-    op.add_column('trades', sa.Column('session_id', sa.Integer(), nullable=True))
-    op.create_foreign_key('fk_trades_session_id', 'trades', 'trading_sessions', ['session_id'], ['id'])
-    op.create_index(op.f('ix_trades_session_id'), 'trades', ['session_id'], unique=False)
+    # Use batch mode for SQLite compatibility when adding foreign keys
+    with op.batch_alter_table('trades', schema=None) as batch_op:
+        batch_op.add_column(sa.Column('session_id', sa.Integer(), nullable=True))
+        batch_op.create_foreign_key('fk_trades_session_id', 'trading_sessions', ['session_id'], ['id'])
+        batch_op.create_index(batch_op.f('ix_trades_session_id'), ['session_id'], unique=False)
     
     # Add composite index on positions(portfolio_id, symbol) for faster lookups
     # This is crucial for queries like "get position for symbol X in portfolio Y"
@@ -54,10 +55,11 @@ def downgrade() -> None:
     op.drop_index('ix_trades_portfolio_status', table_name='trades')
     op.drop_index('ix_positions_portfolio_symbol', table_name='positions')
     
-    # Remove session_id from trades
-    op.drop_index(op.f('ix_trades_session_id'), table_name='trades')
-    op.drop_constraint('fk_trades_session_id', 'trades', type_='foreignkey')
-    op.drop_column('trades', 'session_id')
+    # Use batch mode for SQLite compatibility when removing foreign keys
+    with op.batch_alter_table('trades', schema=None) as batch_op:
+        batch_op.drop_index(batch_op.f('ix_trades_session_id'))
+        batch_op.drop_constraint('fk_trades_session_id', type_='foreignkey')
+        batch_op.drop_column('session_id')
     
     # Commented out user_id removal (corresponding to upgrade)
     # op.drop_index(op.f('ix_portfolios_user_id'), table_name='portfolios')

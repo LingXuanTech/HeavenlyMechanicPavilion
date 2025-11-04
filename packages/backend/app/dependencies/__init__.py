@@ -1,6 +1,7 @@
 """依赖注入模块 - 统一管理所有服务的依赖注入."""
 
 from ..config import get_settings
+from ..db.session import get_db_manager
 from ..services.events import SessionEventManager
 from ..services.graph import TradingGraphService
 from .services import (
@@ -36,7 +37,10 @@ def get_graph_service() -> TradingGraphService:
     Returns:
         TradingGraphService instance
     """
-    return TradingGraphService(event_manager=get_event_manager())
+    return TradingGraphService(
+        event_manager=get_event_manager(),
+        db_manager=get_db_manager(),
+    )
 
 
 __all__ = [
