@@ -53,7 +53,7 @@ interface Agent {
   id: number;
   name: string;
   role: string;
-  llm_config: LLMConfig;
+  llm_config: Record<string, unknown>;
   is_active: boolean;
 }
 
@@ -82,7 +82,7 @@ export default function AgentLLMConfigPage() {
     try {
       setLoading(true);
       const response = await api.agents.list({ limit: 1000 });
-      setAgents(response || []);
+      setAgents(response.agents || []);
     } catch (error) {
       showToast({
         type: "error",
@@ -100,7 +100,7 @@ export default function AgentLLMConfigPage() {
 
   const handleEdit = (agent: Agent) => {
     setEditingAgent(agent);
-    setFormData(agent.llm_config);
+    setFormData(agent.llm_config as unknown as LLMConfig);
     setEditDialogOpen(true);
   };
 
@@ -109,7 +109,7 @@ export default function AgentLLMConfigPage() {
 
     try {
       setSaving(true);
-      await api.agents.update(editingAgent.id, { llm_config: formData });
+      await api.agents.update(editingAgent.id, { llm_config: formData as unknown as Record<string, unknown> });
       
       showToast({
         type: "success",
@@ -180,16 +180,16 @@ export default function AgentLLMConfigPage() {
                     <Badge variant="outline">{agent.role}</Badge>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm">{agent.llm_config.provider}</span>
+                    <span className="text-sm">{(agent.llm_config as unknown as LLMConfig).provider}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm font-mono">{agent.llm_config.model}</span>
+                    <span className="text-sm font-mono">{(agent.llm_config as unknown as LLMConfig).model}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm">{(agent.llm_config.temperature ?? 0).toFixed(1)}</span>
+                    <span className="text-sm">{((agent.llm_config as unknown as LLMConfig).temperature ?? 0).toFixed(1)}</span>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm">{agent.llm_config.max_tokens || "N/A"}</span>
+                    <span className="text-sm">{(agent.llm_config as unknown as LLMConfig).max_tokens || "N/A"}</span>
                   </TableCell>
                   <TableCell>
                     {agent.is_active ? (
