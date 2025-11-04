@@ -1,17 +1,19 @@
 # Backend API Reference
 
-The FastAPI backend exposes REST, SSE, and WebSocket interfaces for orchestrating TradingAgents runs, administering plugins, streaming telemetry, and monitoring system health. This reference summarises the primary endpoints and includes example payloads.
+The FastAPI backend exposes REST, SSE, and WebSocket interfaces for orchestrating TradingAgents runs, administering plugins, streaming telemetry, and monitoring system health. This reference summarises the primary endpoints and includes example payloads aligned with the shared DTOs consumed by the Control Center and external clients.
 
 ## Table of Contents
 
 1. [Conventions](#conventions)
 2. [Health & Metadata](#health--metadata)
-3. [Session Management](#session-management)
-4. [Streaming Endpoints](#streaming-endpoints)
-5. [Vendor Plugin Administration](#vendor-plugin-administration)
-6. [Agent Plugin Administration](#agent-plugin-administration)
-7. [Configuration Management](#configuration-management)
-8. [Monitoring & Metrics](#monitoring--metrics)
+3. [LLM Provider Registry](#llm-provider-registry)
+4. [Session Management](#session-management)
+5. [Streaming Endpoints](#streaming-endpoints)
+6. [Vendor Plugin Administration](#vendor-plugin-administration)
+7. [Agent Plugin Administration](#agent-plugin-administration)
+8. [Configuration Management](#configuration-management)
+9. [Monitoring & Metrics](#monitoring--metrics)
+10. [Troubleshooting & Tips](#troubleshooting--tips)
 
 ## Conventions
 
@@ -20,6 +22,7 @@ The FastAPI backend exposes REST, SSE, and WebSocket interfaces for orchestratin
 - Content type: JSON unless noted
 - All endpoints support `?limit=` and `?offset=` pagination where indicated
 - SSE endpoints use the `text/event-stream` media type
+- Shared DTOs live in `packages/shared/src/domain/session.ts` and `packages/shared/src/clients` for consumers that want type-safe integrations
 
 Swagger UI is available at [http://localhost:8000/docs](http://localhost:8000/docs), and the OpenAPI schema at [http://localhost:8000/openapi.json](http://localhost:8000/openapi.json).
 
@@ -40,13 +43,50 @@ Example response for `/health`:
 }
 ```
 
+## LLM Provider Registry
+
+The canonical provider registry is exposed for UI and automation. Metadata originates from `tradingagents.llm_providers.registry` and is shared with the frontend via DTOs.
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/llm-providers/` | List supported providers and their models with pricing/capabilities |
+| `GET` | `/llm-providers/{provider}/models` | Retrieve model metadata for a provider (`openai`, `claude`, `deepseek`, `grok`) |
+| `POST` | `/llm-providers/validate-key` | Perform a live health check using the supplied API key |
+
+### Validate an API Key
+
+```bash
+curl -X POST http://localhost:8000/llm-providers/validate-key \
+  -H "Content-Type: application/json" \
+  -d '{
+    "provider": "openai",
+    "api_key": "sk-...",
+    "model_name": "gpt-4o-mini"
+  }'
+```
+
+If no `model_name` is supplied the registry default is used. Example response:
+
+```json
+{
+  "provider": "openai",
+  "model_name": "gpt-4o-mini",
+  "valid": true,
+  "detail": null
+}
+```
+
+Failed health checks return `valid: false` with diagnostic information in `detail` (e.g., missing API keys, disabled providers, or upstream errors).
+
 ## Session Management
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
-| `POST` | `/sessions` | Start a new TradingAgents run. Returns a `session_id` and initial status. |
-| `GET` | `/sessions/{session_id}` | Retrieve session status and final decision. |
-| `GET` | `/sessions/{session_id}/events` | Server-Sent Events (SSE) stream for run lifecycle updates. |
+| `POST` | `/sessions` | Start a new TradingAgents run. Returns a `session_id` and SSE endpoint. |
+| `GET` | `/sessions` | List persisted analysis sessions with optional `status`/`ticker` filters. |
+| `GET` | `/sessions/{session_id}` | Retrieve a persisted session summary plus buffered events. |
+| `GET` | `/sessions/{session_id}/events-history` | Fetch recent event history (same payload shape as SSE stream) after a run completes. |
+| `GET` | `/sessions/{session_id}/events` | Server-Sent Events stream for live lifecycle updates. |
 | `WS` | `/sessions/{session_id}/ws` | WebSocket stream mirroring the SSE payload. |
 
 ### Start a Session
@@ -56,26 +96,131 @@ curl -X POST http://localhost:8000/sessions \
   -H "Content-Type: application/json" \
   -d '{
     "ticker": "NVDA",
-    "date": "2024-05-10",
-    "config": {
-      "deep_think_llm": "o4-mini",
-      "quick_think_llm": "gpt-4o-mini",
-      "max_debate_rounds": 1
-    }
+    "trade_date": "2024-05-10",
+    "selected_analysts": ["technical", "news"]
   }'
 ```
 
-### Stream Session Events
+Response:
+
+```json
+{
+  "session_id": "8c98f5b4-7f0d-4fb1-9b7b-19ad2b2795be",
+  "stream_endpoint": "/sessions/8c98f5b4-7f0d-4fb1-9b7b-19ad2b2795be/events"
+}
+```
+
+### List Sessions
+
+```bash
+curl "http://localhost:8000/sessions?limit=20&status=completed"
+```
+
+Example response (`SessionListResponse` / shared `SessionSummary` DTO):
+
+```json
+{
+  "sessions": [
+    {
+      "id": "8c98f5b4-7f0d-4fb1-9b7b-19ad2b2795be",
+      "ticker": "NVDA",
+      "asOfDate": "2024-05-10",
+      "status": "completed",
+      "createdAt": "2024-05-10T14:21:03.814237",
+      "updatedAt": "2024-05-10T14:23:44.019523"
+    }
+  ],
+  "total": 1,
+  "skip": 0,
+  "limit": 20
+}
+```
+
+### Session Detail with Buffered Events
+
+```bash
+curl http://localhost:8000/sessions/8c98f5b4-7f0d-4fb1-9b7b-19ad2b2795be
+```
+
+Example response (`SessionDetailResponse`):
+
+```json
+{
+  "session": {
+    "id": "8c98f5b4-7f0d-4fb1-9b7b-19ad2b2795be",
+    "ticker": "NVDA",
+    "asOfDate": "2024-05-10",
+    "status": "completed",
+    "createdAt": "2024-05-10T14:21:03.814237",
+    "updatedAt": "2024-05-10T14:23:44.019523"
+  },
+  "events": [
+    {
+      "timestamp": "2024-05-10T14:21:05.011924",
+      "event": {
+        "type": "status",
+        "message": "session_started"
+      }
+    },
+    {
+      "timestamp": "2024-05-10T14:23:44.018912",
+      "event": {
+        "type": "decision",
+        "message": "buy",
+        "payload": {
+          "ticker": "NVDA",
+          "conviction": 0.78
+        }
+      }
+    }
+  ]
+}
+```
+
+### Event History Endpoint
+
+`GET /sessions/{session_id}/events-history` returns the same buffered events with a `count` field:
+
+```json
+{
+  "session_id": "8c98f5b4-7f0d-4fb1-9b7b-19ad2b2795be",
+  "events": [
+    {
+      "timestamp": "2024-05-10T14:21:05.011924",
+      "event": {
+        "type": "status",
+        "message": "session_started"
+      }
+    }
+  ],
+  "count": 1
+}
+```
+
+### Stream Session Events (SSE / WebSocket)
 
 ```bash
 # SSE
-curl -N http://localhost:8000/sessions/<SESSION_ID>/events
+tail -f <(curl -N http://localhost:8000/sessions/8c98f5b4-7f0d-4fb1-9b7b-19ad2b2795be/events)
 
 # WebSocket (e.g., using websocat)
-websocat ws://localhost:8000/sessions/<SESSION_ID>/ws
+websocat ws://localhost:8000/sessions/8c98f5b4-7f0d-4fb1-9b7b-19ad2b2795be/ws
 ```
 
-Each event carries a JSON payload describing agent progress, research outputs, trade decisions, and risk checks.
+Each SSE message contains the serialised `SessionEvent` schema:
+
+```json
+{
+  "type": "status",
+  "message": "analyst_panel_complete",
+  "payload": {
+    "analysts": ["fundamental", "news"],
+    "elapsed_seconds": 42.7
+  }
+}
+```
+
+Buffered histories persist after the SSE stream closes, enabling REST clients to reconcile runs without maintaining long-lived connections.
 
 ## Streaming Endpoints
 
@@ -226,4 +371,10 @@ scrape_configs:
 
 > The frontend dashboard also surfaces these metrics at `/monitoring` for quick visual inspection.
 
-Need a command catalogue for deployment? See [docs/DEPLOYMENT.md](./DEPLOYMENT.md). For lower-level subsystem details, refer to [docs/ARCHITECTURE.md](./ARCHITECTURE.md).
+## Troubleshooting & Tips
+
+- **Provider validation failures** – Inspect the `detail` field returned by `POST /llm-providers/validate-key`. Missing API keys surface as `APIKeyMissingError`; disabled providers or incorrect models map to `ProviderNotFoundError`/`ModelNotSupportedError`.
+- **Fallback market data** – If REST responses or SSE payloads include deterministic baseline prices, review `/vendors/routing/config` and vendor logs. The Market Data Service reuses the last good quote or derives a symbol-based baseline when vendors are unreachable.
+- **Session event gaps** – The bounded event buffer stores the most recent events (default 100). If expected history is missing, poll `/sessions/{id}/events-history` immediately after completion or increase the buffer size via `SessionEventManager` configuration.
+
+Need a command catalogue for deployment? See [docs/DEPLOYMENT.md](./DEPLOYMENT.md). For system architecture context, refer to [docs/ARCHITECTURE.md](./ARCHITECTURE.md).

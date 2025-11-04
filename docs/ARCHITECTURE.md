@@ -1,6 +1,6 @@
 # Architecture Overview
 
-TradingAgents coordinates a LangGraph-powered ensemble of specialised agents, a FastAPI services layer, optional background workers, and a Next.js Control Center. This document summarises the major components, data flows, and extensibility hooks that power the platform.
+TradingAgents coordinates a LangGraph-powered ensemble of specialised agents, a FastAPI services layer, optional background workers, and a Next.js Control Center. This document summarises the major components, data flows, and extensibility hooks that power the platform with an emphasis on the unified LLM provider registry, deterministic market data pipeline, and persisted session history.
 
 ## Table of Contents
 
@@ -9,14 +9,18 @@ TradingAgents coordinates a LangGraph-powered ensemble of specialised agents, a 
 3. [Backend Architecture](#backend-architecture)
    - [LangGraph Orchestration](#langgraph-orchestration)
    - [Agent Plugin System](#agent-plugin-system)
+   - [LLM Provider Stack](#llm-provider-stack)
    - [Data Vendor Plugin System](#data-vendor-plugin-system)
+   - [Market Data Service & Broker Pipeline](#market-data-service--broker-pipeline)
    - [Persistence & Caching](#persistence--caching)
+   - [Analysis Session Persistence & Event Streaming](#analysis-session-persistence--event-streaming)
    - [Streaming Infrastructure](#streaming-infrastructure)
    - [Execution & Risk Management](#execution--risk-management)
    - [Monitoring & Alerting](#monitoring--alerting)
 4. [Frontend Control Center](#frontend-control-center)
 5. [Data & Configuration Flow](#data--configuration-flow)
-6. [Related Resources](#related-resources)
+6. [Troubleshooting & Operational Notes](#troubleshooting--operational-notes)
+7. [Related Resources](#related-resources)
 
 ## Multi-Agent Workflow
 
@@ -40,7 +44,7 @@ Each role is implemented as a LangGraph node with access to toolkits, vector mem
 ├── packages/
 │   ├── backend/                 # LangGraph graph, FastAPI app, workers, persistence layer
 │   ├── frontend/                # Next.js Control Center
-│   └── shared/                  # Shared TypeScript clients, schemas, UI tokens
+│   └── shared/                  # Shared TypeScript clients, schemas, UI tokens and DTOs
 ├── docs/                        # Unified documentation (setup, architecture, API, etc.)
 ├── scripts/                     # Deployment helpers (deploy.sh, healthcheck.sh)
 ├── docker-compose*.yml          # Deployment stacks
@@ -67,6 +71,18 @@ Location: `tradingagents/agents/`
 - **Persistence** (`app/db/models/agent_config.py`) stores agent definitions with hot-reload support through REST endpoints.
 - **API** (`app/api/agents.py`) exposes CRUD operations, filtering, pagination, and a `/agents/reload` endpoint for dynamic updates.
 
+### LLM Provider Stack
+
+Location: `tradingagents/llm_providers/`
+
+- **Canonical Registry** (`registry.py`) declares `ProviderType`, `ProviderInfo`, and `ModelInfo` metadata for OpenAI, Claude, DeepSeek, and Grok. Pricing, context windows, rate limits, and capability flags originate from this source of truth.
+- **Factory Pattern** (`factory.py`) instantiates providers on demand through `ProviderFactory.create_provider(...)`, performing lazy imports so unit tests can replace implementations easily.
+- **Provider Implementations** (`openai_provider.py`, `claude_provider.py`, `deepseek_provider.py`, `grok_provider.py`) inherit from `BaseLLMProvider`. They expose uniform async methods: `chat`, `stream`, `count_tokens`, and `health_check`.
+- **Exception Hierarchy** ensures clear error reporting (`LLMProviderError`, `ProviderNotFoundError`, `ModelNotSupportedError`, etc.), allowing the API layer and services to surface actionable feedback.
+- **Registry Consumers** – The `AgentLLMService` validates provider/model combos, defaults cost fields from registry metadata, and performs live health checks when configurations are saved. The `/llm-providers` API family mirrors the registry for consumers and the frontend.
+
+> ℹ️ The legacy static provider maps have been removed; all validation and pricing data should flow through `tradingagents.llm_providers`.
+
 ### Data Vendor Plugin System
 
 Location: `tradingagents/plugins/`
@@ -84,15 +100,33 @@ Location: `tradingagents/plugins/`
   - `PUT /vendors/routing/config` – Set priority chains
   - `POST /vendors/config/reload` – Hot-reload configuration files
 
+### Market Data Service & Broker Pipeline
+
+Location: `app/services/market_data.py`
+
+- **MarketDataService** mediates between broker operations and vendor plugins. It requests recent historical quotes via `route_to_vendor("get_stock_data", ...)`, parses CSV payloads, and derives bid/ask/last prices using configurable spreads.
+- **Deterministic Fallbacks** – When vendors return nothing or raise errors, the service reuses cached quotes or computes a deterministic baseline derived from the ticker symbol. This guarantees reproducible fills for the simulated broker while surfacing warnings for observability.
+- **Broker Integration** – Execution paths obtain `MarketPrice` instances from the service, ensuring order books reflect either live vendor data or consistent fallbacks. Spread settings and default baselines can be tuned per environment.
+
 ### Persistence & Caching
 
 Location: `app/db/`, `app/repositories/`, `app/cache/`
 
-- **Models** (`SQLModel`) store portfolios, positions, trades, executions, agent configs, vendor configs, and run logs.
+- **Models** (`SQLModel`) store portfolios, positions, trades, executions, agent configs, vendor configs, analysis sessions, and run logs.
 - **Alembic** powers schema migrations with async support (`alembic.ini`, `alembic/env.py`).
-- **Repositories** implement a typed CRUD layer (e.g., `PortfolioRepository`, `TradeRepository`) with domain-specific queries.
+- **Repositories** implement a typed CRUD layer (e.g., `PortfolioRepository`, `TradeRepository`, `AnalysisSessionRepository`) with domain-specific queries.
 - **Database Manager** handles engine initialisation, session lifecycle, and optional table creation for SQLite development use.
 - **Redis Cache** (`cache_service.py`) provides optional caching of market data, session state, and generic key/value storage. Connection details are managed by `REDIS_*` environment variables.
+
+### Analysis Session Persistence & Event Streaming
+
+Locations: `app/db/models/analysis_session.py`, `app/services/analysis_session.py`, `app/services/events.py`, `app/api/sessions.py`, `app/api/streams.py`
+
+- **AnalysisSession Model** persists each run with ticker, status, trade date, selected analysts, and summary JSON blobs. Status transitions (`pending → running → completed/failed`) are timestamped for auditability.
+- **SessionEventManager** maintains bounded in-memory buffers (`deque`) of timestamped events per session. Events are appended during active streams and remain queryable after completion.
+- **REST Endpoints** – `/sessions` lists summaries, `/sessions/{id}` returns a summary plus buffered events, and `/sessions/{id}/events-history` exposes the same event history for REST consumers. Payloads align with the shared DTOs under `packages/shared/src/domain/session.ts`.
+- **Realtime Delivery** – `/sessions/{id}/events` (SSE) and `/sessions/{id}/ws` (WebSocket) deliver live updates that mirror the buffered events. Streams are initialised by `TradingGraphService.ensure_session_stream`, and closing messages preserve event history.
+- **Frontend Consumption** – The Control Center hydrates `TradingSession` views using `normalizeSessionSummary`, `normalizeSessionEventsHistory`, and `enrichSessionWithEvents` from the shared package, combining REST history with live SSE updates.
 
 ### Streaming Infrastructure
 
@@ -113,10 +147,10 @@ Location: `app/workers/`, `app/api/streaming.py`, `app/api/streaming_config.py`
 
 Location: `app/services/execution.py`, `app/services/risk_management.py`, `app/services/position_sizing.py`, `app/services/broker_adapter.py`
 
-- **ExecutionService** transforms trader decisions into orders, enforcing pre-trade risk checks and updating persistence.
+- **ExecutionService** transforms trader decisions into orders, enforcing pre-trade risk checks and updating persistence. Market prices flow through `MarketDataService` to maintain consistent book states.
 - **PositionSizingService** supports multiple strategies (fixed dollar, fixed percentage, risk-based, volatility-weighted, fractional Kelly) with configurable caps.
 - **RiskManagementService** computes diagnostics (VaR, exposure, max drawdown, Sharpe) and enforces constraints (position limits, stop-loss/take-profit rules).
-- **BrokerAdapter** abstraction includes a `SimulatedBroker` for paper trading with commission/slippage modelling; the interface is ready for live integrations.
+- **BrokerAdapter** abstraction includes a `SimulatedBroker` for paper trading with commission/slippage modelling. The adapter now expects deterministic pricing from the Market Data Service rather than generating random prices, making fills reproducible across runs.
 - **TradingSessionService** orchestrates paper/live sessions, resets, and state transitions, persisting outcomes to the database.
 
 ### Monitoring & Alerting
@@ -139,6 +173,7 @@ Key features:
 - **Signal Feed**: Streaming trading signals with action type, confidence, price context, and rationale.
 - **Execution Timeline**: Chronological list of trades with status, cost, and agent justification.
 - **Agent Activity Stream**: Role-filterable event feed for analysts, researchers, trader, and risk managers.
+- **Session Detail Views**: The sessions route uses shared DTOs (`@tradingagents/shared/domain`) to hydrate persisted summaries, buffered events, and live SSE updates via the `useSessionStream` hook.
 - **View Controls**: Time-range filters, overview vs. detailed tabs, dark-mode aware components built with shadcn/ui primitives.
 - **Real-time Transport**: SSE/WebSocket hooks (`useRealtimePortfolio`, `useRealtimeSignals`, etc.) handle reconnection and status indicators.
 - **Accessibility & Performance**: Keyboard navigation, ARIA labelling, responsive layout, virtualised lists, and Recharts for live visualisations.
@@ -148,17 +183,41 @@ Configuration is handled via `.env.local` (e.g., `NEXT_PUBLIC_API_URL`) or Compo
 ## Data & Configuration Flow
 
 1. **Environment variables** (see [docs/CONFIGURATION.md](./CONFIGURATION.md)) configure LLM providers, vendor routing, database targets, Redis, monitoring, and deployment-specific behaviour.
-2. **Vendor and agent registries** load built-in plugins, discover third-party extensions, and persist configuration in the database or YAML/JSON files.
-3. **LangGraph runs** pull data through vendor routers, maintain conversation state in vector memory, and propose trades.
-4. **Execution services** validate trades against risk constraints, trigger broker adapters, and persist results.
-5. **Streaming & monitoring** layers surface telemetry back to clients via REST, SSE/WebSocket, and Prometheus endpoints.
-6. **Frontend dashboard** subscribes to streaming channels and monitoring endpoints to visualise activity in real time.
+2. **LLM Provider Registry** supplies metadata and health checks to `AgentLLMService`, API routes, and the Control Center. Provider costs and capabilities originate from the registry to keep databases and UI aligned.
+3. **Vendor and agent registries** load built-in plugins, discover third-party extensions, and persist configuration in the database or YAML/JSON files.
+4. **LangGraph runs** pull data through vendor routers, maintain conversation state in vector memory, and propose trades.
+5. **Market Data Service** supplies deterministic quotes to the broker adapter, pulling from vendors when possible and falling back to cached/baseline prices when necessary.
+6. **Execution services** validate trades against risk constraints, trigger broker adapters, and persist results.
+7. **Session persistence** stores analysis session metadata while SessionEventManager buffers events for later retrieval. REST endpoints expose summaries and event history, and SSE/WebSocket channels deliver live updates.
+8. **Frontend dashboard** consumes shared DTOs to merge REST history and SSE streams, visualising activity in real time.
+
+## Troubleshooting & Operational Notes
+
+### LLM Provider Configuration
+
+- Use `POST /llm-providers/validate-key` to verify API keys before saving configurations. The response includes a `valid` flag and diagnostic `detail` string when health checks fail.
+- A `ProviderNotFoundError` or `ModelNotSupportedError` indicates an outdated provider/model combination; confirm against `GET /llm-providers/` and `GET /llm-providers/{provider}/models`.
+- Missing environment variables surface as `APIKeyMissingError` exceptions. Ensure provider-specific keys (e.g., `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`) are present in runtime configuration.
+- Disabled providers (e.g., removed from deployment via feature flags) still appear in the registry but health checks will fail. The frontend surfaces these failures using the shared DTOs so admins can remediate quickly.
+
+### Market Data Fallback Behaviour
+
+- Vendor routing failures trigger cached quote reuse. Check vendor logs and routing configuration via `/vendors/routing/config` when repeated fallbacks occur.
+- If no prior quote is cached, MarketDataService derives a deterministic baseline informed by the ticker symbol. This keeps simulated fills stable across runs while clearly logging vendor failures.
+- Tune `spread_bps`, `min_spread`, and `fallback_prices` via service configuration when operating in offline or limited-data environments.
+
+### Session Event Buffers
+
+- Buffered events are capped (default 100 per session) to prevent unbounded memory usage. Older events are discarded on overflow.
+- `GET /sessions/{id}/events-history` mirrors the SSE payloads and should be used by automation that cannot maintain long-lived streams.
+- The shared TypeScript DTOs provide guards and normalisers to safely consume events in the frontend and custom clients.
 
 ## Related Resources
 
 - [API Reference](./API.md) – Complete endpoint catalogue with payloads and examples.
 - [Configuration Guide](./CONFIGURATION.md) – Environment variables, vendor routing, agent overrides.
 - [Deployment Guide](./DEPLOYMENT.md) – Docker stacks, production hardening, scaling, and maintenance.
+- [Shared Session DTOs](../packages/shared/src/domain/session.ts) – TypeScript contracts and helpers used by the Control Center and third-party clients.
 - [Operations Guides](./operations/README.md) – Runtime playbooks and Kubernetes example manifests.
 
 For detailed subsystem code, explore the paths highlighted above within `packages/backend` and `packages/frontend`.
