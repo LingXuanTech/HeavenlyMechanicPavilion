@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .base import (
     AgentConfig,
+    AgentLLMConfig,
     AgentLLMUsage,
     Execution,
     Portfolio,
@@ -20,6 +21,7 @@ get_db = get_session
 
 __all__ = [
     "AgentConfig",
+    "AgentLLMConfig",
     "AgentLLMUsage",
     "DatabaseManager",
     "Execution",
