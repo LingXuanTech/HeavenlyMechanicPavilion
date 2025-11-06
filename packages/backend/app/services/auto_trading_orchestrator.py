@@ -44,7 +44,11 @@ class AutoTradingOrchestrator:
         
         # 自动交易状态管理
         self.is_running: Dict[int, bool] = {}
+        self.is_paused: Dict[int, bool] = {}
         self.active_tasks: Dict[int, asyncio.Task] = {}
+        
+        # 交易统计
+        self.trading_stats: Dict[int, Dict] = {}
         
         logger.info("Initialized AutoTradingOrchestrator")
     
@@ -120,6 +124,7 @@ class AutoTradingOrchestrator:
                     "confidence": confidence_score,
                     "rationale": decision_rationale[:200],  # 限制长度
                     "timestamp": datetime.utcnow().isoformat(),
+                    "session_id": str(trading_session_id) if trading_session_id else None,
                 })
                 
                 # 5. 如果不是 HOLD，自动执行交易
@@ -175,6 +180,7 @@ class AutoTradingOrchestrator:
                             "price": trade.average_fill_price or current_price,
                             "status": trade.status,
                             "timestamp": datetime.utcnow().isoformat(),
+                            "session_id": str(trading_session_id) if trading_session_id else None,
                         })
                         
                         results.append({
@@ -220,7 +226,11 @@ class AutoTradingOrchestrator:
                     "symbol": symbol,
                     "error": str(e),
                     "timestamp": datetime.utcnow().isoformat(),
+                    "session_id": str(trading_session_id) if trading_session_id else None,
                 })
+        
+        # 更新统计信息
+        self._update_trading_stats(portfolio_id, results)
         
         logger.info(
             f"自动交易周期完成 - 处理了 {len(results)} 个标的，"
@@ -258,6 +268,12 @@ class AutoTradingOrchestrator:
         
         try:
             while self.is_running.get(portfolio_id, False):
+                # 检查是否暂停
+                if self.is_paused.get(portfolio_id, False):
+                    logger.debug(f"Trading paused for portfolio {portfolio_id}, waiting...")
+                    await asyncio.sleep(5)  # 暂停时每5秒检查一次
+                    continue
+                
                 # 检查是否在交易时间内
                 if trading_hours_only:
                     is_open = await self._check_market_status()
@@ -282,7 +298,7 @@ class AutoTradingOrchestrator:
                     
                 except Exception as e:
                     logger.error(
-                        f"交易周期执行失败: {e}", 
+                        f"交易周期执行失败: {e}",
                         exc_info=True
                     )
                 
@@ -304,6 +320,50 @@ class AutoTradingOrchestrator:
                 f"连续自动交易已停止 - Portfolio: {portfolio_id}"
             )
     
+    def pause_continuous_trading(self, portfolio_id: int):
+        """暂停连续自动交易.
+        
+        暂停后可以通过 resume_continuous_trading 恢复。
+        
+        Args:
+            portfolio_id: 投资组合ID
+        """
+        if portfolio_id not in self.is_running or not self.is_running[portfolio_id]:
+            logger.warning(
+                f"Cannot pause trading for portfolio {portfolio_id}: not running"
+            )
+            return
+        
+        self.is_paused[portfolio_id] = True
+        logger.info(
+            f"自动交易已暂停 - Portfolio: {portfolio_id}"
+        )
+    
+    def resume_continuous_trading(self, portfolio_id: int):
+        """恢复连续自动交易.
+        
+        恢复之前被暂停的自动交易。
+        
+        Args:
+            portfolio_id: 投资组合ID
+        """
+        if portfolio_id not in self.is_running or not self.is_running[portfolio_id]:
+            logger.warning(
+                f"Cannot resume trading for portfolio {portfolio_id}: not running"
+            )
+            return
+        
+        if not self.is_paused.get(portfolio_id, False):
+            logger.warning(
+                f"Trading is not paused for portfolio {portfolio_id}"
+            )
+            return
+        
+        self.is_paused[portfolio_id] = False
+        logger.info(
+            f"自动交易已恢复 - Portfolio: {portfolio_id}"
+        )
+    
     def stop_continuous_trading(self, portfolio_id: int):
         """停止连续自动交易.
         
@@ -316,6 +376,10 @@ class AutoTradingOrchestrator:
                 f"正在停止自动交易 - Portfolio: {portfolio_id}"
             )
         
+        # 清除暂停状态
+        if portfolio_id in self.is_paused:
+            del self.is_paused[portfolio_id]
+        
         # 取消后台任务
         if portfolio_id in self.active_tasks:
             task = self.active_tasks[portfolio_id]
@@ -324,6 +388,47 @@ class AutoTradingOrchestrator:
                 logger.info(
                     f"已取消自动交易任务 - Portfolio: {portfolio_id}"
                 )
+    
+    def is_trading_active(self, portfolio_id: int) -> bool:
+        """检查自动交易是否处于活动状态（运行且未暂停）.
+        
+        Args:
+            portfolio_id: 投资组合ID
+            
+        Returns:
+            True if trading is running and not paused
+        """
+        return (
+            self.is_running.get(portfolio_id, False)
+            and not self.is_paused.get(portfolio_id, False)
+        )
+    
+    def get_trading_status(self, portfolio_id: int) -> Dict:
+        """获取自动交易状态信息.
+        
+        Args:
+            portfolio_id: 投资组合ID
+            
+        Returns:
+            状态信息字典
+        """
+        is_running = self.is_running.get(portfolio_id, False)
+        is_paused = self.is_paused.get(portfolio_id, False)
+        has_task = portfolio_id in self.active_tasks
+        
+        status = "stopped"
+        if is_running and not is_paused:
+            status = "running"
+        elif is_running and is_paused:
+            status = "paused"
+        
+        return {
+            "portfolio_id": portfolio_id,
+            "status": status,
+            "is_running": is_running,
+            "is_paused": is_paused,
+            "has_active_task": has_task,
+        }
     
     async def _wait_for_analysis_completion(
         self, 
@@ -454,15 +559,113 @@ class AutoTradingOrchestrator:
         
         return market_open <= current_time <= market_close
     
+    def _update_trading_stats(self, portfolio_id: int, results: List[Dict]):
+        """更新交易统计信息.
+        
+        Args:
+            portfolio_id: 投资组合ID
+            results: 交易周期结果
+        """
+        if portfolio_id not in self.trading_stats:
+            self.trading_stats[portfolio_id] = {
+                "total_cycles": 0,
+                "total_symbols_processed": 0,
+                "total_trades_executed": 0,
+                "total_trades_filtered": 0,
+                "total_holds": 0,
+                "total_errors": 0,
+                "success_rate": 0.0,
+                "symbol_stats": {},
+                "last_cycle_at": None,
+                "started_at": datetime.utcnow(),
+            }
+        
+        stats = self.trading_stats[portfolio_id]
+        stats["total_cycles"] += 1
+        stats["total_symbols_processed"] += len(results)
+        stats["last_cycle_at"] = datetime.utcnow()
+        
+        for result in results:
+            symbol = result.get("symbol")
+            status = result.get("status")
+            
+            # 更新整体统计
+            if status == "executed":
+                stats["total_trades_executed"] += 1
+            elif status == "filtered":
+                stats["total_trades_filtered"] += 1
+            elif status == "no_action":
+                stats["total_holds"] += 1
+            elif status == "error":
+                stats["total_errors"] += 1
+            
+            # 更新标的统计
+            if symbol not in stats["symbol_stats"]:
+                stats["symbol_stats"][symbol] = {
+                    "processed": 0,
+                    "executed": 0,
+                    "filtered": 0,
+                    "holds": 0,
+                    "errors": 0,
+                }
+            
+            symbol_stat = stats["symbol_stats"][symbol]
+            symbol_stat["processed"] += 1
+            
+            if status == "executed":
+                symbol_stat["executed"] += 1
+            elif status == "filtered":
+                symbol_stat["filtered"] += 1
+            elif status == "no_action":
+                symbol_stat["holds"] += 1
+            elif status == "error":
+                symbol_stat["errors"] += 1
+        
+        # 计算成功率
+        total_attempts = stats["total_trades_executed"] + stats["total_trades_filtered"] + stats["total_errors"]
+        if total_attempts > 0:
+            stats["success_rate"] = stats["total_trades_executed"] / total_attempts
+        
+        logger.debug(
+            f"Trading stats updated for portfolio {portfolio_id}: "
+            f"{stats['total_trades_executed']} executed, "
+            f"{stats['success_rate']:.1%} success rate"
+        )
+    
+    def get_trading_stats(self, portfolio_id: int) -> Optional[Dict]:
+        """获取交易统计信息.
+        
+        Args:
+            portfolio_id: 投资组合ID
+            
+        Returns:
+            统计信息字典，如果不存在则返回 None
+        """
+        return self.trading_stats.get(portfolio_id)
+    
+    def reset_trading_stats(self, portfolio_id: int):
+        """重置交易统计信息.
+        
+        Args:
+            portfolio_id: 投资组合ID
+        """
+        if portfolio_id in self.trading_stats:
+            del self.trading_stats[portfolio_id]
+            logger.info(f"Trading stats reset for portfolio {portfolio_id}")
+    
     async def _emit_event(self, event: Dict):
         """发送事件到前端（通过事件管理器）.
         
         Args:
             event: 事件数据
         """
-        # 广播事件（可以扩展为支持特定会话）
-        # 当前简化版本：直接记录日志
         logger.info(f"Event emitted: {event.get('type')} - {event.get('symbol', 'N/A')}")
         
-        # TODO: 实现真正的事件推送到前端
-        # 可以通过 WebSocket 或 SSE 推送
+        # 推送事件到会话流
+        session_id = event.get('session_id')
+        if session_id and self.events:
+            try:
+                self.events.publish(session_id, event)
+                logger.debug(f"Event published to session {session_id}: {event.get('type')}")
+            except Exception as e:
+                logger.warning(f"Failed to publish event to session {session_id}: {e}")

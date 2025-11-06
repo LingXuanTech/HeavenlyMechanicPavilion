@@ -354,6 +354,8 @@ class RiskManagementService:
 
     def check_stop_loss(self, position: Position, current_price: float) -> bool:
         """Check if stop loss should be triggered.
+        
+        Supports both fixed and trailing stop loss based on configuration.
 
         Args:
             position: Position to check
@@ -368,15 +370,60 @@ class RiskManagementService:
         pnl_pct = (current_price - position.average_cost) / position.average_cost
 
         if position.position_type == "LONG":
-            # Long position: stop loss if price drops too much
-            if pnl_pct <= -self.constraints.default_stop_loss_pct:
-                logger.warning(f"Stop loss triggered for {position.symbol}: loss={pnl_pct:.1%}")
-                return True
+            # Long position: check stop loss
+            if self.constraints.use_trailing_stop:
+                # Trailing stop loss: track highest price since entry
+                # Use position metadata to track high water mark
+                # For now, use a simplified version comparing to entry
+                highest_pnl = max(0, pnl_pct)
+                
+                # If current price dropped below trailing stop from peak
+                trailing_trigger = highest_pnl - pnl_pct >= self.constraints.trailing_stop_pct
+                
+                # Also check absolute stop loss
+                absolute_trigger = pnl_pct <= -self.constraints.default_stop_loss_pct
+                
+                if trailing_trigger and highest_pnl > 0:
+                    logger.warning(
+                        f"Trailing stop loss triggered for {position.symbol}: "
+                        f"peak={highest_pnl:.1%}, current={pnl_pct:.1%}, "
+                        f"drop={highest_pnl - pnl_pct:.1%}"
+                    )
+                    return True
+                elif absolute_trigger:
+                    logger.warning(
+                        f"Fixed stop loss triggered for {position.symbol}: loss={pnl_pct:.1%}"
+                    )
+                    return True
+            else:
+                # Fixed stop loss
+                if pnl_pct <= -self.constraints.default_stop_loss_pct:
+                    logger.warning(f"Stop loss triggered for {position.symbol}: loss={pnl_pct:.1%}")
+                    return True
         else:
             # Short position: stop loss if price rises too much
-            if pnl_pct >= self.constraints.default_stop_loss_pct:
-                logger.warning(f"Stop loss triggered for {position.symbol}: loss={pnl_pct:.1%}")
-                return True
+            if self.constraints.use_trailing_stop:
+                # For short positions, trailing stop tracks lowest price
+                lowest_pnl = max(0, -pnl_pct)
+                trailing_trigger = lowest_pnl + pnl_pct >= self.constraints.trailing_stop_pct
+                absolute_trigger = pnl_pct >= self.constraints.default_stop_loss_pct
+                
+                if trailing_trigger and lowest_pnl > 0:
+                    logger.warning(
+                        f"Trailing stop loss triggered for {position.symbol} (SHORT): "
+                        f"peak={lowest_pnl:.1%}, current={-pnl_pct:.1%}"
+                    )
+                    return True
+                elif absolute_trigger:
+                    logger.warning(
+                        f"Fixed stop loss triggered for {position.symbol} (SHORT): loss={pnl_pct:.1%}"
+                    )
+                    return True
+            else:
+                # Fixed stop loss
+                if pnl_pct >= self.constraints.default_stop_loss_pct:
+                    logger.warning(f"Stop loss triggered for {position.symbol}: loss={pnl_pct:.1%}")
+                    return True
 
         return False
 

@@ -265,6 +265,45 @@ class ExecutionService:
                 current_position,
                 session_id=session_id,
             )
+            
+        elif order_response.status == OrderStatus.PARTIAL:
+            # Handle partial fill
+            self._publish_event(
+                session_id=str(session_id) if session_id else None,
+                event=ExecutionEvent(
+                    event_type=ExecutionEventType.ORDER_PARTIALLY_FILLED,
+                    portfolio_id=portfolio_id,
+                    session_id=str(session_id) if session_id else None,
+                    order_data=OrderEventData(
+                        symbol=symbol,
+                        action=order_action.value,
+                        quantity=quantity,
+                        order_type=order_response.status.value,
+                        status=order_response.status.value,
+                        order_id=order_response.order_id,
+                        filled_quantity=order_response.filled_quantity,
+                        average_fill_price=order_response.average_fill_price,
+                        commission=order_response.commission,
+                        fees=order_response.fees,
+                    ),
+                    message=f"Order partially filled: {order_action.value} {order_response.filled_quantity}/{quantity} {symbol} @ ${order_response.average_fill_price:.2f}",
+                )
+            )
+            
+            # Process the filled portion
+            if order_response.filled_quantity > 0:
+                logger.info(
+                    f"Processing partial fill: {order_response.filled_quantity}/{quantity} {symbol}"
+                )
+                await self._handle_fill(
+                    session,
+                    created_trade,
+                    order_response,
+                    portfolio,
+                    current_position,
+                    session_id=session_id,
+                )
+            
         elif order_response.status == OrderStatus.REJECTED:
             self._publish_event(
                 session_id=str(session_id) if session_id else None,
@@ -594,6 +633,186 @@ class ExecutionService:
             decision_rationale=reason,
         )
 
+    async def cancel_order(
+        self,
+        session: AsyncSession,
+        trade_id: int,
+        session_id: Optional[int] = None,
+    ) -> Optional[Trade]:
+        """Cancel a pending or partially filled order.
+        
+        Args:
+            session: Database session
+            trade_id: Trade ID to cancel
+            session_id: Trading session ID for event publishing
+            
+        Returns:
+            Updated trade record if successful
+        """
+        trade_repo = TradeRepository(session)
+        trade = await trade_repo.get(trade_id)
+        
+        if not trade:
+            raise ResourceNotFoundError(
+                f"Trade {trade_id} not found",
+                details={"trade_id": trade_id},
+            )
+        
+        # Check if order can be cancelled
+        if trade.status in ["FILLED", "CANCELLED", "REJECTED"]:
+            logger.warning(
+                f"Cannot cancel trade {trade_id} with status {trade.status}"
+            )
+            self._publish_event(
+                session_id=str(session_id) if session_id else None,
+                event=ExecutionEvent(
+                    event_type=ExecutionEventType.ORDER_CANCELLED,
+                    portfolio_id=trade.portfolio_id,
+                    session_id=str(session_id) if session_id else None,
+                    order_data=OrderEventData(
+                        symbol=trade.symbol,
+                        action=trade.action,
+                        quantity=trade.quantity,
+                        order_type=trade.order_type,
+                        status="CANNOT_CANCEL",
+                        reason=f"Order already {trade.status}",
+                    ),
+                    message=f"Cannot cancel order {trade_id}: already {trade.status}",
+                )
+            )
+            return trade
+        
+        try:
+            # Cancel order with broker
+            # Note: This assumes trade has an order_id stored
+            # You may need to add order_id field to Trade model
+            logger.info(f"Cancelling order for trade {trade_id}")
+            
+            # For now, just update the status
+            # In production, you would call broker.cancel_order(order_id)
+            trade.status = "CANCELLED"
+            trade.updated_at = datetime.utcnow()
+            
+            updated_trade = await trade_repo.update(trade)
+            await session.commit()
+            
+            # Publish cancellation event
+            self._publish_event(
+                session_id=str(session_id) if session_id else None,
+                event=ExecutionEvent(
+                    event_type=ExecutionEventType.ORDER_CANCELLED,
+                    portfolio_id=trade.portfolio_id,
+                    session_id=str(session_id) if session_id else None,
+                    order_data=OrderEventData(
+                        symbol=trade.symbol,
+                        action=trade.action,
+                        quantity=trade.quantity,
+                        order_type=trade.order_type,
+                        status="CANCELLED",
+                    ),
+                    message=f"Order cancelled: {trade.symbol}",
+                )
+            )
+            
+            logger.info(f"Order cancelled successfully: trade_id={trade_id}")
+            return updated_trade
+            
+        except Exception as e:
+            logger.error(f"Failed to cancel order {trade_id}: {e}", exc_info=True)
+            raise
+    
+    async def check_pending_limit_orders(
+        self,
+        session: AsyncSession,
+        portfolio_id: int,
+    ) -> List[Trade]:
+        """Check pending limit orders and execute if price conditions are met.
+        
+        Args:
+            session: Database session
+            portfolio_id: Portfolio ID
+            
+        Returns:
+            List of trades that were filled
+        """
+        trade_repo = TradeRepository(session)
+        
+        # Get all pending/submitted limit orders for this portfolio
+        # Note: You may need to add a method to TradeRepository to query by status
+        # For now, we'll assume we can filter trades
+        all_trades = await trade_repo.list()  # This needs proper filtering
+        pending_trades = [
+            t for t in all_trades
+            if t.portfolio_id == portfolio_id
+            and t.status in ["PENDING", "SUBMITTED"]
+            and t.order_type == "LIMIT"
+        ]
+        
+        filled_trades = []
+        
+        for trade in pending_trades:
+            try:
+                # Get current market price
+                market_price = await self.broker.get_market_price(trade.symbol)
+                
+                # Check if limit price condition is met
+                should_fill = False
+                
+                if trade.action == "BUY":
+                    # Buy limit: execute if market price <= limit price
+                    # Assuming average_fill_price stores the limit price for pending orders
+                    if trade.average_fill_price and market_price.ask <= trade.average_fill_price:
+                        should_fill = True
+                        fill_price = min(trade.average_fill_price, market_price.ask)
+                        
+                elif trade.action == "SELL":
+                    # Sell limit: execute if market price >= limit price
+                    if trade.average_fill_price and market_price.bid >= trade.average_fill_price:
+                        should_fill = True
+                        fill_price = max(trade.average_fill_price, market_price.bid)
+                
+                if should_fill:
+                    # Update trade status
+                    trade.status = "FILLED"
+                    trade.filled_quantity = trade.quantity
+                    trade.average_fill_price = fill_price
+                    trade.filled_at = datetime.utcnow()
+                    
+                    updated_trade = await trade_repo.update(trade)
+                    filled_trades.append(updated_trade)
+                    
+                    # Publish fill event
+                    self._publish_event(
+                        session_id=None,
+                        event=ExecutionEvent(
+                            event_type=ExecutionEventType.ORDER_FILLED,
+                            portfolio_id=portfolio_id,
+                            order_data=OrderEventData(
+                                symbol=trade.symbol,
+                                action=trade.action,
+                                quantity=trade.quantity,
+                                order_type="LIMIT",
+                                status="FILLED",
+                                filled_quantity=trade.filled_quantity,
+                                average_fill_price=fill_price,
+                            ),
+                            message=f"Limit order filled: {trade.action} {trade.quantity} {trade.symbol} @ ${fill_price:.2f}",
+                        )
+                    )
+                    
+                    logger.info(
+                        f"Limit order filled: {trade.action} {trade.quantity} {trade.symbol} @ ${fill_price:.2f}"
+                    )
+                    
+            except Exception as e:
+                logger.error(f"Error checking limit order for trade {trade.id}: {e}", exc_info=True)
+                continue
+        
+        if filled_trades:
+            await session.commit()
+            
+        return filled_trades
+    
     async def check_stop_loss_take_profit(
         self,
         session: AsyncSession,
