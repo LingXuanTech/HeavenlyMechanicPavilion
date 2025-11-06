@@ -57,9 +57,10 @@ The workspace is orchestrated by PNPM. `pnpm sync` installs JavaScript dependenc
 
 ### LangGraph Orchestration
 
-- `tradingagents.graph.TradingAgentsGraph` defines the state machine linking analyst, researcher, trader, and risk nodes.
-- Nodes access vendor data, reflection memories, and shared state through toolkits defined under `tradingagents.agents.utils`.
-- Graph runs can be configured via environment variables (`TRADINGAGENTS_*`), CLI parameters, or API payload overrides.
+- **Asynchronous Execution**: The `TradingGraphService` executes the synchronous `TradingAgentsGraph` within a `ThreadPoolExecutor`. This is a critical design pattern that prevents the computationally intensive graph runs from blocking the main FastAPI asynchronous event loop, ensuring the application remains responsive.
+- **Graph Definition**: `tradingagents.graph.TradingAgentsGraph` defines the state machine linking analyst, researcher, trader, and risk nodes.
+- **Toolkit Access**: Nodes access vendor data, reflection memories, and shared state through toolkits defined under `tradingagents.agents.utils`.
+- **Configuration**: Graph runs can be configured via environment variables (`TRADINGAGENTS_*`), CLI parameters, or API payload overrides.
 
 ### Agent Plugin System
 
@@ -73,13 +74,12 @@ Location: `tradingagents/agents/`
 
 ### LLM Provider Stack
 
-Location: `tradingagents/llm_providers/`
+Location: `tradingagents/llm_providers/`, `app/services/llm_runtime.py`
 
-- **Canonical Registry** (`registry.py`) declares `ProviderType`, `ProviderInfo`, and `ModelInfo` metadata for OpenAI, Claude, DeepSeek, and Grok. Pricing, context windows, rate limits, and capability flags originate from this source of truth.
-- **Factory Pattern** (`factory.py`) instantiates providers on demand through `ProviderFactory.create_provider(...)`, performing lazy imports so unit tests can replace implementations easily.
-- **Provider Implementations** (`openai_provider.py`, `claude_provider.py`, `deepseek_provider.py`, `grok_provider.py`) inherit from `BaseLLMProvider`. They expose uniform async methods: `chat`, `stream`, `count_tokens`, and `health_check`.
-- **Exception Hierarchy** ensures clear error reporting (`LLMProviderError`, `ProviderNotFoundError`, `ModelNotSupportedError`, etc.), allowing the API layer and services to surface actionable feedback.
-- **Registry Consumers** – The `AgentLLMService` validates provider/model combos, defaults cost fields from registry metadata, and performs live health checks when configurations are saved. The `/llm-providers` API family mirrors the registry for consumers and the frontend.
+- **Dynamic LLM Resolution**: The system supports dynamic, per-agent LLM configuration. The `TradingAgentsGraph` uses a `_resolve_llm` method that queries the `AgentLLMRuntime` service. This service fetches agent-specific LLM configurations from the database, enabling hot-reloading and fine-grained control without requiring a server restart.
+- **Fallback Mechanism**: If the runtime manager fails to resolve an LLM for a specific agent, it gracefully falls back to a default `quick` or `deep` thinking model defined in the configuration.
+- **Canonical Registry** (`registry.py`): This remains the source of truth for provider metadata (e.g., pricing, context windows, rate limits). The `AgentLLMRuntime` and `AgentLLMService` use this registry to validate configurations and populate model details.
+- **Factory and Implementations**: The factory pattern (`factory.py`) and provider implementations (`openai_provider.py`, etc.) remain the core components for instantiating and interacting with different LLM APIs.
 
 > ℹ️ The legacy static provider maps have been removed; all validation and pricing data should flow through `tradingagents.llm_providers`.
 
@@ -116,19 +116,20 @@ Location: `app/db/`, `app/repositories/`, `app/cache/`
 - **Alembic** powers schema migrations with async support (`alembic.ini`, `alembic/env.py`).
 - **Repositories** implement a typed CRUD layer (e.g., `PortfolioRepository`, `TradeRepository`, `AnalysisSessionRepository`) with domain-specific queries.
 - **Database Manager** handles engine initialisation, session lifecycle, and optional table creation for SQLite development use.
-- **Redis Cache** (`cache_service.py`) provides optional caching of market data, session state, and generic key/value storage. Connection details are managed by `REDIS_*` environment variables.
+- **Redis Cache Service**: A high-level `CacheService` (`app/cache/cache_service.py`) exists, providing methods to cache market data, session data, and agent configurations in Redis.
+- **Architectural Discrepancy**: The `MarketDataService` currently **does not** use the centralized `CacheService`. Instead, it relies on a simple instance-level dictionary (`_quote_cache`) for caching. This is a known architectural inconsistency; future work should integrate `MarketDataService` with `CacheService` to leverage distributed caching.
 
 ### Analysis Session Persistence & Event Streaming
 
 Locations: `app/db/models/analysis_session.py`, `app/services/analysis_session.py`, `app/services/events.py`, `app/api/sessions.py`, `app/api/streams.py`
 
 - **AnalysisSession Model** persists each run with ticker, status, trade date, selected analysts, and summary JSON blobs. Status transitions (`pending → running → completed/failed`) are timestamped for auditability.
-- **SessionEventManager** maintains bounded in-memory buffers (`deque`) of timestamped events per session. Events are appended during active streams and remain queryable after completion.
+- **SessionEventManager** maintains bounded in-memory buffers (`deque`) of timestamped events per session. Events are appended during active streams and remain queryable after completion. **Note: Event history is not persisted to the database**; only the final session summary is stored. This means detailed event logs are lost upon service restart.
 - **REST Endpoints** – `/sessions` lists summaries, `/sessions/{id}` returns a summary plus buffered events, and `/sessions/{id}/events-history` exposes the same event history for REST consumers. Payloads align with the shared DTOs under `packages/shared/src/domain/session.ts`.
 - **Realtime Delivery** – `/sessions/{id}/events` (SSE) and `/sessions/{id}/ws` (WebSocket) deliver live updates that mirror the buffered events. Streams are initialised by `TradingGraphService.ensure_session_stream`, and closing messages preserve event history.
 - **Frontend Consumption** – The Control Center hydrates `TradingSession` views using `normalizeSessionSummary`, `normalizeSessionEventsHistory`, and `enrichSessionWithEvents` from the shared package, combining REST history with live SSE updates.
 
-### Streaming Infrastructure
+### Background Worker System (Streaming Infrastructure)
 
 Location: `app/workers/`, `app/api/streaming.py`, `app/api/streaming_config.py`
 
@@ -211,6 +212,23 @@ Configuration is handled via `.env.local` (e.g., `NEXT_PUBLIC_API_URL`) or Compo
 - Buffered events are capped (default 100 per session) to prevent unbounded memory usage. Older events are discarded on overflow.
 - `GET /sessions/{id}/events-history` mirrors the SSE payloads and should be used by automation that cannot maintain long-lived streams.
 - The shared TypeScript DTOs provide guards and normalisers to safely consume events in the frontend and custom clients.
+
+## Architecture Considerations
+
+This section highlights known limitations and architectural trade-offs in the current implementation.
+
+### Authentication Middleware
+
+- **Logic vs. Integration**: The core logic for JWT and API Key handling is fully implemented in `app/security/auth.py`. However, the `AuthMiddleware` in `app/middleware/auth.py` currently acts only as a request logger and **does not enforce authentication**. To secure the API, this middleware must be updated to call the verification functions from `auth.py` and reject unauthorized requests.
+
+### In-Memory State Management
+
+Several critical components store their state in the service's memory, which introduces a single point of failure and data loss risk upon service restart.
+- **Auto-Trading Tasks**: The `AutoTradingOrchestrator` manages continuous trading tasks (e.g., which portfolios are running, their intervals, and active task handles) in instance variables. If the application restarts, these tasks are not automatically recovered.
+- **Event History**: As noted in the "Analysis Session" section, the `SessionEventManager` holds detailed event histories in memory. While performant, this data is ephemeral.
+- **Market Data Cache**: The `MarketDataService`'s quote cache is instance-local, meaning a cold start will result in increased latency as the cache needs to be repopulated.
+
+Future work should consider moving this state to a persistent, distributed store like Redis or a dedicated database table to improve fault tolerance and scalability.
 
 ## Related Resources
 

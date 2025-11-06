@@ -6,9 +6,12 @@ import logging
 from typing import Callable
 
 from fastapi import Request, Response
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from ..config import get_settings
+from ..db.session import get_session
+from ..security.dependencies import get_current_user_from_api_key, get_current_user_from_token
 from ..security.rate_limit import check_ip_rate_limit
 
 logger = logging.getLogger(__name__)
@@ -18,8 +21,37 @@ settings = get_settings()
 class AuthMiddleware(BaseHTTPMiddleware):
     """Middleware for authentication and access logging."""
 
+    def __init__(self, app, public_paths: list[str] | None = None):
+        """Initialize auth middleware with public paths.
+        
+        Args:
+            app: FastAPI application
+            public_paths: List of path prefixes that don't require authentication
+        """
+        super().__init__(app)
+        self.public_paths = public_paths or [
+            "/",
+            "/health",
+            "/docs",
+            "/openapi.json",
+            "/redoc",
+            "/api/auth/login",
+            "/api/auth/register",
+        ]
+
+    def _is_public_path(self, path: str) -> bool:
+        """Check if path is public (no auth required).
+        
+        Args:
+            path: Request path
+            
+        Returns:
+            True if path is public
+        """
+        return any(path.startswith(public) for public in self.public_paths)
+
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """Process request and log access.
+        """Process request with authentication and logging.
 
         Args:
             request: FastAPI request
@@ -34,9 +66,71 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         logger.info(f"Request: {method} {path} from {ip_address}")
 
-        response = await call_next(request)
+        # Skip auth for public paths
+        if self._is_public_path(path):
+            response = await call_next(request)
+            logger.info(f"Response: {method} {path} - {response.status_code} (public)")
+            return response
 
-        logger.info(f"Response: {method} {path} - {response.status_code}")
+        # Perform authentication
+        try:
+            # Create a temporary database session for auth check
+            async for db in get_session():
+                # Try to authenticate user via token or API key
+                user = None
+                
+                # Check for Bearer token
+                auth_header = request.headers.get("authorization")
+                if auth_header and auth_header.startswith("Bearer "):
+                    from fastapi.security import HTTPAuthorizationCredentials
+                    credentials = HTTPAuthorizationCredentials(
+                        scheme="Bearer",
+                        credentials=auth_header.split(" ")[1]
+                    )
+                    user = await get_current_user_from_token(credentials, db)
+                
+                # If no token, check for API key
+                if not user:
+                    api_key = request.headers.get("x-api-key")
+                    if api_key:
+                        user = await get_current_user_from_api_key(api_key, db)
+                
+                # If still no user, return 401
+                if not user:
+                    logger.warning(f"Unauthorized access attempt to {path} from {ip_address}")
+                    return JSONResponse(
+                        status_code=401,
+                        content={
+                            "detail": "Not authenticated",
+                            "message": "Please provide a valid Bearer token or X-API-Key header"
+                        },
+                        headers={"WWW-Authenticate": "Bearer"}
+                    )
+                
+                # Check if user is active
+                if not user.is_active:
+                    logger.warning(f"Inactive user {user.username} attempted to access {path}")
+                    return JSONResponse(
+                        status_code=403,
+                        content={"detail": "Inactive user"}
+                    )
+                
+                # Store user in request state for downstream handlers
+                request.state.user = user
+                
+                # Break after first iteration (we only need one session)
+                break
+                
+        except Exception as e:
+            logger.error(f"Authentication error for {path}: {e}", exc_info=True)
+            return JSONResponse(
+                status_code=500,
+                content={"detail": "Internal authentication error"}
+            )
+
+        # Continue to next middleware/handler
+        response = await call_next(request)
+        logger.info(f"Response: {method} {path} - {response.status_code} (authenticated as {user.username})")
 
         return response
 

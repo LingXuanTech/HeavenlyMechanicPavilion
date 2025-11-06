@@ -42,7 +42,17 @@ app.add_middleware(ErrorHandlingMiddleware)
 app.add_middleware(CompressionMiddleware, minimum_size=500, compression_level=6)
 
 # Add authentication and rate limiting middleware
-app.add_middleware(AuthMiddleware)
+# Define public paths that don't require authentication
+public_paths = [
+    "/",
+    "/health",
+    "/docs",
+    "/openapi.json",
+    "/redoc",
+    "/api/auth/login",
+    "/api/auth/register",
+]
+app.add_middleware(AuthMiddleware, public_paths=public_paths)
 if settings.rate_limit_enabled:
     app.add_middleware(RateLimitMiddleware)
 
