@@ -32,3 +32,4 @@ alembic
 sqlmodel
 asyncpg
 aiosqlite
+alpaca-py>=0.7.0

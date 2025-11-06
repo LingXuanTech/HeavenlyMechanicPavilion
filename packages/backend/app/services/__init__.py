@@ -1,6 +1,7 @@
 """Service layer for the FastAPI backend."""
 
 from .alerting import AlertingService, AlertLevel
+from .auto_trading_orchestrator import AutoTradingOrchestrator
 from .backtest import BacktestService
 from .broker_adapter import (
     BrokerAdapter,
@@ -25,6 +26,7 @@ from .trading_session import TradingSessionService
 __all__ = [
     "AlertingService",
     "AlertLevel",
+    "AutoTradingOrchestrator",
     "BacktestService",
     "BrokerAdapter",
     "ExecutionService",

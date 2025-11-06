@@ -4,13 +4,17 @@ from fastapi import Depends
 
 from ..config.settings import Settings, get_settings
 from ..services.alerting import AlertingService
+from ..services.auto_trading_orchestrator import AutoTradingOrchestrator
 from ..services.broker_adapter import BrokerAdapter, SimulatedBroker
+from ..services.brokers.alpaca_adapter import AlpacaBrokerAdapter
 from ..services.execution import ExecutionService
+from ..services.graph import TradingGraphService
 from ..services.market_data import MarketDataService
 from ..services.monitoring import MonitoringService
 from ..services.position_sizing import PositionSizingMethod, PositionSizingService
 from ..services.risk_management import RiskConstraints, RiskManagementService
 from ..services.trading_session import TradingSessionService
+from ..services.events import SessionEventManager
 
 # ============= 应用级单例服务 =============
 
@@ -67,18 +71,55 @@ def get_broker_adapter(
         BrokerAdapter 实例
 
     Raises:
-        NotImplementedError: 如果请求实盘交易但未实现
+        ValueError: 如果配置无效
+        NotImplementedError: 如果券商类型未实现
     """
+    broker_type = settings.broker_type.lower()
+    
     if session_type == "PAPER":
-        return SimulatedBroker(
-            initial_capital=initial_capital,
-            commission_per_trade=0.0,
-            slippage_percent=0.001,
-            market_data_service=market_data_service,
-        )
+        # Paper trading - 优先使用配置的券商类型，否则使用模拟器
+        if broker_type == "alpaca":
+            # 使用 Alpaca Paper Trading
+            if not settings.alpaca_api_key or not settings.alpaca_api_secret:
+                raise ValueError(
+                    "Alpaca API key and secret are required. "
+                    "Please set ALPACA_API_KEY and ALPACA_API_SECRET environment variables."
+                )
+            return AlpacaBrokerAdapter(
+                api_key=settings.alpaca_api_key,
+                api_secret=settings.alpaca_api_secret,
+                base_url=settings.alpaca_base_url,
+                paper_trading=True,
+            )
+        else:
+            # 默认使用模拟器
+            return SimulatedBroker(
+                initial_capital=initial_capital,
+                commission_per_trade=0.0,
+                slippage_percent=0.001,
+                market_data_service=market_data_service,
+            )
     else:
-        # TODO: 实现实盘券商适配器
-        raise NotImplementedError("Live trading not yet implemented")
+        # Live trading
+        if broker_type == "alpaca":
+            if not settings.alpaca_api_key or not settings.alpaca_api_secret:
+                raise ValueError(
+                    "Alpaca API key and secret are required for live trading. "
+                    "Please set ALPACA_API_KEY and ALPACA_API_SECRET environment variables."
+                )
+            # 实盘交易需要明确设置 base_url 为实盘地址
+            live_base_url = "https://api.alpaca.markets"
+            return AlpacaBrokerAdapter(
+                api_key=settings.alpaca_api_key,
+                api_secret=settings.alpaca_api_secret,
+                base_url=live_base_url,
+                paper_trading=False,
+            )
+        else:
+            raise NotImplementedError(
+                f"Live trading with broker type '{broker_type}' is not yet implemented. "
+                "Currently supported: alpaca"
+            )
 
 
 def get_position_sizing_service(
@@ -146,3 +187,40 @@ def get_trading_session_service() -> TradingSessionService:
         TradingSessionService 实例
     """
     return TradingSessionService()
+
+
+# ============= 自动交易协调器 =============
+
+# 应用级单例
+_auto_trading_orchestrator: AutoTradingOrchestrator | None = None
+
+
+def get_auto_trading_orchestrator(
+    graph_service: TradingGraphService = Depends(lambda: None),  # Will be injected in API
+    trading_session_service: TradingSessionService = Depends(get_trading_session_service),
+    event_manager: SessionEventManager = Depends(lambda: None),  # Will be injected in API
+) -> AutoTradingOrchestrator:
+    """获取自动交易协调器实例 (应用级单例).
+    
+    Note: graph_service and event_manager need to be properly injected in the API layer
+    as they require additional initialization.
+    
+    Args:
+        graph_service: Agent 图谱服务
+        trading_session_service: 交易会话服务
+        event_manager: 事件管理器
+        
+    Returns:
+        AutoTradingOrchestrator 实例
+    """
+    global _auto_trading_orchestrator
+    if _auto_trading_orchestrator is None:
+        # This will be properly initialized in the API startup
+        # For now, create a placeholder that will be replaced
+        if graph_service and event_manager:
+            _auto_trading_orchestrator = AutoTradingOrchestrator(
+                graph_service=graph_service,
+                trading_session_service=trading_session_service,
+                event_manager=event_manager,
+            )
+    return _auto_trading_orchestrator

@@ -19,29 +19,29 @@ TradingAgents orchestrates a team of specialist LLM-driven agents – analysts, 
 
 > **Disclaimer**: TradingAgents is released for research purposes only. It is not financial, investment, or trading advice. Real-world performance depends on model choice, data quality, configuration, and market conditions. See the full [disclaimer](https://tauric.ai/disclaimer/).
 
-## 🚦 Documentation at a Glance
+## 📚 Documentation
 
-| Topic | Summary |
+**主文档**: [DOCUMENTATION.md](DOCUMENTATION.md) - 完整的项目文档，包含功能说明、快速开始、技术架构、开发指南和待办事项
+
+### 核心文档
+
+| 文档 | 说明 |
 | --- | --- |
-| [SETUP](docs/SETUP.md) | Install dependencies, configure environments, and run the CLI or services locally. |
-| [ARCHITECTURE](docs/ARCHITECTURE.md) | Multi-agent workflow, monorepo layout, and subsystem design. |
-| [API](docs/API.md) | REST, SSE, WebSocket, and admin endpoints exposed by the backend. |
-| [CONFIGURATION](docs/CONFIGURATION.md) | Environment variables, vendor routing, agent options, and default overrides. |
-| [DEPLOYMENT](docs/DEPLOYMENT.md) | Docker Compose stacks, production hardening, scaling, and maintenance. |
-| [DEVELOPMENT](docs/DEVELOPMENT.md) | Conventions, testing matrix, tooling, and contribution workflow. |
-| [DATABASE PERFORMANCE TUNING](docs/DATABASE_PERFORMANCE_TUNING.md) | Connection pooling, query optimization, indexes, and read replica support. |
-| [PERFORMANCE OPTIMIZATIONS](PERFORMANCE_OPTIMIZATIONS.md) | Comprehensive guide to frontend, backend, and infrastructure optimizations. |
-| [OPTIMIZATION QUICK START](OPTIMIZATION_QUICK_START.md) | Quick reference for developers to leverage performance optimizations. |
+| [SETUP](docs/SETUP.md) | 安装依赖、环境配置、本地运行指南 |
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | 多智能体工作流、项目结构、子系统设计 |
+| [API](docs/API.md) | REST、SSE、WebSocket 和管理端点文档 |
+| [CONFIGURATION](docs/CONFIGURATION.md) | 环境变量、数据源路由、Agent 配置 |
+| [DEPLOYMENT](docs/DEPLOYMENT.md) | Docker 部署、生产环境配置、扩展策略 |
+| [DEVELOPMENT](docs/DEVELOPMENT.md) | 开发规范、测试策略、贡献流程 |
 
-### 📊 Project Status & Roadmap
+### 技术专题
 
-| Document | Summary |
+| 文档 | 说明 |
 | --- | --- |
-| [PROJECT ANALYSIS](PROJECT_ANALYSIS.md) | Comprehensive analysis of codebase strengths, issues, and recommendations. |
-| [IMPROVEMENT PLAN](IMPROVEMENT_PLAN.md) | Detailed 6-month roadmap with priorities, timelines, and success metrics. |
-| [QUICK FIXES](docs/QUICK_FIXES.md) | Step-by-step guide to fix critical issues (P0 priority items). |
+| [DATABASE PERFORMANCE TUNING](docs/DATABASE_PERFORMANCE_TUNING.md) | 连接池、查询优化、索引、读副本支持 |
+| [QUICK FIXES](docs/QUICK_FIXES.md) | 常见问题快速修复指南 |
 
-Additional operational guidance (e.g., Kubernetes manifests) lives under [`docs/operations/`](docs/operations/README.md).
+更多运维指南（如 Kubernetes 配置）请查看 [`docs/operations/`](docs/operations/README.md)。
 
 ## 🔍 What You Get
 

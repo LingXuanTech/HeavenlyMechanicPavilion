@@ -3,3 +3,7 @@ export { LiveSignalFeed } from "./live-signal-feed";
 export { TradeExecutionTimeline } from "./trade-execution-timeline";
 export { AgentActivityStream } from "./agent-activity-stream";
 export { DashboardControls } from "./dashboard-controls";
+export { AgentDecisionFlow } from "./agent-decision-flow";
+export { TradeExecutionTracker } from "./trade-execution-tracker";
+export { PerformanceChart } from "./performance-chart";
+export { AgentPerformanceComparison } from "./agent-performance-comparison";

@@ -44,6 +44,15 @@ class Settings(BaseSettings):
     grok_api_key: Optional[str] = Field(default=None, alias="GROK_API_KEY")
     anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
 
+    # Broker Configuration
+    broker_type: str = Field(default="simulated", alias="BROKER_TYPE")  # simulated, alpaca
+    alpaca_api_key: Optional[str] = Field(default=None, alias="ALPACA_API_KEY")
+    alpaca_api_secret: Optional[str] = Field(default=None, alias="ALPACA_API_SECRET")
+    alpaca_base_url: str = Field(
+        default="https://paper-api.alpaca.markets",  # Paper trading by default
+        alias="ALPACA_BASE_URL"
+    )
+    
     # Encryption key for sensitive data
     encryption_key: Optional[str] = Field(default=None, alias="ENCRYPTION_KEY")
 
