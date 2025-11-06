@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Dict, List, Optional
 
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide, OrderType as AlpacaOrderType, TimeInForce
@@ -19,6 +19,7 @@ from ..broker_adapter import (
     OrderStatus,
     OrderType,
 )
+from ..market_calendar import MarketCalendarService
 from ...core.errors import (
     ExternalServiceError,
     ResourceNotFoundError,
@@ -60,6 +61,9 @@ class AlpacaBrokerAdapter(BrokerAdapter):
             api_key=api_key,
             secret_key=secret_key,
         )
+        
+        # 初始化市场日历服务
+        self.market_calendar = MarketCalendarService(trading_client=self.trading_client)
         
         # 验证连接
         try:
@@ -277,6 +281,118 @@ class AlpacaBrokerAdapter(BrokerAdapter):
             raise ExternalServiceError(
                 "无法获取账户信息",
                 details={"error": str(e)}
+            )
+    
+    async def get_positions(self) -> List[Dict]:
+        """获取所有持仓.
+        
+        Returns:
+            持仓列表，每个持仓包含以下字段：
+            - symbol: 股票代码
+            - quantity: 持仓数量 (正数为多头，负数为空头)
+            - average_cost: 平均成本
+            - current_price: 当前价格
+            - market_value: 市值
+            - unrealized_pnl: 未实现盈亏
+            - unrealized_pnl_percent: 未实现盈亏百分比
+            - position_type: 持仓类型 (LONG/SHORT)
+            
+        Raises:
+            ExternalServiceError: Alpaca API 调用失败
+        """
+        try:
+            # 获取所有持仓
+            alpaca_positions = self.trading_client.get_all_positions()
+            
+            positions = []
+            for pos in alpaca_positions:
+                # 转换持仓数据
+                quantity = float(pos.qty)
+                position_type = "LONG" if quantity > 0 else "SHORT"
+                
+                position = {
+                    "symbol": pos.symbol,
+                    "quantity": abs(quantity),  # 数量取绝对值
+                    "average_cost": float(pos.avg_entry_price),
+                    "current_price": float(pos.current_price),
+                    "market_value": float(pos.market_value),
+                    "unrealized_pnl": float(pos.unrealized_pl),
+                    "unrealized_pnl_percent": float(pos.unrealized_plpc),
+                    "position_type": position_type,
+                    "side": pos.side,  # 原始方向信息 (long/short)
+                }
+                positions.append(position)
+            
+            logger.info(f"获取到 {len(positions)} 个持仓")
+            return positions
+            
+        except Exception as e:
+            logger.error(f"获取持仓列表失败: {e}")
+            raise ExternalServiceError(
+                f"无法获取持仓列表: {e}",
+                details={"error": str(e)}
+            )
+    
+    async def get_position(self, symbol: str) -> Optional[Dict]:
+        """获取指定股票的持仓.
+        
+        Args:
+            symbol: 股票代码
+            
+        Returns:
+            持仓信息字典，如果没有持仓则返回 None
+            字段说明同 get_positions()
+            
+        Raises:
+            ValidationError: 股票代码无效
+            ExternalServiceError: Alpaca API 调用失败
+        """
+        if not symbol or not symbol.strip():
+            raise ValidationError(
+                "股票代码不能为空",
+                details={"symbol": symbol}
+            )
+        
+        symbol = symbol.strip().upper()
+        
+        try:
+            # 尝试获取指定股票的持仓
+            try:
+                alpaca_position = self.trading_client.get_open_position(symbol)
+            except Exception as e:
+                # 如果持仓不存在，Alpaca 会抛出异常
+                error_msg = str(e).lower()
+                if "position does not exist" in error_msg or "not found" in error_msg:
+                    logger.info(f"股票 {symbol} 没有持仓")
+                    return None
+                raise
+            
+            # 转换持仓数据
+            quantity = float(alpaca_position.qty)
+            position_type = "LONG" if quantity > 0 else "SHORT"
+            
+            position = {
+                "symbol": alpaca_position.symbol,
+                "quantity": abs(quantity),
+                "average_cost": float(alpaca_position.avg_entry_price),
+                "current_price": float(alpaca_position.current_price),
+                "market_value": float(alpaca_position.market_value),
+                "unrealized_pnl": float(alpaca_position.unrealized_pl),
+                "unrealized_pnl_percent": float(alpaca_position.unrealized_plpc),
+                "position_type": position_type,
+                "side": alpaca_position.side,
+            }
+            
+            logger.info(f"获取到 {symbol} 的持仓: {quantity} @ ${position['average_cost']:.2f}")
+            return position
+            
+        except ValidationError:
+            raise
+        except Exception as e:
+            logger.error(f"获取持仓失败 ({symbol}): {e}")
+            raise ExternalServiceError(
+                f"无法获取持仓信息: {e}",
+                details={"symbol": symbol, "error": str(e)}
             )
     
     def _convert_order_side(self, action: OrderAction) -> OrderSide:

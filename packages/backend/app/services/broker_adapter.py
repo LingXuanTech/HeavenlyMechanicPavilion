@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from ..core.errors import (
     ExternalServiceError,
@@ -162,6 +162,36 @@ class BrokerAdapter(ABC):
 
         Returns:
             Available buying power
+        """
+        pass
+    
+    @abstractmethod
+    async def get_positions(self) -> List[Dict]:
+        """Get all current positions.
+        
+        Returns:
+            List of positions, each containing:
+            - symbol: Stock symbol
+            - quantity: Position quantity (absolute value)
+            - average_cost: Average entry price
+            - current_price: Current market price
+            - market_value: Current market value
+            - unrealized_pnl: Unrealized profit/loss
+            - unrealized_pnl_percent: Unrealized P&L percentage
+            - position_type: Position type (LONG/SHORT)
+        """
+        pass
+    
+    @abstractmethod
+    async def get_position(self, symbol: str) -> Optional[Dict]:
+        """Get position for a specific symbol.
+        
+        Args:
+            symbol: Stock symbol
+            
+        Returns:
+            Position dict or None if no position exists
+            Fields are the same as get_positions()
         """
         pass
 
@@ -411,3 +441,27 @@ class SimulatedBroker(BrokerAdapter):
             Available buying power
         """
         return self.current_capital
+    
+    async def get_positions(self) -> List[Dict]:
+        """Get all current positions from simulated portfolio.
+        
+        For simulated broker, this requires tracking positions separately.
+        Currently returns empty list as position tracking is not implemented.
+        
+        Returns:
+            Empty list (position tracking not implemented in simulator)
+        """
+        logger.warning("SimulatedBroker.get_positions() not fully implemented - returns empty list")
+        return []
+    
+    async def get_position(self, symbol: str) -> Optional[Dict]:
+        """Get position for a specific symbol.
+        
+        Args:
+            symbol: Stock symbol
+            
+        Returns:
+            None (position tracking not implemented in simulator)
+        """
+        logger.warning(f"SimulatedBroker.get_position({symbol}) not fully implemented - returns None")
+        return None

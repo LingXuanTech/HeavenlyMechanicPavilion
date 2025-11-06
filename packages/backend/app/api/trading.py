@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.errors import TradingAgentsError
 from ..db import get_db
+from ..db.models import User, UserRole
 from ..repositories import PortfolioRepository, PositionRepository
 from ..schemas.trading import (
     ExecuteSignalRequest,
@@ -21,6 +22,7 @@ from ..schemas.trading import (
     TradeResponse,
     TradingSessionResponse,
 )
+from ..security.dependencies import get_current_active_user, require_role
 from ..services import (
     PositionSizingMethod,
     TradingSessionService,
@@ -38,6 +40,7 @@ trading_session_service = TradingSessionService()
 async def start_trading_session(
     request: StartSessionRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.TRADER, UserRole.ADMIN)),
 ) -> TradingSessionResponse:
     """Start a new trading session."""
     try:
@@ -82,6 +85,7 @@ async def start_trading_session(
 async def stop_trading_session(
     session_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.TRADER, UserRole.ADMIN)),
 ) -> TradingSessionResponse:
     """Stop a trading session."""
     try:
@@ -112,6 +116,7 @@ async def stop_trading_session(
 async def execute_signal(
     request: ExecuteSignalRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.TRADER, UserRole.ADMIN)),
 ) -> TradeResponse | None:
     """Execute a trading signal."""
     try:
@@ -160,6 +165,7 @@ async def execute_signal(
 async def force_exit_position(
     request: ForceExitRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.TRADER, UserRole.ADMIN)),
 ) -> TradeResponse | None:
     """Force exit a position."""
     try:
@@ -209,6 +215,7 @@ async def get_risk_diagnostics(
     portfolio_id: int,
     session_id: int | None = None,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> RiskDiagnosticsResponse:
     """Get risk diagnostics for a portfolio."""
     try:
@@ -275,6 +282,7 @@ async def get_risk_diagnostics(
 async def get_portfolio_state(
     portfolio_id: int,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ) -> PortfolioStateDetailResponse:
     """Get current portfolio state including all positions."""
     try:
@@ -320,4 +328,106 @@ async def get_portfolio_state(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to get portfolio state",
+        )
+
+
+@router.get("/broker/positions")
+async def get_broker_positions(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.TRADER, UserRole.ADMIN)),
+) -> list[dict]:
+    """从券商直接获取所有持仓（实时数据）.
+    
+    此端点绕过数据库，直接从券商 API 获取当前持仓状态。
+    用于验证数据库持仓记录的准确性或获取最新状态。
+    
+    Args:
+        session_id: 交易会话ID
+        
+    Returns:
+        持仓列表，每个持仓包含：
+        - symbol: 股票代码
+        - quantity: 持仓数量
+        - average_cost: 平均成本
+        - current_price: 当前价格
+        - market_value: 市值
+        - unrealized_pnl: 未实现盈亏
+        - unrealized_pnl_percent: 未实现盈亏百分比
+        - position_type: 持仓类型 (LONG/SHORT)
+    """
+    try:
+        # 获取执行服务
+        execution_service = trading_session_service.get_execution_service(session_id)
+        
+        if not execution_service:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Trading session {session_id} not found or not active",
+            )
+        
+        # 直接从券商查询持仓
+        positions = await execution_service.broker.get_positions()
+        
+        logger.info(f"从券商获取到 {len(positions)} 个持仓 (session {session_id})")
+        return positions
+        
+    except HTTPException:
+        raise
+    except TradingAgentsError as exc:
+        raise exc
+    except Exception as e:
+        logger.error(f"从券商获取持仓失败: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"无法从券商获取持仓: {str(e)}",
+        )
+
+
+@router.get("/broker/positions/{symbol}")
+async def get_broker_position(
+    symbol: str,
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.TRADER, UserRole.ADMIN)),
+) -> dict | None:
+    """从券商直接获取指定股票的持仓（实时数据）.
+    
+    Args:
+        symbol: 股票代码
+        session_id: 交易会话ID
+        
+    Returns:
+        持仓信息或 None（如果没有持仓）
+        字段说明同 get_broker_positions()
+    """
+    try:
+        # 获取执行服务
+        execution_service = trading_session_service.get_execution_service(session_id)
+        
+        if not execution_service:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Trading session {session_id} not found or not active",
+            )
+        
+        # 直接从券商查询持仓
+        position = await execution_service.broker.get_position(symbol)
+        
+        if position:
+            logger.info(f"从券商获取到 {symbol} 的持仓 (session {session_id})")
+        else:
+            logger.info(f"券商无 {symbol} 的持仓 (session {session_id})")
+            
+        return position
+        
+    except HTTPException:
+        raise
+    except TradingAgentsError as exc:
+        raise exc
+    except Exception as e:
+        logger.error(f"从券商获取持仓失败 ({symbol}): {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"无法从券商获取持仓: {str(e)}",
         )

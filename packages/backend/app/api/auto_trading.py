@@ -8,6 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_db
+from ..db.models import User, UserRole
 from ..dependencies import get_event_manager, get_graph_service
 from ..schemas.auto_trading import (
     AutoTradingStatusResponse,
@@ -17,6 +18,7 @@ from ..schemas.auto_trading import (
     StopAutoTradingRequest,
     TradingCycleResult,
 )
+from ..security.dependencies import get_current_active_user, require_role
 from ..services.auto_trading_orchestrator import AutoTradingOrchestrator
 from ..services.events import SessionEventManager
 from ..services.graph import TradingGraphService
@@ -43,11 +45,28 @@ def get_orchestrator(
     Returns:
         AutoTradingOrchestrator 实例
     """
+    from ..services.market_calendar import MarketCalendarService
+    
     trading_session_service = TradingSessionService()
+    
+    # 尝试获取市场日历服务
+    market_calendar = None
+    try:
+        # 从 trading_session_service 中获取 broker 的 trading_client
+        # 如果有活跃的会话，使用其 market_calendar
+        if trading_session_service.active_sessions:
+            first_session_id = next(iter(trading_session_service.active_sessions))
+            execution_service = trading_session_service.get_execution_service(first_session_id)
+            if execution_service and hasattr(execution_service.broker, 'market_calendar'):
+                market_calendar = execution_service.broker.market_calendar
+    except Exception as e:
+        logger.warning(f"无法初始化市场日历服务: {e}")
+    
     return AutoTradingOrchestrator(
         graph_service=graph_service,
         trading_session_service=trading_session_service,
         event_manager=event_manager,
+        market_calendar=market_calendar,
     )
 
 
@@ -57,6 +76,7 @@ async def start_auto_trading(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     orchestrator: AutoTradingOrchestrator = Depends(get_orchestrator),
+    current_user: User = Depends(require_role(UserRole.TRADER, UserRole.ADMIN)),
 ):
     """
     启动自动交易.
@@ -137,6 +157,7 @@ async def start_auto_trading(
 async def stop_auto_trading(
     request: StopAutoTradingRequest,
     orchestrator: AutoTradingOrchestrator = Depends(get_orchestrator),
+    current_user: User = Depends(require_role(UserRole.TRADER, UserRole.ADMIN)),
 ):
     """
     停止自动交易.
@@ -181,7 +202,10 @@ async def stop_auto_trading(
 
 
 @router.get("/status/{portfolio_id}", response_model=AutoTradingStatusResponse)
-async def get_auto_trading_status(portfolio_id: int):
+async def get_auto_trading_status(
+    portfolio_id: int,
+    current_user: User = Depends(get_current_active_user),
+):
     """
     查询自动交易状态.
     
@@ -212,6 +236,7 @@ async def run_once(
     request: RunOnceRequest,
     db: AsyncSession = Depends(get_db),
     orchestrator: AutoTradingOrchestrator = Depends(get_orchestrator),
+    current_user: User = Depends(require_role(UserRole.TRADER, UserRole.ADMIN)),
 ):
     """
     手动触发一次完整的分析+交易流程.
@@ -233,6 +258,19 @@ async def run_once(
         f"手动触发单次交易 - Portfolio: {request.portfolio_id}, "
         f"Symbols: {request.symbols}"
     )
+    
+    # 检查市场状态（如果配置了市场日历服务）
+    if orchestrator.market_calendar:
+        try:
+            is_open = await orchestrator.market_calendar.is_market_open()
+            if not is_open:
+                next_open = await orchestrator.market_calendar.get_next_market_open()
+                logger.warning(
+                    f"市场当前关闭，下次开盘时间: {next_open}"
+                )
+                # 仍然允许执行，但记录警告
+        except Exception as e:
+            logger.warning(f"无法检查市场状态: {e}")
     
     try:
         results = await orchestrator.run_single_cycle(
@@ -277,7 +315,9 @@ async def run_once(
 
 
 @router.get("/active", response_model=Dict[int, AutoTradingStatusResponse])
-async def list_active_trading():
+async def list_active_trading(
+    current_user: User = Depends(get_current_active_user),
+):
     """
     列出所有活跃的自动交易.
     

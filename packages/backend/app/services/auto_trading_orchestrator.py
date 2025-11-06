@@ -7,11 +7,12 @@ from typing import Dict, List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.errors import ResourceNotFoundError
+from ..core.errors import ExternalServiceError, ResourceNotFoundError
 from ..repositories import PortfolioRepository
 from .events import SessionEventManager
 from .execution import ExecutionService
 from .graph import TradingGraphService
+from .market_calendar import MarketCalendarService
 from .trading_session import TradingSessionService
 from ..dependencies.services import get_market_data_service
 
@@ -26,6 +27,7 @@ class AutoTradingOrchestrator:
         graph_service: TradingGraphService,
         trading_session_service: TradingSessionService,
         event_manager: SessionEventManager,
+        market_calendar: Optional[MarketCalendarService] = None,
     ):
         """初始化自动交易协调器.
         
@@ -33,10 +35,12 @@ class AutoTradingOrchestrator:
             graph_service: Agent 图谱服务
             trading_session_service: 交易会话服务
             event_manager: 事件管理器
+            market_calendar: 市场日历服务（可选）
         """
         self.graph = graph_service
         self.sessions = trading_session_service
         self.events = event_manager
+        self.market_calendar = market_calendar
         
         # 自动交易状态管理
         self.is_running: Dict[int, bool] = {}
@@ -255,10 +259,12 @@ class AutoTradingOrchestrator:
         try:
             while self.is_running.get(portfolio_id, False):
                 # 检查是否在交易时间内
-                if trading_hours_only and not self._is_market_open():
-                    logger.debug("当前不在交易时间，等待...")
-                    await asyncio.sleep(60)  # 1分钟后重新检查
-                    continue
+                if trading_hours_only:
+                    is_open = await self._check_market_status()
+                    if not is_open:
+                        logger.debug("当前不在交易时间，等待...")
+                        await asyncio.sleep(60)  # 1分钟后重新检查
+                        continue
                 
                 # 运行交易周期
                 try:
@@ -404,8 +410,32 @@ class AutoTradingOrchestrator:
             # 返回默认值或抛出异常
             raise ValueError(f"Cannot get price for {symbol}")
     
-    def _is_market_open(self) -> bool:
-        """检查市场是否开市（美股时间）.
+    async def _check_market_status(self) -> bool:
+        """检查市场是否开市.
+        
+        使用 MarketCalendarService 获取准确的市场状态，
+        如果服务不可用则回退到简单的时间检查。
+        
+        Returns:
+            是否在交易时间内
+        """
+        if self.market_calendar:
+            try:
+                # 使用 Alpaca Clock API 获取准确状态
+                return await self.market_calendar.is_market_open()
+            except ExternalServiceError as e:
+                logger.warning(
+                    f"无法从市场日历服务获取状态，使用简单时间检查: {e}"
+                )
+        
+        # 回退到简单的时间检查
+        return self._is_market_open_simple()
+    
+    def _is_market_open_simple(self) -> bool:
+        """简单的市场开市检查（美股时间）.
+        
+        注意：这是简化版本，不考虑节假日。
+        生产环境应使用 MarketCalendarService。
         
         Returns:
             是否在交易时间内
@@ -417,7 +447,7 @@ class AutoTradingOrchestrator:
             return False
         
         # 美股交易时间: 9:30 - 16:00 EST
-        # 简化版本，实际应考虑时区转换和节假日
+        # 简化版本，实际应考虑时区转换
         current_time = now.time()
         market_open = time(9, 30)
         market_close = time(16, 0)

@@ -8,6 +8,7 @@ from .auto_trading import router as auto_trading_router
 from .backtests import router as backtests_router
 from .health import router as health_router
 from .llm_providers import router as llm_providers_router
+from .market import router as market_router
 from .monitoring import router as monitoring_router
 
 # NOTE: agent_llm schema/service not yet implemented
@@ -34,6 +35,7 @@ def get_api_router() -> APIRouter:
     # api_router.include_router(agent_llm_router, tags=["agent-llm-configs"])
     api_router.include_router(trading_router, tags=["trading"])
     api_router.include_router(auto_trading_router, tags=["auto-trading"])
+    api_router.include_router(market_router, tags=["market"])
     api_router.include_router(backtests_router, tags=["backtests"])
     api_router.include_router(streaming_router, prefix="/streaming", tags=["streaming"])
     api_router.include_router(

@@ -16,6 +16,14 @@ from ..repositories import (
     PositionRepository,
     TradeRepository,
 )
+from ..schemas.execution_events import (
+    ExecutionEvent,
+    ExecutionEventType,
+    OrderEventData,
+    PositionEventData,
+    RiskEventData,
+    PortfolioEventData,
+)
 from .broker_adapter import (
     BrokerAdapter,
     OrderAction,
@@ -23,6 +31,7 @@ from .broker_adapter import (
     OrderStatus,
     OrderType,
 )
+from .events import SessionEventManager
 from .position_sizing import PositionSizingService
 from .risk_management import RiskManagementService
 
@@ -37,6 +46,7 @@ class ExecutionService:
         broker: BrokerAdapter,
         position_sizing_service: Optional[PositionSizingService] = None,
         risk_management_service: Optional[RiskManagementService] = None,
+        event_manager: Optional[SessionEventManager] = None,
     ):
         """Initialize execution service.
 
@@ -44,10 +54,12 @@ class ExecutionService:
             broker: Broker adapter for order execution
             position_sizing_service: Position sizing service
             risk_management_service: Risk management service
+            event_manager: Event manager for real-time streaming
         """
         self.broker = broker
         self.position_sizing = position_sizing_service or PositionSizingService()
         self.risk_management = risk_management_service or RiskManagementService()
+        self.event_manager = event_manager
 
         logger.info("Initialized ExecutionService")
 
@@ -143,6 +155,23 @@ class ExecutionService:
                 order_action.value,
                 exc.message,
             )
+            # Publish risk check failure event
+            self._publish_event(
+                session_id=str(session_id) if session_id else None,
+                event=ExecutionEvent(
+                    event_type=ExecutionEventType.RISK_CHECK_FAILED
+                        if isinstance(exc, RiskConstraintViolation)
+                        else ExecutionEventType.INSUFFICIENT_FUNDS,
+                    portfolio_id=portfolio_id,
+                    session_id=str(session_id) if session_id else None,
+                    risk_data=RiskEventData(
+                        symbol=symbol,
+                        reason=exc.message,
+                        details=exc.details if hasattr(exc, 'details') else None,
+                    ),
+                    message=f"Risk check failed: {exc.message}",
+                )
+            )
             raise
 
         # Create order request
@@ -159,6 +188,25 @@ class ExecutionService:
 
         # Submit order to broker
         logger.info(f"Submitting order: {order_action.value} {quantity} {symbol} @ MARKET")
+        
+        # Publish order submitted event
+        self._publish_event(
+            session_id=str(session_id) if session_id else None,
+            event=ExecutionEvent(
+                event_type=ExecutionEventType.ORDER_SUBMITTED,
+                portfolio_id=portfolio_id,
+                session_id=str(session_id) if session_id else None,
+                order_data=OrderEventData(
+                    symbol=symbol,
+                    action=order_action.value,
+                    quantity=quantity,
+                    order_type=OrderType.MARKET.value,
+                    status="SUBMITTED",
+                ),
+                message=f"Order submitted: {order_action.value} {quantity} {symbol}",
+            )
+        )
+        
         order_response = await self.broker.submit_order(order_request)
 
         # Create trade record
@@ -185,14 +233,55 @@ class ExecutionService:
 
         created_trade = await trade_repo.create(trade)
 
-        # If filled, create execution record and update position
+        # Publish order status event
         if order_response.status == OrderStatus.FILLED:
+            self._publish_event(
+                session_id=str(session_id) if session_id else None,
+                event=ExecutionEvent(
+                    event_type=ExecutionEventType.ORDER_FILLED,
+                    portfolio_id=portfolio_id,
+                    session_id=str(session_id) if session_id else None,
+                    order_data=OrderEventData(
+                        symbol=symbol,
+                        action=order_action.value,
+                        quantity=quantity,
+                        order_type=order_response.status.value,
+                        status=order_response.status.value,
+                        order_id=order_response.order_id,
+                        filled_quantity=order_response.filled_quantity,
+                        average_fill_price=order_response.average_fill_price,
+                        commission=order_response.commission,
+                        fees=order_response.fees,
+                    ),
+                    message=f"Order filled: {order_action.value} {order_response.filled_quantity} {symbol} @ ${order_response.average_fill_price:.2f}",
+                )
+            )
+            
             await self._handle_fill(
                 session,
                 created_trade,
                 order_response,
                 portfolio,
                 current_position,
+                session_id=session_id,
+            )
+        elif order_response.status == OrderStatus.REJECTED:
+            self._publish_event(
+                session_id=str(session_id) if session_id else None,
+                event=ExecutionEvent(
+                    event_type=ExecutionEventType.ORDER_REJECTED,
+                    portfolio_id=portfolio_id,
+                    session_id=str(session_id) if session_id else None,
+                    order_data=OrderEventData(
+                        symbol=symbol,
+                        action=order_action.value,
+                        quantity=quantity,
+                        order_type=order_response.status.value,
+                        status=order_response.status.value,
+                        reason="Order rejected by broker",
+                    ),
+                    message=f"Order rejected: {order_action.value} {quantity} {symbol}",
+                )
             )
 
         await session.commit()
@@ -286,6 +375,7 @@ class ExecutionService:
         order_response,
         portfolio: Portfolio,
         current_position: Optional[Position],
+        session_id: Optional[int] = None,
     ):
         """Handle a filled order by creating execution and updating position.
 
@@ -295,6 +385,7 @@ class ExecutionService:
             order_response: Order response from broker
             portfolio: Portfolio
             current_position: Current position (if exists)
+            session_id: Trading session ID for event publishing
         """
         # Create execution record
         execution_repo = ExecutionRepository(session)
@@ -315,6 +406,9 @@ class ExecutionService:
 
         # Update or create position
         position_repo = PositionRepository(session)
+        position_closed = False
+        position_opened = False
+        updated_position = None
 
         if current_position:
             # Update existing position
@@ -330,7 +424,7 @@ class ExecutionService:
                 current_position.current_price = order_response.average_fill_price
                 current_position.updated_at = datetime.utcnow()
 
-                await position_repo.update(current_position)
+                updated_position = await position_repo.update(current_position)
 
             elif trade.action == "SELL":
                 # Realize P&L
@@ -346,8 +440,9 @@ class ExecutionService:
                 # Delete position if fully closed
                 if current_position.quantity <= 0:
                     await position_repo.delete(current_position.id)
+                    position_closed = True
                 else:
-                    await position_repo.update(current_position)
+                    updated_position = await position_repo.update(current_position)
 
         else:
             # Create new position
@@ -362,7 +457,8 @@ class ExecutionService:
                     entry_date=datetime.utcnow(),
                 )
 
-                await position_repo.create(new_position)
+                updated_position = await position_repo.create(new_position)
+                position_opened = True
 
         # Update portfolio capital
         portfolio_repo = PortfolioRepository(session)
@@ -381,7 +477,90 @@ class ExecutionService:
             )
 
         portfolio.updated_at = datetime.utcnow()
-        await portfolio_repo.update(portfolio)
+        updated_portfolio = await portfolio_repo.update(portfolio)
+        
+        # Publish position events
+        if position_opened and updated_position:
+            self._publish_event(
+                session_id=str(session_id) if session_id else None,
+                event=ExecutionEvent(
+                    event_type=ExecutionEventType.POSITION_OPENED,
+                    portfolio_id=portfolio.id,
+                    session_id=str(session_id) if session_id else None,
+                    position_data=PositionEventData(
+                        symbol=updated_position.symbol,
+                        quantity=updated_position.quantity,
+                        average_cost=updated_position.average_cost,
+                        current_price=updated_position.current_price,
+                        unrealized_pnl=updated_position.unrealized_pnl,
+                        position_type=updated_position.position_type,
+                    ),
+                    message=f"Position opened: {updated_position.symbol} ({updated_position.quantity} shares)",
+                )
+            )
+        elif position_closed:
+            self._publish_event(
+                session_id=str(session_id) if session_id else None,
+                event=ExecutionEvent(
+                    event_type=ExecutionEventType.POSITION_CLOSED,
+                    portfolio_id=portfolio.id,
+                    session_id=str(session_id) if session_id else None,
+                    position_data=PositionEventData(
+                        symbol=trade.symbol,
+                        quantity=0,
+                        average_cost=current_position.average_cost,
+                        current_price=order_response.average_fill_price,
+                        unrealized_pnl=0,
+                        realized_pnl=current_position.realized_pnl,
+                        position_type=current_position.position_type,
+                    ),
+                    message=f"Position closed: {trade.symbol}",
+                )
+            )
+        elif updated_position:
+            self._publish_event(
+                session_id=str(session_id) if session_id else None,
+                event=ExecutionEvent(
+                    event_type=ExecutionEventType.POSITION_UPDATED,
+                    portfolio_id=portfolio.id,
+                    session_id=str(session_id) if session_id else None,
+                    position_data=PositionEventData(
+                        symbol=updated_position.symbol,
+                        quantity=updated_position.quantity,
+                        average_cost=updated_position.average_cost,
+                        current_price=updated_position.current_price,
+                        unrealized_pnl=updated_position.unrealized_pnl,
+                        realized_pnl=updated_position.realized_pnl,
+                        position_type=updated_position.position_type,
+                    ),
+                    message=f"Position updated: {updated_position.symbol} ({updated_position.quantity} shares)",
+                )
+            )
+        
+        # Publish portfolio update event
+        positions_count = len(await position_repo.get_by_portfolio(portfolio.id))
+        total_positions_value = sum(
+            p.quantity * p.current_price
+            for p in await position_repo.get_by_portfolio(portfolio.id)
+        )
+        
+        self._publish_event(
+            session_id=str(session_id) if session_id else None,
+            event=ExecutionEvent(
+                event_type=ExecutionEventType.PORTFOLIO_UPDATED,
+                portfolio_id=portfolio.id,
+                session_id=str(session_id) if session_id else None,
+                portfolio_data=PortfolioEventData(
+                    portfolio_id=portfolio.id,
+                    current_capital=portfolio.current_capital,
+                    total_value=portfolio.current_capital + total_positions_value,
+                    unrealized_pnl=sum(p.unrealized_pnl for p in await position_repo.get_by_portfolio(portfolio.id)),
+                    realized_pnl=sum(p.realized_pnl for p in await position_repo.get_by_portfolio(portfolio.id)),
+                    positions_count=positions_count,
+                ),
+                message=f"Portfolio updated: ${portfolio.current_capital:.2f} cash, {positions_count} positions",
+            )
+        )
 
     async def force_exit_position(
         self,
@@ -449,6 +628,22 @@ class ExecutionService:
 
             # Check stop loss
             if self.risk_management.check_stop_loss(position, current_price):
+                # Publish stop loss event
+                self._publish_event(
+                    session_id=None,
+                    event=ExecutionEvent(
+                        event_type=ExecutionEventType.STOP_LOSS_TRIGGERED,
+                        portfolio_id=portfolio_id,
+                        risk_data=RiskEventData(
+                            symbol=position.symbol,
+                            reason="Stop loss triggered",
+                            current_price=current_price,
+                            stop_loss_price=position.average_cost * (1 - self.risk_management.constraints.stop_loss_pct),
+                        ),
+                        message=f"Stop loss triggered for {position.symbol}",
+                    )
+                )
+                
                 trade = await self.force_exit_position(
                     session, portfolio_id, position.symbol, "Stop loss triggered"
                 )
@@ -458,6 +653,22 @@ class ExecutionService:
 
             # Check take profit
             if self.risk_management.check_take_profit(position, current_price):
+                # Publish take profit event
+                self._publish_event(
+                    session_id=None,
+                    event=ExecutionEvent(
+                        event_type=ExecutionEventType.TAKE_PROFIT_TRIGGERED,
+                        portfolio_id=portfolio_id,
+                        risk_data=RiskEventData(
+                            symbol=position.symbol,
+                            reason="Take profit triggered",
+                            current_price=current_price,
+                            take_profit_price=position.average_cost * (1 + self.risk_management.constraints.take_profit_pct),
+                        ),
+                        message=f"Take profit triggered for {position.symbol}",
+                    )
+                )
+                
                 trade = await self.force_exit_position(
                     session, portfolio_id, position.symbol, "Take profit triggered"
                 )
@@ -468,3 +679,21 @@ class ExecutionService:
             await session.commit()
 
         return executed_trades
+    
+    def _publish_event(self, session_id: Optional[str], event: ExecutionEvent) -> None:
+        """Publish an execution event to the session stream.
+        
+        Args:
+            session_id: Session ID to publish to
+            event: Event to publish
+        """
+        if not self.event_manager or not session_id:
+            return
+            
+        try:
+            self.event_manager.publish(
+                session_id,
+                event.model_dump(mode='json')
+            )
+        except Exception as e:
+            logger.warning(f"Failed to publish event: {e}")
