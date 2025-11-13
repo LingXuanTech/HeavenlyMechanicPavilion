@@ -228,6 +228,9 @@ class SimulatedBroker(BrokerAdapter):
 
         self.orders = {}
         self.order_counter = 0
+        
+        # Position tracking: symbol -> position_data
+        self.positions = {}
 
         logger.info(
             f"Initialized SimulatedBroker with capital=${initial_capital:,.2f}, "
@@ -330,13 +333,17 @@ class SimulatedBroker(BrokerAdapter):
             # Calculate commission
             commission = self.commission_per_trade
 
-            # Update capital if filled
+            # Update positions and capital if filled
             if status == OrderStatus.FILLED and fill_price is not None:
                 trade_value = filled_quantity * fill_price
                 if order.action in [OrderAction.BUY, OrderAction.COVER]:
                     self.current_capital -= trade_value + commission
+                    # BUY adds to long position, COVER reduces short position
+                    self._update_position(order.symbol, filled_quantity, fill_price, "BUY")
                 else:
                     self.current_capital += trade_value - commission
+                    # SELL reduces long position, SHORT adds to short position
+                    self._update_position(order.symbol, filled_quantity, fill_price, "SELL")
 
                 logger.info(
                     f"Order {order_id} FILLED: {filled_quantity} @ ${fill_price:.2f}, "
@@ -445,14 +452,43 @@ class SimulatedBroker(BrokerAdapter):
     async def get_positions(self) -> List[Dict]:
         """Get all current positions from simulated portfolio.
         
-        For simulated broker, this requires tracking positions separately.
-        Currently returns empty list as position tracking is not implemented.
-        
         Returns:
-            Empty list (position tracking not implemented in simulator)
+            List of position dictionaries with current market values
         """
-        logger.warning("SimulatedBroker.get_positions() not fully implemented - returns empty list")
-        return []
+        positions = []
+        
+        for symbol, position_data in self.positions.items():
+            if abs(position_data["quantity"]) > 0.001:  # Only include positions with significant quantity
+                # Get current market price
+                try:
+                    market_price = await self.get_market_price(symbol)
+                    current_price = market_price.last
+                except Exception as e:
+                    logger.warning(f"Failed to get market price for {symbol}: {e}")
+                    continue
+                
+                # Calculate position metrics
+                quantity = position_data["quantity"]
+                average_cost = position_data["average_cost"]
+                market_value = abs(quantity) * current_price
+                unrealized_pnl = quantity * (current_price - average_cost)
+                unrealized_pnl_percent = (current_price - average_cost) / average_cost * 100 if average_cost > 0 else 0
+                position_type = "LONG" if quantity > 0 else "SHORT"
+                
+                position = {
+                    "symbol": symbol,
+                    "quantity": quantity,
+                    "average_cost": average_cost,
+                    "current_price": current_price,
+                    "market_value": market_value,
+                    "unrealized_pnl": unrealized_pnl,
+                    "unrealized_pnl_percent": unrealized_pnl_percent,
+                    "position_type": position_type
+                }
+                positions.append(position)
+        
+        logger.debug(f"Returning {len(positions)} positions")
+        return positions
     
     async def get_position(self, symbol: str) -> Optional[Dict]:
         """Get position for a specific symbol.
@@ -461,7 +497,105 @@ class SimulatedBroker(BrokerAdapter):
             symbol: Stock symbol
             
         Returns:
-            None (position tracking not implemented in simulator)
+            Position dictionary or None if no position exists
         """
-        logger.warning(f"SimulatedBroker.get_position({symbol}) not fully implemented - returns None")
-        return None
+        position_data = self.positions.get(symbol)
+        if not position_data or abs(position_data["quantity"]) < 0.001:
+            return None
+        
+        try:
+            market_price = await self.get_market_price(symbol)
+            current_price = market_price.last
+        except Exception as e:
+            logger.warning(f"Failed to get market price for {symbol}: {e}")
+            return None
+        
+        # Calculate position metrics
+        quantity = position_data["quantity"]
+        average_cost = position_data["average_cost"]
+        market_value = abs(quantity) * current_price
+        unrealized_pnl = quantity * (current_price - average_cost)
+        unrealized_pnl_percent = (current_price - average_cost) / average_cost * 100 if average_cost > 0 else 0
+        position_type = "LONG" if quantity > 0 else "SHORT"
+        
+        return {
+            "symbol": symbol,
+            "quantity": quantity,
+            "average_cost": average_cost,
+            "current_price": current_price,
+            "market_value": market_value,
+            "unrealized_pnl": unrealized_pnl,
+            "unrealized_pnl_percent": unrealized_pnl_percent,
+            "position_type": position_type
+        }
+
+    def _update_position(self, symbol: str, quantity: float, price: float, action: str):
+        """Update position for a symbol after a trade execution.
+        
+        Args:
+            symbol: Stock symbol
+            quantity: Trade quantity (absolute value)
+            price: Execution price
+            action: Trade action ('BUY' or 'SELL')
+        """
+        if symbol not in self.positions:
+            # Initialize new position
+            self.positions[symbol] = {
+                "quantity": 0.0,
+                "average_cost": 0.0,
+                "total_cost": 0.0
+            }
+        
+        position = self.positions[symbol]
+        
+        if action == "BUY":
+            if position["quantity"] >= 0:
+                # Adding to long position
+                new_quantity = position["quantity"] + quantity
+                new_total_cost = position["total_cost"] + (quantity * price)
+                position["quantity"] = new_quantity
+                position["average_cost"] = new_total_cost / new_quantity if new_quantity > 0 else 0
+                position["total_cost"] = new_total_cost
+            else:
+                # Covering short position
+                if quantity <= abs(position["quantity"]):
+                    # Partial cover
+                    position["quantity"] += quantity
+                    if position["quantity"] == 0:
+                        position["average_cost"] = 0.0
+                        position["total_cost"] = 0.0
+                else:
+                    # More than needed to cover - flip to long
+                    remaining = quantity + position["quantity"]  # position["quantity"] is negative
+                    position["quantity"] = remaining
+                    position["total_cost"] = remaining * price
+                    position["average_cost"] = price
+        else:  # SELL
+            if position["quantity"] <= 0:
+                # Adding to short position
+                new_quantity = position["quantity"] - quantity
+                new_total_cost = position["total_cost"] + (quantity * price)
+                position["quantity"] = new_quantity
+                position["average_cost"] = new_total_cost / abs(new_quantity) if new_quantity < 0 else 0
+                position["total_cost"] = new_total_cost
+            else:
+                # Reducing long position
+                if quantity <= position["quantity"]:
+                    # Partial sell
+                    position["quantity"] -= quantity
+                    if position["quantity"] == 0:
+                        position["average_cost"] = 0.0
+                        position["total_cost"] = 0.0
+                else:
+                    # More than holding - flip to short
+                    remaining = quantity - position["quantity"]  # position["quantity"] is positive
+                    position["quantity"] = -remaining
+                    position["total_cost"] = remaining * price
+                    position["average_cost"] = price
+        
+        # Clean up positions with zero quantity
+        if abs(position["quantity"]) < 0.001:
+            del self.positions[symbol]
+            logger.debug(f"Removed position for {symbol} (zero quantity)")
+        else:
+            logger.debug(f"Updated position for {symbol}: {position['quantity']} shares @ ${position['average_cost']:.2f}")

@@ -2,6 +2,7 @@
 
 from fastapi import Depends
 
+from ..cache import get_redis_manager, CacheService
 from ..config.settings import Settings, get_settings
 from ..services.alerting import AlertingService
 from ..services.auto_trading_orchestrator import AutoTradingOrchestrator
@@ -19,6 +20,7 @@ from ..services.events import SessionEventManager
 # ============= 应用级单例服务 =============
 
 _market_data_service: MarketDataService | None = None
+_cache_service: CacheService | None = None
 
 
 def get_market_data_service() -> MarketDataService:
@@ -27,6 +29,17 @@ def get_market_data_service() -> MarketDataService:
     if _market_data_service is None:
         _market_data_service = MarketDataService()
     return _market_data_service
+
+
+def get_cache_service() -> CacheService:
+    """获取缓存服务实例 (应用级单例)."""
+    global _cache_service
+    if _cache_service is None:
+        redis_manager = get_redis_manager()
+        if redis_manager is None:
+            raise ValueError("Redis未初始化，无法创建缓存服务")
+        _cache_service = CacheService(redis_manager)
+    return _cache_service
 
 
 def get_alerting_service(settings: Settings = Depends(get_settings)) -> AlertingService:

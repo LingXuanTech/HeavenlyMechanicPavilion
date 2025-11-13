@@ -8,6 +8,8 @@ from io import StringIO
 from typing import TYPE_CHECKING, Dict, Optional
 
 from tradingagents.plugins import route_to_vendor
+from ..dependencies.services import get_cache_service
+from ..cache import get_redis_manager
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +31,7 @@ class MarketDataService:
         spread_bps: float = 10.0,
         min_spread: float = 0.01,
         fallback_prices: Optional[Dict[str, float]] = None,
+        use_redis_cache: bool = True,
     ) -> None:
         """Initialize the market data service.
 
@@ -37,10 +40,12 @@ class MarketDataService:
             spread_bps: Bid/ask spread width in basis points (0.01% = 1 bps).
             min_spread: Minimum absolute spread applied when deriving bid/ask.
             fallback_prices: Optional static price map used when vendors fail.
+            use_redis_cache: Whether to use Redis for caching market data.
         """
         self.lookback_days = lookback_days
         self.spread_bps = spread_bps
         self.min_spread = min_spread
+        self.use_redis_cache = use_redis_cache
         self._fallback_prices = {
             symbol.upper(): float(price)
             for symbol, price in (fallback_prices or {}).items()
@@ -57,8 +62,25 @@ class MarketDataService:
             MarketPrice instance containing bid/ask/last quotes.
         """
         normalized_symbol = self._normalize_symbol(symbol)
-        quote: Optional[MarketPrice] = None
+        
+        # Try to get from Redis cache first (if enabled)
+        if self.use_redis_cache and get_redis_manager():
+            try:
+                cached_data = await self._get_cached_market_data(normalized_symbol)
+                if cached_data:
+                    logger.info("Using Redis cached market data for %s", normalized_symbol)
+                    return self._dict_to_price(cached_data)
+            except Exception as exc:
+                logger.warning("Redis cache lookup failed for %s: %s", normalized_symbol, exc)
+        
+        # Try to get from memory cache
+        cached_quote = self._quote_cache.get(normalized_symbol)
+        if cached_quote is not None:
+            logger.info("Using memory cached market data for %s", normalized_symbol)
+            return self._clone_price(cached_quote)
 
+        # Get from vendor
+        quote: Optional[MarketPrice] = None
         try:
             quote = self._get_price_from_vendors(normalized_symbol)
         except Exception as exc:  # pragma: no cover - defensive logging
@@ -69,14 +91,19 @@ class MarketDataService:
             )
 
         if quote is not None:
+            # Cache in memory
             self._quote_cache[normalized_symbol] = quote
+            
+            # Cache in Redis (if enabled)
+            if self.use_redis_cache and get_redis_manager():
+                try:
+                    await self._cache_market_data(normalized_symbol, quote)
+                except Exception as exc:
+                    logger.warning("Failed to cache market data in Redis for %s: %s", normalized_symbol, exc)
+            
             return quote
 
-        cached_quote = self._quote_cache.get(normalized_symbol)
-        if cached_quote is not None:
-            logger.info("Using cached market data for %s", normalized_symbol)
-            return self._clone_price(cached_quote)
-
+        # Use fallback
         fallback_quote = self._build_fallback_price(normalized_symbol)
         self._quote_cache[normalized_symbol] = fallback_quote
         return fallback_quote
@@ -241,6 +268,45 @@ class MarketDataService:
         if not stripped:
             raise ValueError("Symbol must be provided")
         return stripped.upper()
+
+    async def _get_cached_market_data(self, symbol: str) -> Optional[dict]:
+        """Get market data from Redis cache."""
+        try:
+            cache_service = get_cache_service()
+            date_key = datetime.utcnow().strftime("%Y-%m-%d")
+            return await cache_service.get_market_data(symbol, date_key)
+        except Exception:
+            return None
+
+    async def _cache_market_data(self, symbol: str, quote: MarketPrice) -> None:
+        """Cache market data in Redis."""
+        try:
+            cache_service = get_cache_service()
+            date_key = datetime.utcnow().strftime("%Y-%m-%d")
+            
+            data = {
+                "symbol": quote.symbol,
+                "bid": quote.bid,
+                "ask": quote.ask,
+                "last": quote.last,
+                "timestamp": quote.timestamp.isoformat(),
+            }
+            
+            await cache_service.cache_market_data(symbol, date_key, data, expire=300)  # 5 minutes
+        except Exception as exc:
+            logger.warning("Failed to cache market data for %s: %s", symbol, exc)
+
+    def _dict_to_price(self, data: dict) -> MarketPrice:
+        """Convert dictionary to MarketPrice object."""
+        from .broker_adapter import MarketPrice
+        
+        return MarketPrice(
+            symbol=data["symbol"],
+            bid=float(data["bid"]),
+            ask=float(data["ask"]),
+            last=float(data["last"]),
+            timestamp=datetime.fromisoformat(data["timestamp"]),
+        )
 
 
 __all__ = ["MarketDataService"]
