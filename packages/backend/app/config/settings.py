@@ -90,6 +90,10 @@ class Settings(BaseSettings):
     streaming_enabled: bool = Field(default=True, alias="STREAMING_ENABLED")
     auto_start_workers: bool = Field(default=False, alias="AUTO_START_WORKERS")
 
+    # Event persistence configuration
+    event_persistence_enabled: bool = Field(default=True, alias="EVENT_PERSISTENCE_ENABLED")
+    event_buffer_size: int = Field(default=100, alias="EVENT_BUFFER_SIZE")
+
     # Monitoring configuration
     monitoring_enabled: bool = Field(default=True, alias="MONITORING_ENABLED")
     metrics_enabled: bool = Field(default=True, alias="METRICS_ENABLED")

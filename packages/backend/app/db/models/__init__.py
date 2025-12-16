@@ -24,6 +24,7 @@ from .portfolio import Portfolio
 from .position import Position
 from .risk_metrics import RiskMetrics
 from .run_log import RunLog
+from .session_event import SessionEvent
 from .trade import Trade
 from .trading_session import TradingSession
 from .user import User, UserRole
@@ -41,6 +42,7 @@ __all__ = [
     "Position",
     "RiskMetrics",
     "RunLog",
+    "SessionEvent",
     "Trade",
     "TradingSession",
     "User",

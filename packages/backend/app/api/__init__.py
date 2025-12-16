@@ -16,7 +16,7 @@ from .routes.agent_llm import router as agent_llm_router
 from .sessions import router as sessions_router
 from .streaming import router as streaming_router
 from .streaming_config import router as streaming_config_router
-from .streams import router as streams_router
+from .streams_enhanced import router as streams_router  # Use enhanced streams with DB persistence
 from .trading import router as trading_router
 from .vendors import router as vendors_router
 

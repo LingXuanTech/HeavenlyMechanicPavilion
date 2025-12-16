@@ -1,8 +1,13 @@
 """依赖注入模块 - 统一管理所有服务的依赖注入."""
 
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from ..config import get_settings
 from ..db.session import get_db_manager
-from ..services.events import SessionEventManager
+from ..services.events_enhanced import EnhancedSessionEventManager
 from ..services.graph import TradingGraphService
 from .services import (
     get_alerting_service,
@@ -16,18 +21,40 @@ from .services import (
 )
 
 # Global singleton event manager for session streaming and event buffering
-_event_manager: SessionEventManager | None = None
+_event_manager: EnhancedSessionEventManager | None = None
 
 
-def get_event_manager() -> SessionEventManager:
-    """Get the global session event manager singleton.
+@asynccontextmanager
+async def get_db_session_factory() -> AsyncGenerator[AsyncSession, None]:
+    """Database session factory for EnhancedSessionEventManager.
+
+    Yields:
+        AsyncSession: A database session
+    """
+    db_manager = get_db_manager()
+    async with db_manager.session_factory() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+
+
+def get_event_manager() -> EnhancedSessionEventManager:
+    """Get the global enhanced session event manager singleton.
 
     Returns:
-        SessionEventManager instance
+        EnhancedSessionEventManager instance with database persistence
     """
     global _event_manager
     if _event_manager is None:
-        _event_manager = SessionEventManager()
+        settings = get_settings()
+        _event_manager = EnhancedSessionEventManager(
+            db_session_factory=get_db_session_factory,
+            max_buffer_size=getattr(settings, 'event_buffer_size', 100),
+            persist_to_db=getattr(settings, 'event_persistence_enabled', True),
+        )
     return _event_manager
 
 

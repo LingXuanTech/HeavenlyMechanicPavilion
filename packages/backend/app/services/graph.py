@@ -16,9 +16,13 @@ from tradingagents.graph.trading_graph import TradingAgentsGraph
 from ..db.session import DatabaseManager
 from .analysis_session import AnalysisSessionService
 from .events import SessionEventManager
+from .events_enhanced import EnhancedSessionEventManager
 from .llm_runtime import AgentLLMRuntime
 
 DEFAULT_ANALYSTS = ["market", "social", "news", "fundamentals"]
+
+# Type alias for event manager (supports both original and enhanced versions)
+EventManagerType = SessionEventManager | EnhancedSessionEventManager
 
 
 class TradingGraphService:
@@ -26,7 +30,7 @@ class TradingGraphService:
 
     def __init__(
         self,
-        event_manager: SessionEventManager,
+        event_manager: EventManagerType,
         db_manager: DatabaseManager,
         *,
         config_overrides: Optional[Dict[str, Any]] = None,

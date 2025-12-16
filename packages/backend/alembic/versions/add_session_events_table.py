@@ -1,7 +1,7 @@
 """Add session_events table for event persistence
 
 Revision ID: add_session_events_001
-Revises: 
+Revises: 5951c803aff7
 Create Date: 2025-11-13 11:34:00.000000
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'add_session_events_001'
-down_revision = None  # Update this to the latest migration ID
+down_revision = '5951c803aff7'  # Latest migration: add_database_optimization_indexes
 branch_labels = None
 depends_on = None
 

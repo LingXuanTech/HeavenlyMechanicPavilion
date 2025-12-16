@@ -16,6 +16,7 @@ from .portfolio import PortfolioRepository
 from .position import PositionRepository
 from .risk_metrics import RiskMetricsRepository
 from .run_log import RunLogRepository
+from .session_event import SessionEventRepository
 from .trade import TradeRepository
 from .trading_session import TradingSessionRepository
 from .vendor_config import VendorConfigRepository
@@ -33,6 +34,7 @@ __all__ = [
     "PositionRepository",
     "RiskMetricsRepository",
     "RunLogRepository",
+    "SessionEventRepository",
     "TradeRepository",
     "TradingSessionRepository",
     "VendorConfigRepository",
