@@ -18,12 +18,10 @@ from ..schemas.agent_config import (
     AgentConfigUpdate,
 )
 
-# NOTE: AgentLLMConfig schema/service not yet implemented
-# from ..schemas.agent_llm_config import AgentLLMConfigResponse
+from ..schemas.agent_llm_config import AgentLLMConfigResponse
 from ..schemas.agent_llm_usage import AgentLLMUsageQuery, AgentLLMUsageSummary
 from ..services.agent_config import AgentConfigService
-
-# from ..services.agent_llm_config import AgentLLMConfigService
+from ..services.agent_llm_config import AgentLLMConfigService
 from ..services.agent_llm_usage import AgentLLMUsageService
 
 logger = logging.getLogger(__name__)
@@ -98,13 +96,18 @@ async def list_agents(
 ):
     """List all agent configurations."""
     service = AgentConfigService(session)
-    # NOTE: AgentLLMConfigService not yet implemented
-    # llm_service = AgentLLMConfigService(session)
+    llm_service = AgentLLMConfigService(session)
     agents = await service.list_agents(role=role, is_active=is_active, skip=skip, limit=limit)
     response_agents = []
     for agent in agents:
-        # primary_llm = await llm_service.get_primary_config(agent.id)
+        primary_llm_model = await llm_service.get_primary_config(agent.id)
         primary_llm = None
+        if primary_llm_model:
+            primary_llm = {
+                "provider": primary_llm_model.provider,
+                "model": primary_llm_model.model_name,
+                "temperature": primary_llm_model.temperature,
+            }
         response_agents.append(_convert_db_to_response(agent, primary_llm))
     return AgentConfigList(agents=response_agents, total=len(response_agents))
 
@@ -116,15 +119,22 @@ async def get_agent(
 ):
     """Get an agent configuration by ID."""
     service = AgentConfigService(session)
+    llm_service = AgentLLMConfigService(session)
     agent = await service.get_agent(agent_id)
     if not agent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Agent with ID {agent_id} not found",
         )
-    # NOTE: AgentLLMConfigService not yet implemented
-    # primary_llm = await AgentLLMConfigService(session).get_primary_config(agent_id)
+    
+    primary_llm_model = await llm_service.get_primary_config(agent_id)
     primary_llm = None
+    if primary_llm_model:
+        primary_llm = {
+            "provider": primary_llm_model.provider,
+            "model": primary_llm_model.model_name,
+            "temperature": primary_llm_model.temperature,
+        }
     return _convert_db_to_response(agent, primary_llm)
 
 
@@ -135,15 +145,22 @@ async def get_agent_by_name(
 ):
     """Get an agent configuration by name."""
     service = AgentConfigService(session)
+    llm_service = AgentLLMConfigService(session)
     agent = await service.get_agent_by_name(agent_name)
     if not agent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Agent with name '{agent_name}' not found",
         )
-    # NOTE: AgentLLMConfigService not yet implemented
-    # primary_llm = await AgentLLMConfigService(session).get_primary_config(agent.id)
+    
+    primary_llm_model = await llm_service.get_primary_config(agent.id)
     primary_llm = None
+    if primary_llm_model:
+        primary_llm = {
+            "provider": primary_llm_model.provider,
+            "model": primary_llm_model.model_name,
+            "temperature": primary_llm_model.temperature,
+        }
     return _convert_db_to_response(agent, primary_llm)
 
 
@@ -172,15 +189,22 @@ async def update_agent(
 ):
     """Update an agent configuration."""
     service = AgentConfigService(session)
+    llm_service = AgentLLMConfigService(session)
     agent = await service.update_agent(agent_id, agent_data)
     if not agent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Agent with ID {agent_id} not found",
         )
-    # NOTE: AgentLLMConfigService not yet implemented
-    # primary_llm = await AgentLLMConfigService(session).get_primary_config(agent_id)
+    
+    primary_llm_model = await llm_service.get_primary_config(agent_id)
     primary_llm = None
+    if primary_llm_model:
+        primary_llm = {
+            "provider": primary_llm_model.provider,
+            "model": primary_llm_model.model_name,
+            "temperature": primary_llm_model.temperature,
+        }
     return _convert_db_to_response(agent, primary_llm)
 
 
@@ -212,15 +236,22 @@ async def activate_agent(
 ):
     """Activate an agent configuration."""
     service = AgentConfigService(session)
+    llm_service = AgentLLMConfigService(session)
     agent = await service.activate_agent(agent_id)
     if not agent:
         raise HTTPException(
             status=status.HTTP_404_NOT_FOUND,
             detail=f"Agent with ID {agent_id} not found",
         )
-    # NOTE: AgentLLMConfigService not yet implemented
-    # primary_llm = await AgentLLMConfigService(session).get_primary_config(agent_id)
+    
+    primary_llm_model = await llm_service.get_primary_config(agent_id)
     primary_llm = None
+    if primary_llm_model:
+        primary_llm = {
+            "provider": primary_llm_model.provider,
+            "model": primary_llm_model.model_name,
+            "temperature": primary_llm_model.temperature,
+        }
     return _convert_db_to_response(agent, primary_llm)
 
 
@@ -231,15 +262,22 @@ async def deactivate_agent(
 ):
     """Deactivate an agent configuration."""
     service = AgentConfigService(session)
+    llm_service = AgentLLMConfigService(session)
     agent = await service.deactivate_agent(agent_id)
     if not agent:
         raise HTTPException(
             status=status.HTTP_404_NOT_FOUND,
             detail=f"Agent with ID {agent_id} not found",
         )
-    # NOTE: AgentLLMConfigService not yet implemented
-    # primary_llm = await AgentLLMConfigService(session).get_primary_config(agent_id)
+    
+    primary_llm_model = await llm_service.get_primary_config(agent_id)
     primary_llm = None
+    if primary_llm_model:
+        primary_llm = {
+            "provider": primary_llm_model.provider,
+            "model": primary_llm_model.model_name,
+            "temperature": primary_llm_model.temperature,
+        }
     return _convert_db_to_response(agent, primary_llm)
 
 

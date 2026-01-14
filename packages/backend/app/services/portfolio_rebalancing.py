@@ -10,6 +10,7 @@ from ..core.errors import ValidationError
 from ..db.models import Portfolio, Position
 from ..repositories import PortfolioRepository, PositionRepository
 from .broker_adapter import BrokerAdapter, MarketPrice
+from .execution import ExecutionService
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class PortfolioRebalancingService:
     def __init__(
         self,
         broker: BrokerAdapter,
+        execution_service: Optional[ExecutionService] = None,
         rebalance_threshold: float = 0.05,  # 5% deviation triggers rebalance
         min_trade_value: float = 100.0,  # Minimum trade value to avoid tiny trades
     ):
@@ -27,10 +29,12 @@ class PortfolioRebalancingService:
         
         Args:
             broker: Broker adapter for market data
+            execution_service: Service for executing trades
             rebalance_threshold: Threshold for triggering rebalance (e.g., 0.05 = 5%)
             min_trade_value: Minimum value for rebalancing trades
         """
         self.broker = broker
+        self.execution_service = execution_service or ExecutionService(broker)
         self.rebalance_threshold = rebalance_threshold
         self.min_trade_value = min_trade_value
         
@@ -276,25 +280,42 @@ class PortfolioRebalancingService:
             }
         
         # Execute actions
-        # Note: This requires integration with ExecutionService
-        # For now, just return the planned actions
         logger.info(
-            f"Would execute {len(actions)} rebalancing actions for portfolio {portfolio_id}"
+            f"Executing {len(actions)} rebalancing actions for portfolio {portfolio_id}"
         )
-        logger.warning(
-            "Actual execution requires ExecutionService integration - returning planned actions only"
-        )
+        
+        actions_taken = []
+        for action in actions:
+            try:
+                trade = await self.execution_service.execute_signal(
+                    session=session,
+                    portfolio_id=portfolio_id,
+                    symbol=action["symbol"],
+                    signal=action["action"],
+                    current_price=action["estimated_price"],
+                    decision_rationale=action["reason"],
+                )
+                if trade:
+                    actions_taken.append({
+                        "symbol": action["symbol"],
+                        "action": action["action"],
+                        "quantity": trade.filled_quantity,
+                        "price": trade.average_fill_price,
+                        "status": trade.status,
+                    })
+            except Exception as e:
+                logger.error(f"Failed to execute rebalancing action for {action['symbol']}: {e}")
         
         return {
             "portfolio_id": portfolio_id,
             "rebalancing_needed": True,
             "dry_run": False,
             "planned_actions": actions,
-            "actions_taken": [],
-            "message": f"{len(actions)} actions planned (execution not yet implemented)",
+            "actions_taken": actions_taken,
+            "message": f"Executed {len(actions_taken)}/{len(actions)} rebalancing actions",
         }
 
-    def calculate_optimal_weights(
+    async def calculate_optimal_weights(
         self,
         symbols: List[str],
         strategy: str = "equal_weight",
@@ -308,19 +329,49 @@ class PortfolioRebalancingService:
         Returns:
             Target weights for each symbol
         """
+        if not symbols:
+            return {}
+
         if strategy == "equal_weight":
             # Equal weight for all symbols
             weight = 1.0 / len(symbols)
             return {symbol: weight for symbol in symbols}
         
         elif strategy == "market_cap":
-            # Market cap weighted (requires market cap data)
-            # Placeholder: return equal weight for now
-            logger.warning(
-                "Market cap weighting not yet implemented, using equal weight"
-            )
-            weight = 1.0 / len(symbols)
-            return {symbol: weight for symbol in symbols}
+            # Market cap weighted
+            from tradingagents.dataflows.interface import route_to_vendor
+            import json
+
+            market_caps = {}
+            total_market_cap = 0.0
+
+            for symbol in symbols:
+                try:
+                    # Get fundamental data which includes market cap
+                    raw_data = route_to_vendor("get_fundamentals", symbol)
+                    
+                    # Alpha Vantage returns a JSON string or dict
+                    if isinstance(raw_data, str):
+                        data = json.loads(raw_data)
+                    else:
+                        data = raw_data
+                    
+                    mcap = float(data.get("MarketCapitalization", 0))
+                    if mcap <= 0:
+                        logger.warning(f"Market cap for {symbol} is 0 or missing, using 1.0 as fallback")
+                        mcap = 1.0
+                        
+                    market_caps[symbol] = mcap
+                    total_market_cap += mcap
+                except Exception as e:
+                    logger.error(f"Failed to get market cap for {symbol}: {e}")
+                    market_caps[symbol] = 1.0
+                    total_market_cap += 1.0
+
+            if total_market_cap == 0:
+                return {symbol: 1.0 / len(symbols) for symbol in symbols}
+
+            return {symbol: mcap / total_market_cap for symbol, mcap in market_caps.items()}
         
         else:
             raise ValidationError(

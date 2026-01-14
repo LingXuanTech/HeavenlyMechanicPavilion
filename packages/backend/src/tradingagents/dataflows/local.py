@@ -8,7 +8,7 @@ from dateutil.relativedelta import relativedelta
 from tqdm import tqdm
 
 from .config import DATA_DIR
-from .reddit_utils import fetch_top_from_category
+from .reddit_utils import fetch_top_from_category, fetch_top_from_category_async
 
 
 def get_YFin_data_window(
@@ -363,6 +363,43 @@ def get_simfin_income_statements(
     )
 
 
+async def get_reddit_global_news_async(
+    curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
+    look_back_days: Annotated[int, "Number of days to look back"] = 7,
+    limit: Annotated[int, "Maximum number of articles to return"] = 5,
+) -> str:
+    """Async version of get_reddit_global_news."""
+    curr_date_dt = datetime.strptime(curr_date, "%Y-%m-%d")
+    before = curr_date_dt - relativedelta(days=look_back_days)
+    before = before.strftime("%Y-%m-%d")
+
+    posts = []
+    curr_iter_date = datetime.strptime(before, "%Y-%m-%d")
+
+    while curr_iter_date <= curr_date_dt:
+        curr_date_str = curr_iter_date.strftime("%Y-%m-%d")
+        fetch_result = await fetch_top_from_category_async(
+            "global_news",
+            curr_date_str,
+            limit,
+            data_path=os.path.join(DATA_DIR, "reddit_data"),
+        )
+        posts.extend(fetch_result)
+        curr_iter_date += relativedelta(days=1)
+
+    if len(posts) == 0:
+        return ""
+
+    news_str = ""
+    for post in posts:
+        if post["content"] == "":
+            news_str += f"### {post['title']}\n\n"
+        else:
+            news_str += f"### {post['title']}\n\n{post['content']}\n\n"
+
+    return f"## Global News Reddit, from {before} to {curr_date}:\n{news_str}"
+
+
 def get_reddit_global_news(
     curr_date: Annotated[str, "Current date in yyyy-mm-dd format"],
     look_back_days: Annotated[int, "Number of days to look back"] = 7,
@@ -414,6 +451,43 @@ def get_reddit_global_news(
             news_str += f"### {post['title']}\n\n{post['content']}\n\n"
 
     return f"## Global News Reddit, from {before} to {curr_date}:\n{news_str}"
+
+
+async def get_reddit_company_news_async(
+    query: Annotated[str, "Search query or ticker symbol"],
+    start_date: Annotated[str, "Start date in yyyy-mm-dd format"],
+    end_date: Annotated[str, "End date in yyyy-mm-dd format"],
+) -> str:
+    """Async version of get_reddit_company_news."""
+    start_date_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_date_dt = datetime.strptime(end_date, "%Y-%m-%d")
+
+    posts = []
+    curr_date = start_date_dt
+
+    while curr_date <= end_date_dt:
+        curr_date_str = curr_date.strftime("%Y-%m-%d")
+        fetch_result = await fetch_top_from_category_async(
+            "company_news",
+            curr_date_str,
+            10,
+            query,
+            data_path=os.path.join(DATA_DIR, "reddit_data"),
+        )
+        posts.extend(fetch_result)
+        curr_date += relativedelta(days=1)
+
+    if len(posts) == 0:
+        return ""
+
+    news_str = ""
+    for post in posts:
+        if post["content"] == "":
+            news_str += f"### {post['title']}\n\n"
+        else:
+            news_str += f"### {post['title']}\n\n{post['content']}\n\n"
+
+    return f"##{query} News Reddit, from {start_date} to {end_date}:\n\n{news_str}"
 
 
 def get_reddit_company_news(

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import re
@@ -44,6 +45,92 @@ ticker_to_company = {
     "ROKU": "Roku",
     "PINS": "Pinterest",
 }
+
+
+async def fetch_top_from_category_async(
+    category: Annotated[str, "Category to fetch top post from. Collection of subreddits."],
+    date: Annotated[str, "Date to fetch top posts from."],
+    max_limit: Annotated[int, "Maximum number of posts to fetch."],
+    query: Annotated[str, "Optional query to search for in the subreddit."] = None,
+    data_path: Annotated[
+        str,
+        "Path to the data folder. Default is 'reddit_data'.",
+    ] = "reddit_data",
+):
+    """Async version of fetch_top_from_category."""
+    base_path = data_path
+
+    all_content = []
+
+    if not os.path.exists(os.path.join(base_path, category)):
+        return []
+
+    category_dirs = os.listdir(os.path.join(base_path, category))
+    if not category_dirs:
+        return []
+
+    if max_limit < len(category_dirs):
+        # Instead of raising error, just adjust limit
+        limit_per_subreddit = 1
+    else:
+        limit_per_subreddit = max_limit // len(category_dirs)
+
+    for data_file in category_dirs:
+        if not data_file.endswith(".jsonl"):
+            continue
+
+        all_content_curr_subreddit = []
+
+        # Use run_in_executor for file I/O to keep it async-friendly
+        loop = asyncio.get_event_loop()
+
+        def read_file():
+            results = []
+            with open(os.path.join(base_path, category, data_file), "rb") as f:
+                for line in f:
+                    if not line.strip():
+                        continue
+                    parsed_line = json.loads(line)
+                    post_date = datetime.utcfromtimestamp(parsed_line["created_utc"]).strftime(
+                        "%Y-%m-%d"
+                    )
+                    if post_date != date:
+                        continue
+
+                    if "company" in category and query:
+                        search_terms = []
+                        if "OR" in ticker_to_company.get(query, query):
+                            search_terms = ticker_to_company.get(query, query).split(" OR ")
+                        else:
+                            search_terms = [ticker_to_company.get(query, query)]
+                        search_terms.append(query)
+
+                        found = False
+                        for term in search_terms:
+                            if re.search(term, parsed_line["title"], re.IGNORECASE) or re.search(
+                                term, parsed_line["selftext"], re.IGNORECASE
+                            ):
+                                found = True
+                                break
+                        if not found:
+                            continue
+
+                    results.append(
+                        {
+                            "title": parsed_line["title"],
+                            "content": parsed_line["selftext"],
+                            "url": parsed_line["url"],
+                            "upvotes": parsed_line["ups"],
+                            "posted_date": post_date,
+                        }
+                    )
+            return results
+
+        all_content_curr_subreddit = await loop.run_in_executor(None, read_file)
+        all_content_curr_subreddit.sort(key=lambda x: x["upvotes"], reverse=True)
+        all_content.extend(all_content_curr_subreddit[:limit_per_subreddit])
+
+    return all_content
 
 
 def fetch_top_from_category(

@@ -53,6 +53,9 @@ class Settings(BaseSettings):
         alias="ALPACA_BASE_URL"
     )
     
+    binance_api_key: Optional[str] = Field(default=None, alias="BINANCE_API_KEY")
+    binance_api_secret: Optional[str] = Field(default=None, alias="BINANCE_API_SECRET")
+
     # Encryption key for sensitive data
     encryption_key: Optional[str] = Field(default=None, alias="ENCRYPTION_KEY")
 

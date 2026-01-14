@@ -23,13 +23,15 @@ from .alpha_vantage_stock import get_stock as get_alpha_vantage_stock
 
 # Configuration and routing logic
 from .config import get_config
-from .google import get_google_news
+from .google import get_google_news, get_google_news_async
 from .local import (
     get_finnhub_company_insider_sentiment,
     get_finnhub_company_insider_transactions,
     get_finnhub_news,
     get_reddit_company_news,
+    get_reddit_company_news_async,
     get_reddit_global_news,
+    get_reddit_global_news_async,
     get_simfin_balance_sheet,
     get_simfin_cashflow,
     get_simfin_income_statements,
@@ -120,9 +122,15 @@ VENDOR_METHODS = {
         "alpha_vantage": get_alpha_vantage_news,
         "openai": get_stock_news_openai,
         "google": get_google_news,
+        "google_async": get_google_news_async,
         "local": [get_finnhub_news, get_reddit_company_news, get_google_news],
+        "local_async": [get_reddit_company_news_async, get_google_news_async],
     },
-    "get_global_news": {"openai": get_global_news_openai, "local": get_reddit_global_news},
+    "get_global_news": {
+        "openai": get_global_news_openai,
+        "local": get_reddit_global_news,
+        "local_async": get_reddit_global_news_async,
+    },
     "get_insider_sentiment": {"local": get_finnhub_company_insider_sentiment},
     "get_insider_transactions": {
         "alpha_vantage": get_alpha_vantage_insider_transactions,
@@ -285,3 +293,62 @@ def route_to_vendor(method: str, *args, **kwargs):
     else:
         # Convert all results to strings and concatenate
         return "\n".join(str(result) for result in results)
+
+
+async def route_to_vendor_async(method: str, *args, **kwargs):
+    """ASYNC version of route_to_vendor."""
+    _ensure_plugin_registry()
+
+    # Try plugin-based routing first (if it supports async)
+    # For now, we'll implement the async logic here directly for legacy fallback
+    category = get_category_for_method(method)
+    vendor_config = get_vendor(category, method)
+    primary_vendors = [v.strip() for v in vendor_config.split(",")]
+
+    if method not in VENDOR_METHODS:
+        raise ValueError(f"Method '{method}' not supported")
+
+    all_available_vendors = list(VENDOR_METHODS[method].keys())
+    fallback_vendors = primary_vendors.copy()
+    for vendor in all_available_vendors:
+        if vendor not in fallback_vendors:
+            fallback_vendors.append(vendor)
+
+    results = []
+    for vendor in fallback_vendors:
+        if vendor not in VENDOR_METHODS[method]:
+            continue
+
+        vendor_impl = VENDOR_METHODS[method][vendor]
+        
+        if isinstance(vendor_impl, list):
+            vendor_methods = vendor_impl
+        else:
+            vendor_methods = [vendor_impl]
+
+        vendor_results = []
+        for impl_func in vendor_methods:
+            try:
+                # Check if the implementation is a coroutine
+                import asyncio
+                if asyncio.iscoroutinefunction(impl_func):
+                    result = await impl_func(*args, **kwargs)
+                else:
+                    # Run sync function in thread pool to avoid blocking
+                    loop = asyncio.get_event_loop()
+                    result = await loop.run_in_executor(None, lambda: impl_func(*args, **kwargs))
+                
+                vendor_results.append(result)
+            except Exception as e:
+                print(f"ASYNC FAILED: {impl_func.__name__} failed: {e}")
+                continue
+
+        if vendor_results:
+            results.extend(vendor_results)
+            if len(primary_vendors) == 1:
+                break
+
+    if not results:
+        raise RuntimeError(f"All async vendor implementations failed for method '{method}'")
+
+    return results[0] if len(results) == 1 else "\n".join(str(r) for r in results)

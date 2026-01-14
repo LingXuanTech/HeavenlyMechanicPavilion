@@ -129,6 +129,30 @@ class AutoTradingOrchestrator:
                 
                 # 5. 如果不是 HOLD，自动执行交易
                 if processed_signal != "HOLD":
+                    # 检查是否需要手动干预
+                    # TODO: 从配置或数据库中读取是否开启手动审批
+                    manual_intervention_required = False
+                    
+                    if manual_intervention_required:
+                        logger.info(f"[{symbol}] 等待手动干预审批...")
+                        await self._emit_event({
+                            "type": "intervention_required",
+                            "symbol": symbol,
+                            "decision": processed_signal,
+                            "confidence": confidence_score,
+                            "rationale": decision_rationale,
+                            "timestamp": datetime.utcnow().isoformat(),
+                            "session_id": str(trading_session_id) if trading_session_id else None,
+                        })
+                        # 在实际实现中，这里需要一个等待机制（如 Redis 订阅或状态轮询）
+                        # 暂时跳过执行，等待用户通过 API 触发
+                        results.append({
+                            "symbol": symbol,
+                            "decision": processed_signal,
+                            "status": "awaiting_approval",
+                        })
+                        continue
+
                     logger.info(f"[{symbol}] 准备执行 {processed_signal} 订单...")
                     
                     # 获取当前市场价格

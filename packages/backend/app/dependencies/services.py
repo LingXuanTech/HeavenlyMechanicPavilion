@@ -8,6 +8,7 @@ from ..services.alerting import AlertingService
 from ..services.auto_trading_orchestrator import AutoTradingOrchestrator
 from ..services.broker_adapter import BrokerAdapter, SimulatedBroker
 from ..services.brokers.alpaca_adapter import AlpacaBrokerAdapter
+from ..services.brokers.binance_adapter import BinanceBrokerAdapter
 from ..services.execution import ExecutionService
 from ..services.graph import TradingGraphService
 from ..services.market_data import MarketDataService
@@ -104,6 +105,14 @@ def get_broker_adapter(
                 base_url=settings.alpaca_base_url,
                 paper_trading=True,
             )
+        elif broker_type == "binance":
+            if not settings.binance_api_key or not settings.binance_api_secret:
+                raise ValueError("Binance API key and secret are required.")
+            return BinanceBrokerAdapter(
+                api_key=settings.binance_api_key,
+                secret_key=settings.binance_api_secret,
+                testnet=True,
+            )
         else:
             # 默认使用模拟器
             return SimulatedBroker(
@@ -128,10 +137,18 @@ def get_broker_adapter(
                 base_url=live_base_url,
                 paper_trading=False,
             )
+        elif broker_type == "binance":
+            if not settings.binance_api_key or not settings.binance_api_secret:
+                raise ValueError("Binance API key and secret are required for live trading.")
+            return BinanceBrokerAdapter(
+                api_key=settings.binance_api_key,
+                secret_key=settings.binance_api_secret,
+                testnet=False,
+            )
         else:
             raise NotImplementedError(
                 f"Live trading with broker type '{broker_type}' is not yet implemented. "
-                "Currently supported: alpaca"
+                "Currently supported: alpaca, binance"
             )
 
 

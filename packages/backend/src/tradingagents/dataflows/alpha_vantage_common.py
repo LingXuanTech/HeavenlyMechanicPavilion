@@ -93,6 +93,41 @@ def _make_api_request(function_name: str, params: dict) -> dict | str:
     return response_text
 
 
+async def _make_api_request_async(function_name: str, params: dict) -> dict | str:
+    """Helper function to make ASYNC API requests and handle responses.
+    
+    Note: Requires httpx to be installed.
+    """
+    import httpx
+    
+    api_params = params.copy()
+    api_params.update(
+        {
+            "function": function_name,
+            "apikey": get_api_key(),
+            "source": "trading_agents",
+        }
+    )
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(API_BASE_URL, params=api_params)
+        response.raise_for_status()
+        response_text = response.text
+
+    try:
+        response_json = json.loads(response_text)
+        if "Information" in response_json:
+            info_message = response_json["Information"]
+            if "rate limit" in info_message.lower() or "api key" in info_message.lower():
+                raise AlphaVantageRateLimitError(
+                    f"Alpha Vantage rate limit exceeded: {info_message}"
+                )
+    except json.JSONDecodeError:
+        pass
+
+    return response_text
+
+
 def _filter_csv_by_date_range(csv_data: str, start_date: str, end_date: str) -> str:
     """
     Filter CSV data to include only rows within the specified date range.

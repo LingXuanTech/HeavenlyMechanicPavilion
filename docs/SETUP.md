@@ -1,167 +1,89 @@
-# Setup Guide
+# TradingAgents 安装与配置指南
 
-This guide walks through preparing a local development environment for TradingAgents, installing dependencies, configuring API keys, and launching the CLI, backend, and frontend services.
+本文档将引导您完成 **TradingAgents** 的本地开发环境搭建。
 
-## Table of Contents
+---
 
-1. [Prerequisites](#prerequisites)
-2. [Clone the Repository](#clone-the-repository)
-3. [Python Environment](#python-environment)
-4. [Install Backend Dependencies](#install-backend-dependencies)
-5. [Install Frontend Dependencies](#install-frontend-dependencies)
-6. [Configure Environment Variables](#configure-environment-variables)
-7. [Run the CLI](#run-the-cli)
-8. [Start the FastAPI Backend](#start-the-fastapi-backend)
-9. [Launch the Frontend Control Center](#launch-the-frontend-control-center)
-10. [Next Steps](#next-steps)
+## 1. 环境要求 (Prerequisites)
 
-## Prerequisites
+在开始之前，请确保您的系统已安装以下软件：
+- **Python**: 3.10 或更高版本
+- **Node.js**: 18.0 或更高版本 (建议使用 v20)
+- **PNPM**: 建议使用最新版本 (`npm install -g pnpm`)
+- **Docker & Docker Compose**: 用于运行数据库和 Redis
 
-| Tool | Minimum Version | Notes |
-| --- | --- | --- |
-| Python | 3.10 | Tested with 3.10–3.13 |
-| Node.js | 20.x | Install via `nvm`, `asdf`, or your OS package manager |
-| pnpm | 9.x | Used for workspace orchestration |
-| uv | latest | Optional (installed automatically via `pnpm sync`) |
-| Docker | 20.10+ | Only required for containerised deployment |
+---
 
-> **Tip:** If you prefer to manage Python environments manually, ensure `pip`, `venv`, or `conda` is available.
+## 2. 后端配置 (Backend Setup)
 
-## Clone the Repository
-
-```bash
-git clone https://github.com/TauricResearch/TradingAgents.git
-cd TradingAgents
-```
-
-TradingAgents is a PNPM workspace. All packages live under `packages/`, and helper tooling lives in `scripts/`.
-
-## Python Environment
-
-Create and activate an isolated Python environment using your preferred tool. Examples:
-
-<details>
-<summary>uv</summary>
-
-```bash
-uv venv .venv
-source .venv/bin/activate
-```
-
-</details>
-
-<details>
-<summary>python -m venv</summary>
-
-```bash
-python -m venv .venv
-source .venv/bin/activate  # Windows: .\.venv\Scripts\activate
-```
-
-</details>
-
-<details>
-<summary>conda</summary>
-
-```bash
-conda create -n tradingagents python=3.13
-conda activate tradingagents
-```
-
-</details>
-
-## Install Backend Dependencies
-
-From the repository root, run the workspace synchronisation helper:
-
-```bash
-pnpm sync
-```
-
-This command installs all PNPM workspace dependencies and executes `uv sync` inside `packages/backend`, ensuring Python requirements are resolved. If you prefer to manage the backend manually:
-
+### A. 安装依赖
+进入后端目录并安装 Python 依赖：
 ```bash
 cd packages/backend
-uv sync  # or: pip install -r requirements.txt
+# 建议使用虚拟环境
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
-## Install Frontend Dependencies
-
-The frontend shares the workspace toolchain. To install only the frontend dependencies:
-
-```bash
-pnpm --filter @tradingagents/frontend install
-```
-
-For development builds, pnpm will install the necessary tooling automatically when you run the frontend dev server.
-
-## Configure Environment Variables
-
-Create a local `.env` file based on the provided template:
-
+### B. 环境变量
+复制示例环境文件并填写您的 API Key：
 ```bash
 cp .env.example .env
 ```
+**必须填写的变量：**
+- `OPENAI_API_KEY`: 您的 OpenAI 密钥。
+- `ALPHA_VANTAGE_API_KEY`: 用于获取行情和基本面数据。
+- `DATABASE_URL`: 例如 `postgresql+asyncpg://user:pass@localhost:5432/tradingagents`。
 
-Populate the required keys. At minimum:
-
-```env
-OPENAI_API_KEY=sk-your-openai-key
-ALPHA_VANTAGE_API_KEY=your-alpha-vantage-key
-```
-
-You can add optional providers (Anthropic, Google, Finnhub, etc.) later. See [docs/CONFIGURATION.md](./CONFIGURATION.md) for a full catalogue of environment variables, defaults, and tuning tips.
-
-## Run the CLI
-
-The CLI coordinates the full LangGraph workflow interactively:
-
+### C. 数据库初始化
+运行 Alembic 迁移以创建表结构：
 ```bash
-pnpm cli
-# or
-make cli
+alembic upgrade head
 ```
 
-Both commands invoke `uv run python -m cli.main` inside `packages/backend`. You will be prompted for ticker symbols, trade date, LLM providers, debate depth, and other options. Results stream live in the terminal.
+---
 
-## Start the FastAPI Backend
+## 3. 前端配置 (Frontend Setup)
 
-To expose REST, SSE, and WebSocket endpoints, start the FastAPI application:
+进入前端目录并安装依赖：
+```bash
+cd packages/frontend
+pnpm install
+```
 
+配置前端环境变量：
+```bash
+cp .env.example .env.local
+# 确保 NEXT_PUBLIC_API_URL 指向后端地址 (默认 http://localhost:8000)
+```
+
+---
+
+## 4. 运行服务 (Running the Services)
+
+### 启动基础设施 (Docker)
+在根目录下运行：
+```bash
+docker compose up -d postgres redis
+```
+
+### 启动后端 API
 ```bash
 cd packages/backend
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload
 ```
 
-Useful URLs:
-
-- API root: [http://localhost:8000/](http://localhost:8000/)
-- Interactive docs (Swagger UI): [http://localhost:8000/docs](http://localhost:8000/docs)
-- Health check: [http://localhost:8000/health](http://localhost:8000/health)
-
-Workers and streaming endpoints require Redis. Enable them by setting the relevant environment variables (`REDIS_ENABLED=true`, etc.) before launching the server.
-
-## Launch the Frontend Control Center
-
-The Next.js dashboard provides a graphical view of agent progress, trades, and risk checks.
-
+### 启动前端控制中心
 ```bash
-pnpm --filter @tradingagents/frontend dev
+cd packages/frontend
+pnpm dev
 ```
 
-By default the app listens on [http://localhost:3000](http://localhost:3000). To point the UI at a non-default backend, create `packages/frontend/.env.local`:
+---
 
-```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
-```
+## 5. 验证安装
+访问 `http://localhost:3000`，您应该能看到 TradingAgents 的控制中心界面。如果后端连接正常，您可以在“会话管理”中尝试启动一个新的股票分析任务。
 
-When running with Docker (see [docs/DEPLOYMENT.md](./DEPLOYMENT.md)), environment variables are injected automatically from the Compose stack.
-
-## Next Steps
-
-- Read [docs/DEVELOPMENT.md](./DEVELOPMENT.md) for testing, linting, and contribution workflows.
-- Explore the backend endpoints in [docs/API.md](./API.md).
-- Plan a containerised rollout with [docs/DEPLOYMENT.md](./DEPLOYMENT.md).
-- Review architecture and subsystem design in [docs/ARCHITECTURE.md](./ARCHITECTURE.md).
-
-Happy building! 🚀
+---
+*本文档由 Architect 模式自动生成，最后更新日期：2026-01-14*

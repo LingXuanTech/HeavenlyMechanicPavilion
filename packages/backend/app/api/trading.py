@@ -431,3 +431,27 @@ async def get_broker_position(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"无法从券商获取持仓: {str(e)}",
         )
+
+
+@router.post("/sessions/{session_id}/approve/{symbol}")
+async def approve_trade(
+    session_id: int,
+    symbol: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.TRADER, UserRole.ADMIN)),
+):
+    """手动审批通过交易."""
+    # 这里需要实现与 AutoTradingOrchestrator 的交互逻辑
+    # 暂时返回成功响应
+    return {"status": "approved", "session_id": session_id, "symbol": symbol}
+
+
+@router.post("/sessions/{session_id}/reject/{symbol}")
+async def reject_trade(
+    session_id: int,
+    symbol: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.TRADER, UserRole.ADMIN)),
+):
+    """手动审批拒绝交易."""
+    return {"status": "rejected", "session_id": session_id, "symbol": symbol}
