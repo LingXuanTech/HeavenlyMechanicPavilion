@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # Backend API Server
+  backend:
+    build:
+      context: ./apps/server
+      dockerfile: Dockerfile
+    container_name: stock-agents-backend
+    ports:
+      - "8000:8000"
+    environment:
+      # Database
+      - DATABASE_MODE=${DATABASE_MODE:-sqlite}
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///./db/trading.db}
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-trading}
+      # LLM API Keys
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      # Data Provider Keys
+      - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY}
+      # Security
+      - API_KEY=${API_KEY:-dev-key-12345}
+      - API_KEY_ENABLED=${API_KEY_ENABLED:-false}
+      # Scheduler
+      - DAILY_ANALYSIS_ENABLED=${DAILY_ANALYSIS_ENABLED:-false}
+      - DAILY_ANALYSIS_HOUR=${DAILY_ANALYSIS_HOUR:-9}
+      - DAILY_ANALYSIS_MINUTE=${DAILY_ANALYSIS_MINUTE:-30}
+    volumes:
+      - ./data/db:/app/db
+      - ./data/chroma:/app/db/chroma
+    depends_on:
+      postgres:
+        condition: service_started
+        required: false
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend Web App
+  frontend:
+    build:
+      context: ./apps/client
+      dockerfile: Dockerfile
+    container_name: stock-agents-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # PostgreSQL Database (optional, use with --profile postgresql)
+  postgres:
+    image: postgres:15-alpine
+    container_name: stock-agents-postgres
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-trading}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    profiles:
+      - postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache (optional, for future use)
+  redis:
+    image: redis:7-alpine
+    container_name: stock-agents-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    profiles:
+      - cache
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: stock-agents-network

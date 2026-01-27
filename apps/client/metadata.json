@@ -1,0 +1,5 @@
+{
+  "name": "Stock Agents Dashboard",
+  "description": "A real-time stock monitoring dashboard powered by AI agents for automated analysis, sentiment tracking, and trade signals.",
+  "requestFramePermissions": []
+}
