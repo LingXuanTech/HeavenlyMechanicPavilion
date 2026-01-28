@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 import time
 import random
+import structlog
 from tenacity import (
     retry,
     stop_after_attempt,
@@ -11,6 +12,8 @@ from tenacity import (
     retry_if_exception_type,
     retry_if_result,
 )
+
+logger = structlog.get_logger(__name__)
 
 
 def is_rate_limited(response):
@@ -24,7 +27,12 @@ def is_rate_limited(response):
     stop=stop_after_attempt(5),
 )
 def make_request(url, headers):
-    """Make a request with retry logic for rate limiting"""
+    """Make a request with retry logic for rate limiting.
+
+    NOTE: This uses blocking time.sleep() and requests.get() for compatibility
+    with the synchronous dataflow pipeline. Consider converting to async with
+    httpx + asyncio.sleep() when the entire dataflow is migrated to async.
+    """
     # Random delay before each request to avoid detection
     time.sleep(random.uniform(2, 6))
     response = requests.get(url, headers=headers)
@@ -88,7 +96,7 @@ def getNewsData(query, start_date, end_date):
                         }
                     )
                 except Exception as e:
-                    print(f"Error processing result: {e}")
+                    logger.debug("Error processing news result", error=str(e))
                     # If one of the fields is not found, skip this result
                     continue
 
@@ -102,7 +110,7 @@ def getNewsData(query, start_date, end_date):
             page += 1
 
         except Exception as e:
-            print(f"Failed after multiple retries: {e}")
+            logger.warning("Google News scraping failed after retries", error=str(e))
             break
 
     return news_results

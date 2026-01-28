@@ -79,10 +79,11 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ onClose }) => {
       });
       setSaveStatus('success');
       setTimeout(() => setSaveStatus('idle'), 2000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setSaveStatus('error');
-      setErrorMessage(err.message || 'Failed to save');
-      if (err.message?.includes('API key')) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to save';
+      setErrorMessage(errorMsg);
+      if (errorMsg.includes('API key')) {
         setShowApiKeyInput(true);
       }
     }

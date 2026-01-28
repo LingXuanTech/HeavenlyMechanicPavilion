@@ -2,8 +2,6 @@ import json
 import structlog
 from datetime import datetime
 from typing import Dict, Any
-from langchain_openai import ChatOpenAI
-from langchain_google_genai import ChatGoogleGenerativeAI
 from config.settings import settings
 
 logger = structlog.get_logger()
@@ -11,19 +9,12 @@ logger = structlog.get_logger()
 class ResponseSynthesizer:
     def __init__(self):
         self._llm = None
-    
+
     @property
     def llm(self):
-        """Lazy initialization of LLM to avoid requiring API keys at import time."""
-        if self._llm is None:
-            # Use a fast model for synthesis
-            if settings.GOOGLE_API_KEY:
-                self._llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=settings.GOOGLE_API_KEY)
-            elif settings.OPENAI_API_KEY:
-                self._llm = ChatOpenAI(model="gpt-4o-mini", api_key=settings.OPENAI_API_KEY)
-            else:
-                raise ValueError("No API key configured. Set GOOGLE_API_KEY or OPENAI_API_KEY.")
-        return self._llm
+        """通过 ai_config_service 统一获取 LLM"""
+        from services.ai_config_service import ai_config_service
+        return ai_config_service.get_llm("synthesis")
 
     async def synthesize(self, symbol: str, agent_reports: Dict[str, str]) -> Dict[str, Any]:
         """

@@ -238,7 +238,7 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
 
     // 新建播放
     try {
-      const textToSpeak = (analysis as any).anchor_script || analysis.reasoning;
+      const textToSpeak = analysis.anchor_script || analysis.reasoning;
       const utterance = new SpeechSynthesisUtterance(textToSpeak);
       utterance.lang = 'zh-CN';
       utterance.rate = 1.1;

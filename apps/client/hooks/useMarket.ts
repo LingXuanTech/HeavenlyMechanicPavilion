@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import * as api from '../services/api';
-import { GlobalMarketAnalysis, FlashNews } from '../types';
+import { GlobalMarketAnalysis, FlashNews, GlobalIndexResponse } from '../types';
 
 export const GLOBAL_MARKET_KEY = ['globalMarket'];
 export const FLASH_NEWS_KEY = ['flashNews'];
@@ -17,7 +17,7 @@ export function useGlobalMarket() {
       return {
         sentiment: globalData.sentiment || 'Neutral',
         summary: globalData.summary || 'Market data from backend',
-        indices: globalData.indices.map((idx: any) => ({
+        indices: globalData.indices.map((idx: GlobalIndexResponse) => ({
           name: idx.name,
           value: idx.value,
           change: idx.change,

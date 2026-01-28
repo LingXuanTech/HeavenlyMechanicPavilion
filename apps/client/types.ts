@@ -111,9 +111,10 @@ export interface AgentAnalysis {
   };
   newsAnalysis: NewsItem[];
   peers: PeerData[];
-  tradeSetup?: TradeSetup; 
-  macroContext?: MacroContext; 
+  tradeSetup?: TradeSetup;
+  macroContext?: MacroContext;
   webSources?: WebSource[];
+  anchor_script?: string; // AI-generated TTS script
 }
 
 export interface MarketIndex {
@@ -297,3 +298,85 @@ export interface UptimeInfo {
   uptime_formatted: string;
   current_time: string;
 }
+
+// ============ API Response Types (Backend snake_case) ============
+// 这些类型对应后端 API 的原始响应格式
+
+/** 后端返回的 K 线数据 */
+export interface KlineDataResponse {
+  datetime: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+/** 后端返回的价格数据 */
+export interface StockPriceResponse {
+  symbol: string;
+  price: number;
+  change: number;
+  change_percent: number;
+  volume: number;
+  timestamp: string;
+  market: string;
+}
+
+/** 后端返回的全球市场指数 */
+export interface GlobalIndexResponse {
+  name: string;
+  value: number;
+  change: number;
+  change_percent: number;
+}
+
+/** 后端返回的全球市场数据 */
+export interface GlobalMarketResponse {
+  sentiment?: string;
+  summary?: string;
+  indices: GlobalIndexResponse[];
+}
+
+/** 后端返回的记忆搜索结果 */
+export interface MemorySearchResponse {
+  query: string;
+  results: AnalysisMemory[];
+  count: number;
+}
+
+/** 后端返回的新闻源信息 */
+export interface NewsSourcesResponse {
+  rss_feeds: Array<{ name: string; url: string; category: string }>;
+  finnhub_enabled: boolean;
+  total_sources: number;
+}
+
+/** 后端返回的错误列表 */
+export interface HealthErrorsResponse {
+  errors: ErrorRecord[];
+  total: number;
+}
+
+/** 服务状态响应 */
+export interface ServiceStatusResponse {
+  status: string;
+  message?: string;
+}
+
+/** 区域情绪数据 */
+export interface RegionSentimentInfo {
+  indices_count: number;
+  avg_change_percent: number;
+  sentiment: string;
+}
+
+/** 组件健康信息 */
+export interface ComponentHealthInfo {
+  status: string;
+  message?: string;
+  latency_ms?: number;
+}
+
+/** SSE 事件数据类型 */
+export type SSEEventData = Record<string, unknown>;

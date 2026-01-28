@@ -31,6 +31,26 @@ class AnalysisMemory(BaseModel):
     entry_price: Optional[float] = None
     target_price: Optional[float] = None
     stop_loss: Optional[float] = None
+    # 价格验证反馈（后续更新）
+    actual_price_1d: Optional[float] = None  # 1天后实际价格
+    actual_price_5d: Optional[float] = None  # 5天后实际价格
+    actual_price_20d: Optional[float] = None  # 20天后实际价格
+    outcome: Optional[str] = None  # "correct", "incorrect", "partial", "pending"
+
+
+class AnalysisOutcome(BaseModel):
+    """分析结果验证"""
+    symbol: str
+    date: str
+    original_signal: str
+    entry_price: Optional[float] = None
+    actual_price_1d: Optional[float] = None
+    actual_price_5d: Optional[float] = None
+    actual_price_20d: Optional[float] = None
+    outcome: str  # "correct", "incorrect", "partial"
+    return_1d_pct: Optional[float] = None
+    return_5d_pct: Optional[float] = None
+    return_20d_pct: Optional[float] = None
 
 
 class MemoryRetrievalResult(BaseModel):
@@ -205,7 +225,8 @@ class MemoryService:
                 try:
                     analysis_date = datetime.strptime(metadata["date"], "%Y-%m-%d").date()
                     days_ago = (today - analysis_date).days
-                except:
+                except ValueError as e:
+                    logger.debug("Could not parse date, using 0", date=metadata.get("date"), error=str(e))
                     days_ago = 0
 
                 # 过滤超出时间范围的
@@ -244,7 +265,7 @@ class MemoryService:
         """
         生成反思报告
 
-        基于历史分析记录，识别模式并提取教训。
+        基于历史分析记录和实际表现，识别模式并提取教训。
 
         Args:
             symbol: 股票代码
@@ -306,7 +327,33 @@ class MemoryService:
                 elif bear_wins > bull_wins:
                     patterns.append(f"历史辩论中空方胜出较多 ({bear_wins}/{len(debate_winners)})")
 
-            # 生成教训
+            # ===== 新增：基于实际表现的反馈 =====
+            # 获取历史准确率
+            accuracy_stats = await self.get_historical_accuracy(symbol)
+            if accuracy_stats.get("status") == "available" and accuracy_stats.get("total", 0) >= 3:
+                accuracy_rate = accuracy_stats.get("accuracy_rate", 0)
+                total_verified = accuracy_stats.get("total", 0)
+
+                if accuracy_rate >= 70:
+                    patterns.append(f"历史预测准确率较高 ({accuracy_rate:.0f}%，基于 {total_verified} 次验证)")
+                    confidence_adjustment += 10
+                    lessons.append("历史表现优秀，可适当提高仓位")
+                elif accuracy_rate >= 50:
+                    patterns.append(f"历史预测准确率一般 ({accuracy_rate:.0f}%，基于 {total_verified} 次验证)")
+                else:
+                    patterns.append(f"历史预测准确率偏低 ({accuracy_rate:.0f}%，基于 {total_verified} 次验证)")
+                    confidence_adjustment -= 15
+                    lessons.append("历史预测表现不佳，建议降低仓位或观望")
+
+                # 分析近期表现趋势
+                correct_count = accuracy_stats.get("correct", 0)
+                incorrect_count = accuracy_stats.get("incorrect", 0)
+                if correct_count > incorrect_count * 2:
+                    lessons.append("近期预测准确率提升，策略可能正在适应市场")
+                elif incorrect_count > correct_count * 2:
+                    lessons.append("近期预测频繁失误，需警惕策略失效风险")
+
+            # 生成基础教训
             if len(memories) >= 5:
                 lessons.append("有足够的历史数据支持决策，但需注意市场环境变化")
             else:
@@ -376,6 +423,197 @@ class MemoryService:
         except Exception as e:
             logger.error("Failed to clear memories", error=str(e))
             return 0
+
+    async def update_analysis_outcome(
+        self,
+        symbol: str,
+        date: str,
+        actual_price_1d: Optional[float] = None,
+        actual_price_5d: Optional[float] = None,
+        actual_price_20d: Optional[float] = None
+    ) -> Optional[AnalysisOutcome]:
+        """
+        更新分析结果的实际价格表现（反馈循环）
+
+        Args:
+            symbol: 股票代码
+            date: 原分析日期
+            actual_price_1d: 1天后实际价格
+            actual_price_5d: 5天后实际价格
+            actual_price_20d: 20天后实际价格
+
+        Returns:
+            分析结果验证
+        """
+        if not self.is_available():
+            return None
+
+        try:
+            doc_id = self._generate_id(symbol, date)
+            result = self._collection.get(ids=[doc_id])
+
+            if not result["ids"]:
+                logger.warning("Analysis not found for outcome update", symbol=symbol, date=date)
+                return None
+
+            metadata = result["metadatas"][0]
+            entry_price = metadata.get("entry_price", 0)
+            original_signal = metadata.get("signal", "")
+
+            # 计算收益率
+            return_1d_pct = None
+            return_5d_pct = None
+            return_20d_pct = None
+
+            if entry_price and entry_price > 0:
+                if actual_price_1d:
+                    return_1d_pct = ((actual_price_1d - entry_price) / entry_price) * 100
+                if actual_price_5d:
+                    return_5d_pct = ((actual_price_5d - entry_price) / entry_price) * 100
+                if actual_price_20d:
+                    return_20d_pct = ((actual_price_20d - entry_price) / entry_price) * 100
+
+            # 判断预测是否正确
+            outcome = self._evaluate_outcome(original_signal, return_5d_pct, return_20d_pct)
+
+            # 更新元数据
+            updated_metadata = metadata.copy()
+            if actual_price_1d:
+                updated_metadata["actual_price_1d"] = actual_price_1d
+            if actual_price_5d:
+                updated_metadata["actual_price_5d"] = actual_price_5d
+            if actual_price_20d:
+                updated_metadata["actual_price_20d"] = actual_price_20d
+            updated_metadata["outcome"] = outcome
+            if return_5d_pct is not None:
+                updated_metadata["return_5d_pct"] = return_5d_pct
+            if return_20d_pct is not None:
+                updated_metadata["return_20d_pct"] = return_20d_pct
+
+            # 更新到 ChromaDB
+            self._collection.update(
+                ids=[doc_id],
+                metadatas=[updated_metadata]
+            )
+
+            logger.info("Analysis outcome updated",
+                       symbol=symbol, date=date, outcome=outcome,
+                       return_5d_pct=return_5d_pct)
+
+            return AnalysisOutcome(
+                symbol=symbol,
+                date=date,
+                original_signal=original_signal,
+                entry_price=entry_price if entry_price else None,
+                actual_price_1d=actual_price_1d,
+                actual_price_5d=actual_price_5d,
+                actual_price_20d=actual_price_20d,
+                outcome=outcome,
+                return_1d_pct=return_1d_pct,
+                return_5d_pct=return_5d_pct,
+                return_20d_pct=return_20d_pct
+            )
+
+        except Exception as e:
+            logger.error("Failed to update analysis outcome", error=str(e))
+            return None
+
+    def _evaluate_outcome(
+        self,
+        signal: str,
+        return_5d_pct: Optional[float],
+        return_20d_pct: Optional[float]
+    ) -> str:
+        """
+        评估预测结果
+
+        Args:
+            signal: 原始信号 (Buy/Sell/Hold)
+            return_5d_pct: 5天收益率
+            return_20d_pct: 20天收益率
+
+        Returns:
+            "correct", "incorrect", "partial", "pending"
+        """
+        if return_5d_pct is None and return_20d_pct is None:
+            return "pending"
+
+        # 使用5天收益为主，20天为辅
+        primary_return = return_5d_pct if return_5d_pct is not None else return_20d_pct
+
+        is_buy = "Buy" in signal or "Strong Buy" in signal
+        is_sell = "Sell" in signal or "Strong Sell" in signal
+
+        if is_buy:
+            if primary_return > 2:  # 2%+ 收益视为正确
+                return "correct"
+            elif primary_return > -2:  # -2% ~ 2% 视为部分正确
+                return "partial"
+            else:
+                return "incorrect"
+        elif is_sell:
+            if primary_return < -2:  # -2%- 跌幅视为正确
+                return "correct"
+            elif primary_return < 2:
+                return "partial"
+            else:
+                return "incorrect"
+        else:  # Hold
+            if abs(primary_return) < 3:  # 波动 <3% 视为正确
+                return "correct"
+            else:
+                return "partial"
+
+    async def get_historical_accuracy(self, symbol: Optional[str] = None) -> Dict[str, Any]:
+        """
+        获取历史预测准确率
+
+        Args:
+            symbol: 股票代码（可选，不指定则统计全部）
+
+        Returns:
+            准确率统计
+        """
+        if not self.is_available():
+            return {"status": "unavailable"}
+
+        try:
+            # 获取有 outcome 的记录
+            where_filter = {"outcome": {"$ne": "pending"}}
+            if symbol:
+                where_filter = {"$and": [{"symbol": symbol}, {"outcome": {"$ne": "pending"}}]}
+
+            results = self._collection.get(where=where_filter)
+
+            if not results["ids"]:
+                return {
+                    "status": "no_data",
+                    "total": 0,
+                    "accuracy_rate": 0
+                }
+
+            outcomes = [m.get("outcome", "pending") for m in results["metadatas"]]
+            total = len(outcomes)
+            correct = outcomes.count("correct")
+            partial = outcomes.count("partial")
+            incorrect = outcomes.count("incorrect")
+
+            # 计算加权准确率（partial 算 0.5）
+            accuracy_rate = ((correct + partial * 0.5) / total) * 100 if total > 0 else 0
+
+            return {
+                "status": "available",
+                "symbol": symbol or "all",
+                "total": total,
+                "correct": correct,
+                "partial": partial,
+                "incorrect": incorrect,
+                "accuracy_rate": round(accuracy_rate, 1)
+            }
+
+        except Exception as e:
+            logger.error("Failed to get accuracy", error=str(e))
+            return {"status": "error", "reason": str(e)}
 
 
 # 全局单例

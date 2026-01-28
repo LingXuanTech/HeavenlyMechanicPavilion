@@ -3,14 +3,16 @@ import json
 import time
 import uuid
 import structlog
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from typing import AsyncGenerator, Optional
+from typing import AsyncGenerator, Optional, Iterator, Any
 from sse_starlette.sse import ServerSentEvent, EventSourceResponse
 from sqlmodel import Session, select
 from api.sse import sse_manager
 from services.synthesizer import synthesizer
 from services.memory_service import memory_service, AnalysisMemory
+from services.cache_service import cache_service
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 from config.settings import settings
@@ -19,15 +21,38 @@ from db.models import AnalysisResult, engine, get_session
 router = APIRouter(prefix="/analyze", tags=["Analysis"])
 logger = structlog.get_logger()
 
-# In-memory task tracking (could be moved to DB/Redis)
-tasks = {}
+# Thread pool for running synchronous graph execution
+_graph_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="graph_worker")
+
+
+async def async_stream_wrapper(sync_iterator: Iterator[Any]) -> AsyncGenerator[Any, None]:
+    """将同步迭代器包装为异步生成器，避免阻塞事件循环。
+
+    使用线程池执行同步迭代器的 next() 调用，让事件循环可以处理其他任务。
+    """
+    loop = asyncio.get_event_loop()
+
+    def get_next():
+        try:
+            return next(sync_iterator), False
+        except StopIteration:
+            return None, True
+
+    while True:
+        result, done = await loop.run_in_executor(_graph_executor, get_next)
+        if done:
+            break
+        yield result
 
 
 async def run_analysis_task(task_id: str, symbol: str, trade_date: str):
     """执行分析任务并将结果保存到数据库"""
     logger.info("Starting analysis task", task_id=task_id, symbol=symbol)
     start_time = time.time()
-    tasks[task_id] = {"status": "running", "progress": 0, "events": []}
+
+    # 初始化任务状态（缓存层）和 SSE 事件队列（分布式）
+    await cache_service.set_task(task_id, {"status": "running", "symbol": symbol, "progress": 0})
+    await cache_service.init_sse_task(task_id, symbol)
 
     try:
         # 获取历史反思信息（用于增强分析决策）
@@ -62,8 +87,9 @@ async def run_analysis_task(task_id: str, symbol: str, trade_date: str):
 
         agent_reports = {}
 
-        # Stream graph execution
-        for chunk in ta.graph.stream(init_state, **args):
+        # Stream graph execution (wrapped in async to avoid blocking event loop)
+        sync_stream = ta.graph.stream(init_state, **args)
+        async for chunk in async_stream_wrapper(sync_stream):
             for node_name, node_data in chunk.items():
                 logger.info("Graph node completed", node=node_name)
 
@@ -101,7 +127,7 @@ async def run_analysis_task(task_id: str, symbol: str, trade_date: str):
                     "status": "completed",
                     "message": f"Node {node_name} finished"
                 }
-                tasks[task_id]["events"].append({"event": current_stage, "data": event_data})
+                await cache_service.push_sse_event(task_id, current_stage, event_data)
 
         # Final Synthesis
         logger.info("Starting final synthesis", symbol=symbol)
@@ -151,9 +177,9 @@ async def run_analysis_task(task_id: str, symbol: str, trade_date: str):
             "elapsed_seconds": elapsed_seconds,
         }
 
-        tasks[task_id]["status"] = "completed"
-        tasks[task_id]["result"] = final_json
-        tasks[task_id]["events"].append({"event": "stage_final", "data": final_json})
+        await cache_service.push_sse_event(task_id, "stage_final", final_json)
+        await cache_service.set_sse_status(task_id, "completed")
+        await cache_service.set_task(task_id, {"status": "completed", "symbol": symbol})
 
     except Exception as e:
         logger.error("Analysis task failed", task_id=task_id, error=str(e))
@@ -176,9 +202,9 @@ async def run_analysis_task(task_id: str, symbol: str, trade_date: str):
             session.add(analysis_result)
             session.commit()
 
-        tasks[task_id]["status"] = "failed"
-        tasks[task_id]["error"] = str(e)
-        tasks[task_id]["events"].append({"event": "error", "data": {"message": str(e)}})
+        await cache_service.push_sse_event(task_id, "error", {"message": str(e)})
+        await cache_service.set_sse_status(task_id, "failed")
+        await cache_service.set_task(task_id, {"status": "failed", "symbol": symbol, "error": str(e)})
 
 
 @router.post("/{symbol}")
@@ -195,31 +221,37 @@ async def trigger_analysis(symbol: str, background_tasks: BackgroundTasks, trade
 
 @router.get("/stream/{task_id}")
 async def stream_analysis(task_id: str):
-    """SSE 流式获取分析进度"""
-    if task_id not in tasks:
-        raise HTTPException(status_code=404, detail="Task not found")
+    """SSE 流式获取分析进度（支持分布式）"""
+    # 检查任务是否存在
+    sse_data = await cache_service.get_sse_events(task_id)
+    if not sse_data:
+        # 检查缓存中是否存在任务状态
+        cached_task = await cache_service.get_task(task_id)
+        if not cached_task:
+            raise HTTPException(status_code=404, detail="Task not found")
 
     async def event_generator() -> AsyncGenerator:
         sent_count = 0
-        while True:
-            task = tasks.get(task_id)
-            if not task:
+        max_wait_cycles = 600  # 最多等待 10 分钟 (600 * 1s)
+        wait_cycles = 0
+
+        while wait_cycles < max_wait_cycles:
+            sse_data = await cache_service.get_sse_events(task_id, from_index=sent_count)
+            if not sse_data:
                 break
 
             # Send new events
-            while sent_count < len(task["events"]):
-                event = task["events"][sent_count]
+            for event in sse_data["events"]:
                 yield ServerSentEvent(event=event["event"], data=json.dumps(event["data"]))
                 sent_count += 1
 
-            if task["status"] in ["completed", "failed"]:
-                while sent_count < len(task["events"]):
-                    event = task["events"][sent_count]
-                    yield ServerSentEvent(event=event["event"], data=json.dumps(event["data"]))
-                    sent_count += 1
+            if sse_data["status"] in ["completed", "failed"]:
+                # 任务完成，延迟清理 SSE 事件（允许客户端重连获取最终结果）
+                # 清理由 TTL 自动处理
                 break
 
             await asyncio.sleep(1)
+            wait_cycles += 1
 
     return EventSourceResponse(event_generator())
 
@@ -258,40 +290,60 @@ async def get_latest_analysis(symbol: str, session: Session = Depends(get_sessio
 async def get_analysis_history(
     symbol: str,
     limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    status: Optional[str] = Query(default=None, description="Filter by status: completed, failed"),
     session: Session = Depends(get_session)
 ):
-    """获取指定股票的历史分析记录"""
-    statement = (
-        select(AnalysisResult)
-        .where(AnalysisResult.symbol == symbol)
-        .order_by(AnalysisResult.created_at.desc())
-        .limit(limit)
-    )
+    """获取指定股票的历史分析记录（支持分页和状态筛选）"""
+    statement = select(AnalysisResult).where(AnalysisResult.symbol == symbol)
+
+    if status:
+        statement = statement.where(AnalysisResult.status == status)
+
+    # 使用复合索引 ix_analysis_symbol_created
+    statement = statement.order_by(AnalysisResult.created_at.desc())
+
+    # 先获取总数
+    from sqlmodel import func
+    count_stmt = select(func.count()).select_from(AnalysisResult).where(AnalysisResult.symbol == symbol)
+    if status:
+        count_stmt = count_stmt.where(AnalysisResult.status == status)
+    total = session.exec(count_stmt).one()
+
+    # 分页
+    statement = statement.offset(offset).limit(limit)
     results = session.exec(statement).all()
 
-    return [
-        {
-            "id": r.id,
-            "date": r.date,
-            "signal": r.signal,
-            "confidence": r.confidence,
-            "status": r.status,
-            "created_at": r.created_at.isoformat(),
-            "task_id": r.task_id,
-        }
-        for r in results
-    ]
+    return {
+        "items": [
+            {
+                "id": r.id,
+                "date": r.date,
+                "signal": r.signal,
+                "confidence": r.confidence,
+                "status": r.status,
+                "created_at": r.created_at.isoformat(),
+                "task_id": r.task_id,
+            }
+            for r in results
+        ],
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+    }
 
 
 @router.get("/status/{task_id}")
 async def get_task_status(task_id: str, session: Session = Depends(get_session)):
     """查询分析任务状态"""
-    # 先检查内存中的任务
-    if task_id in tasks:
+    # 先检查缓存中的任务（含进程内和分布式）
+    cached_task = await cache_service.get_task(task_id)
+    if cached_task:
         return {
             "task_id": task_id,
-            "status": tasks[task_id]["status"],
-            "in_memory": True
+            "status": cached_task.get("status", "unknown"),
+            "symbol": cached_task.get("symbol"),
+            "source": "cache"
         }
 
     # 再检查数据库
@@ -306,5 +358,5 @@ async def get_task_status(task_id: str, session: Session = Depends(get_session))
         "status": result.status,
         "symbol": result.symbol,
         "created_at": result.created_at.isoformat(),
-        "in_memory": False
+        "source": "database"
     }

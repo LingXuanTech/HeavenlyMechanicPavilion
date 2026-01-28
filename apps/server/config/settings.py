@@ -1,16 +1,29 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, List
 import os
+import sys
+
+def _parse_cors_origins() -> List[str]:
+    """解析 CORS_ORIGINS 环境变量（逗号分隔）"""
+    origins_str = os.getenv("CORS_ORIGINS", "")
+    if origins_str:
+        return [o.strip() for o in origins_str.split(",") if o.strip()]
+    # 默认仅允许本地开发
+    return ["http://localhost:3000", "http://127.0.0.1:3000"]
+
 
 class Settings(BaseSettings):
     # API Settings
     API_V1_STR: str = "/api"
     PROJECT_NAME: str = "Stock Agents Monitoring Dashboard"
 
+    # Environment
+    ENV: str = os.getenv("ENV", "development")  # development | production
+
     # Security
-    API_KEY: str = os.getenv("API_KEY", "dev-key-12345")
+    API_KEY: str = os.getenv("API_KEY", "")  # 生产环境必须配置
     API_KEY_ENABLED: bool = os.getenv("API_KEY_ENABLED", "false").lower() == "true"
-    CORS_ORIGINS: list[str] = ["*"]
+    CORS_ORIGINS: List[str] = _parse_cors_origins()
 
     # LLM Settings
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
@@ -36,6 +49,9 @@ class Settings(BaseSettings):
     # ChromaDB
     CHROMA_DB_PATH: str = os.getenv("CHROMA_DB_PATH", "./db/chroma")
 
+    # Redis (可选，未配置时使用内存缓存)
+    REDIS_URL: Optional[str] = os.getenv("REDIS_URL")
+
     # Prompt Config
     PROMPTS_YAML_PATH: str = os.getenv("PROMPTS_YAML_PATH", "./config/prompts.yaml")
 
@@ -58,4 +74,28 @@ class Settings(BaseSettings):
         case_sensitive = True
         env_file = ".env"
 
+    def validate_production(self) -> None:
+        """生产环境启动前验证"""
+        if self.ENV != "production":
+            return
+
+        errors = []
+
+        if self.API_KEY_ENABLED and not self.API_KEY:
+            errors.append("API_KEY must be set when API_KEY_ENABLED=true in production")
+
+        if not self.OPENAI_API_KEY and not self.GOOGLE_API_KEY:
+            errors.append("At least one LLM API key (OPENAI_API_KEY or GOOGLE_API_KEY) must be set")
+
+        if self.DATABASE_MODE == "postgresql" and not self.POSTGRES_PASSWORD:
+            errors.append("POSTGRES_PASSWORD must be set when using PostgreSQL")
+
+        if errors:
+            for err in errors:
+                print(f"[CONFIG ERROR] {err}", file=sys.stderr)
+            sys.exit(1)
+
+
 settings = Settings()
+# 生产环境启动时自动验证
+settings.validate_production()

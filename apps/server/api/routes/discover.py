@@ -3,9 +3,7 @@ import structlog
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from typing import List, Dict, Any
 from services.prompt_manager import prompt_manager
-from config.settings import settings
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_openai import ChatOpenAI
+from services.ai_config_service import ai_config_service
 from langchain_core.prompts import ChatPromptTemplate
 import json
 
@@ -14,10 +12,12 @@ logger = structlog.get_logger()
 
 class DiscoveryService:
     def __init__(self):
-        if settings.GOOGLE_API_KEY:
-            self.llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=settings.GOOGLE_API_KEY)
-        else:
-            self.llm = ChatOpenAI(model="gpt-4o-mini", api_key=settings.OPENAI_API_KEY)
+        self._llm = None
+
+    @property
+    def llm(self):
+        """通过 ai_config_service 统一获取 LLM"""
+        return ai_config_service.get_llm("quick_think")
 
     async def discover_stocks(self, query: str) -> List[Dict[str, Any]]:
         logger.info("Discovering stocks", query=query)
@@ -25,8 +25,7 @@ class DiscoveryService:
         prompt_data = prompt_manager.get_prompt("scout_agent", {"query": query})
         
         prompt = ChatPromptTemplate.from_messages([
-            ("system", prompt_data["system"] + "
-请输出严格的 JSON 数组格式，每个对象包含 symbol, name, reason, confidence (0-100)。不要包含 Markdown 代码块。"),
+            ("system", prompt_data["system"] + "\n请输出严格的 JSON 数组格式，每个对象包含 symbol, name, reason, confidence (0-100)。不要包含 Markdown 代码块。"),
             ("user", prompt_data["user"])
         ])
         

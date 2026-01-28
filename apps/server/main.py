@@ -3,10 +3,14 @@ import structlog
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
 from config.settings import settings
+from api.exceptions import AppException
+from services.data_router import close_http_client
+from services.cache_service import cache_service
 
 # Load environment variables
 load_dotenv()
@@ -14,6 +18,7 @@ load_dotenv()
 # Configure structured logging
 structlog.configure(
     processors=[
+        structlog.contextvars.merge_contextvars,  # 支持上下文变量（request_id）
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.JSONRenderer(),
     ]
@@ -25,19 +30,69 @@ from services.scheduler import watchlist_scheduler
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
-    logger.info("Starting Stock Agents Monitoring Dashboard API")
+    logger.info("Starting Stock Agents Monitoring Dashboard API", env=settings.ENV)
     # Initialize DB, Scheduler, etc.
     watchlist_scheduler.start()
     yield
     # Shutdown logic
     logger.info("Shutting down API")
     watchlist_scheduler.shutdown()
+    await close_http_client()  # 关闭共享 HTTP 客户端
+    await cache_service.close()  # 关闭缓存连接
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
     lifespan=lifespan,
     openapi_url=f"{settings.API_V1_STR}/openapi.json"
 )
+
+# =============================================================================
+# 全局异常处理器
+# =============================================================================
+
+@app.exception_handler(AppException)
+async def app_exception_handler(request: Request, exc: AppException):
+    """处理应用自定义异常"""
+    logger.warning(
+        "Application exception",
+        code=exc.code,
+        message=exc.message,
+        status_code=exc.status_code,
+        path=request.url.path
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=exc.to_dict()
+    )
+
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception):
+    """处理未捕获的异常"""
+    logger.error(
+        "Unhandled exception",
+        error=str(exc),
+        error_type=type(exc).__name__,
+        path=request.url.path
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "INTERNAL_ERROR",
+                "message": "An unexpected error occurred",
+                "details": {"type": type(exc).__name__} if settings.ENV == "development" else {}
+            }
+        }
+    )
+
+# =============================================================================
+# 中间件
+# =============================================================================
+
+# 请求追踪（必须在 CORS 之前添加，以确保所有请求都有 request_id）
+from api.middleware import RequestTracingMiddleware
+app.add_middleware(RequestTracingMiddleware)
 
 # Set up CORS
 app.add_middleware(
@@ -103,6 +158,9 @@ app.include_router(news_aggregator.router, prefix=settings.API_V1_STR)
 
 from api.routes import health as health_routes
 app.include_router(health_routes.router, prefix=settings.API_V1_STR)
+
+from api.routes import ai_config
+app.include_router(ai_config.router, prefix=settings.API_V1_STR)
 
 @app.on_event("startup")
 def on_startup():

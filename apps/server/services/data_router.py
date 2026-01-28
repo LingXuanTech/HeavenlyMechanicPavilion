@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from functools import lru_cache
+import httpx
 import yfinance as yf
 import akshare as ak
 from services.models import StockPrice, KlineData, CompanyFundamentals, NewsItem
@@ -14,6 +15,25 @@ logger = structlog.get_logger()
 # 简单的内存缓存（生产环境可换成 Redis）
 _price_cache: Dict[str, tuple] = {}  # {symbol: (StockPrice, timestamp)}
 _CACHE_TTL_SECONDS = 60  # 缓存有效期 60 秒
+
+# 复用的 HTTP 客户端（避免每次请求创建新连接）
+_http_client: Optional[httpx.AsyncClient] = None
+
+
+async def get_http_client() -> httpx.AsyncClient:
+    """获取或创建共享的 HTTP 客户端"""
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        _http_client = httpx.AsyncClient(timeout=httpx.Timeout(10.0))
+    return _http_client
+
+
+async def close_http_client():
+    """关闭 HTTP 客户端（应用退出时调用）"""
+    global _http_client
+    if _http_client is not None:
+        await _http_client.aclose()
+        _http_client = None
 
 
 class DataSourceError(Exception):
@@ -122,15 +142,15 @@ class MarketRouter:
     @classmethod
     async def _get_price_alpha_vantage(cls, symbol: str) -> StockPrice:
         """通过 Alpha Vantage 获取价格（需要 API Key）"""
-        import requests
-
         api_key = settings.ALPHA_VANTAGE_API_KEY
         if not api_key:
             raise DataSourceError("alpha_vantage", "API key not configured")
 
         try:
             url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={api_key}"
-            response = requests.get(url, timeout=10)
+            client = await get_http_client()
+            response = await client.get(url)
+            response.raise_for_status()
             data = response.json()
 
             quote = data.get("Global Quote", {})
@@ -151,6 +171,8 @@ class MarketRouter:
                 timestamp=datetime.now(),
                 market="US"
             )
+        except httpx.HTTPError as e:
+            raise DataSourceError("alpha_vantage", f"HTTP error: {str(e)}")
         except Exception as e:
             raise DataSourceError("alpha_vantage", str(e))
 

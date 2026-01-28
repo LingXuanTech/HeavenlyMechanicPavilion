@@ -1,6 +1,6 @@
 import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
 import * as api from '../services/api';
-import { Stock, StockPrice } from '../types';
+import { Stock, StockPrice, KlineDataResponse } from '../types';
 
 export const PRICE_KEY = (symbol: string) => ['price', symbol];
 export const HISTORY_KEY = (symbol: string) => ['history', symbol];
@@ -33,7 +33,7 @@ export function useStockHistory(symbol: string) {
     queryKey: HISTORY_KEY(symbol),
     queryFn: async () => {
       const history = await api.getMarketHistory(symbol);
-      return history.map((h: any) => ({
+      return history.map((h: KlineDataResponse) => ({
         time: new Date(h.datetime).toLocaleDateString(),
         value: h.close,
       }));
@@ -58,7 +58,7 @@ export function useStockPrices(stocks: Stock[]) {
           price: data.price,
           change: data.change,
           changePercent: data.change_percent,
-          history: history.map((h: any) => ({
+          history: history.map((h: KlineDataResponse) => ({
             time: new Date(h.datetime).toLocaleDateString(),
             value: h.close,
           })),
@@ -72,7 +72,7 @@ export function useStockPrices(stocks: Stock[]) {
       const isLoading = results.some((r) => r.isLoading);
       const errors = results.filter((r) => r.error);
 
-      results.forEach((result, index) => {
+      results.forEach((result) => {
         if (result.data) {
           const { symbol, ...priceData } = result.data;
           prices[symbol] = priceData;

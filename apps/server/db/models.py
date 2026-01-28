@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Optional, List
+from enum import Enum
 from sqlmodel import SQLModel, Field, create_engine, Session, select
+from sqlalchemy import Index
 from sqlalchemy.pool import StaticPool
 from config.settings import settings
 import structlog
@@ -17,6 +19,13 @@ class Watchlist(SQLModel, table=True):
 
 
 class AnalysisResult(SQLModel, table=True):
+    __table_args__ = (
+        # 复合索引：优化 "获取指定股票的最新分析" 查询
+        Index("ix_analysis_symbol_created", "symbol", "created_at"),
+        # 复合索引：优化 "按状态筛选指定股票分析" 查询
+        Index("ix_analysis_symbol_status", "symbol", "status"),
+    )
+
     id: Optional[int] = Field(default=None, primary_key=True)
     symbol: str = Field(index=True)
     date: str = Field(index=True)
@@ -40,6 +49,45 @@ class ChatHistory(SQLModel, table=True):
     role: str
     content: str
     created_at: datetime = Field(default_factory=datetime.now)
+
+
+# ============ AI 配置模型 ============
+
+class AIProviderType(str, Enum):
+    """AI 提供商类型"""
+    OPENAI = "openai"                       # 官方 OpenAI
+    OPENAI_COMPATIBLE = "openai_compatible" # NewAPI/OneAPI/OpenRouter 等兼容接口
+    GOOGLE = "google"                       # Google Gemini
+    ANTHROPIC = "anthropic"                 # Anthropic Claude
+    DEEPSEEK = "deepseek"                   # DeepSeek (OpenAI 兼容)
+
+
+class AIProvider(SQLModel, table=True):
+    """AI 模型提供商配置"""
+    __tablename__ = "ai_providers"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    name: str = Field(index=True, unique=True)  # 显示名称，如 "OpenAI Official"
+    provider_type: AIProviderType = Field(default=AIProviderType.OPENAI)
+    base_url: Optional[str] = Field(default=None)  # API 端点，OpenAI 兼容时必填
+    api_key: str = Field(default="")               # 加密存储
+    models: str = Field(default="[]")              # JSON: ["gpt-4o", "gpt-4o-mini"]
+    is_enabled: bool = Field(default=True)
+    priority: int = Field(default=0)               # 优先级，数字越小优先级越高
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class AIModelConfig(SQLModel, table=True):
+    """AI 模型使用配置（哪个场景用哪个模型）"""
+    __tablename__ = "ai_model_configs"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    config_key: str = Field(index=True, unique=True)  # "deep_think", "quick_think", "synthesis"
+    provider_id: Optional[int] = Field(default=None, foreign_key="ai_providers.id")
+    model_name: str = Field(default="")               # 具体模型名
+    is_active: bool = Field(default=True)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
 
 def get_engine():

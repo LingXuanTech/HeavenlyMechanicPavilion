@@ -7,6 +7,7 @@ from services.health_monitor import (
     HealthReport,
     HealthStatus
 )
+from services.api_metrics import api_metrics
 
 router = APIRouter(prefix="/health", tags=["Health Monitor"])
 logger = structlog.get_logger()
@@ -212,3 +213,46 @@ async def readiness_probe():
     except Exception as e:
         logger.error("Readiness check failed", error=str(e))
         raise HTTPException(status_code=503, detail="Not ready")
+
+
+# =============================================================================
+# API 性能指标端点
+# =============================================================================
+
+
+@router.get("/api-metrics")
+async def get_api_metrics():
+    """
+    获取 API 性能指标
+
+    返回请求统计、延迟分布、错误率等。
+    适用于监控仪表板和告警系统。
+    """
+    return api_metrics.get_metrics()
+
+
+@router.get("/api-metrics/slow-requests")
+async def get_slow_requests(
+    threshold_ms: float = Query(default=1000.0, ge=100.0, description="慢请求阈值（毫秒）"),
+    limit: int = Query(default=10, ge=1, le=50, description="返回数量")
+):
+    """
+    获取慢请求列表
+
+    返回响应时间超过阈值的请求。
+    """
+    return {
+        "threshold_ms": threshold_ms,
+        "slow_requests": api_metrics.get_slow_requests(threshold_ms, limit)
+    }
+
+
+@router.delete("/api-metrics")
+async def reset_api_metrics():
+    """
+    重置 API 指标
+
+    清除所有统计数据，重新开始计数。
+    """
+    api_metrics.reset()
+    return {"status": "success", "message": "API metrics reset"}

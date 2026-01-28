@@ -18,6 +18,7 @@ export {
   ANALYSIS_KEY,
   LATEST_ANALYSIS_KEY,
 } from './useAnalysis';
+export type { AnalysisState } from './useAnalysis';
 
 // 市场数据
 export {
@@ -108,3 +109,13 @@ export {
 // AI Scout
 export { useScout, SCOUT_KEY } from './useScout';
 export type { UseScoutReturn } from './useScout';
+
+// 调度器管理
+export {
+  useSchedulerStatus,
+  useSchedulerJobs,
+  useTriggerDailyAnalysis,
+  useRefreshScheduler,
+  SCHEDULER_KEY,
+} from './useScheduler';
+export type { SchedulerJob, SchedulerStatus, SchedulerJobsResponse } from './useScheduler';

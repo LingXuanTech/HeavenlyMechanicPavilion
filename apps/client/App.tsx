@@ -13,6 +13,8 @@ import FlashNewsTicker from './components/FlashNewsTicker';
 import PromptEditor from './components/PromptEditor';
 import PortfolioAnalysisComponent from './components/PortfolioAnalysis';
 import MacroDashboard from './components/MacroDashboard';
+import SchedulerPanel from './components/SchedulerPanel';
+import AIConfigPanel from './components/AIConfigPanel';
 import {
   useWatchlist,
   useAddStock,
@@ -60,6 +62,8 @@ const App: React.FC = () => {
   const [showPromptEditor, setShowPromptEditor] = useState(false);
   const [showPortfolioAnalysis, setShowPortfolioAnalysis] = useState(false);
   const [showMacroDashboard, setShowMacroDashboard] = useState(false);
+  const [showSchedulerPanel, setShowSchedulerPanel] = useState(false);
+  const [showAIConfig, setShowAIConfig] = useState(false);
 
   // === 计算属性 ===
   const marketStatus: MarketStatus = useMemo(
@@ -138,6 +142,8 @@ const App: React.FC = () => {
         onOpenPromptEditor={() => setShowPromptEditor(true)}
         onOpenPortfolioAnalysis={() => setShowPortfolioAnalysis(true)}
         onOpenMacroDashboard={() => setShowMacroDashboard(true)}
+        onOpenSchedulerPanel={() => setShowSchedulerPanel(true)}
+        onOpenAIConfig={() => setShowAIConfig(true)}
       />
 
       <div className="flex-1 flex flex-col h-full overflow-hidden relative">
@@ -207,6 +213,12 @@ const App: React.FC = () => {
 
       {/* Macro Dashboard Modal */}
       {showMacroDashboard && <MacroDashboard onClose={() => setShowMacroDashboard(false)} />}
+
+      {/* Scheduler Panel Modal */}
+      {showSchedulerPanel && <SchedulerPanel onClose={() => setShowSchedulerPanel(false)} />}
+
+      {/* AI Config Panel Modal */}
+      {showAIConfig && <AIConfigPanel onClose={() => setShowAIConfig(false)} />}
     </div>
   );
 };

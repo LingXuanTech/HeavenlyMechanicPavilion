@@ -16,7 +16,9 @@ import {
   PieChart,
   Globe,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Zap,
+  Cpu,
 } from 'lucide-react';
 import { useScout } from '../hooks';
 import SystemStatusPanel from './SystemStatusPanel';
@@ -29,6 +31,8 @@ interface SidebarProps {
   onOpenPromptEditor?: () => void;
   onOpenPortfolioAnalysis?: () => void;
   onOpenMacroDashboard?: () => void;
+  onOpenSchedulerPanel?: () => void;
+  onOpenAIConfig?: () => void;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -38,7 +42,9 @@ const Sidebar: React.FC<SidebarProps> = ({
   onFilterChange,
   onOpenPromptEditor,
   onOpenPortfolioAnalysis,
-  onOpenMacroDashboard
+  onOpenMacroDashboard,
+  onOpenSchedulerPanel,
+  onOpenAIConfig,
 }) => {
   // 手动添加状态
   const [isAdding, setIsAdding] = useState(false);
@@ -92,7 +98,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             <div className="flex gap-2 mb-2">
               <select
                 value={newMarket}
-                onChange={(e) => setNewMarket(e.target.value as any)}
+                onChange={(e) => setNewMarket(e.target.value as Stock['market'])}
                 className="bg-gray-700 text-xs rounded px-1 py-1 text-white border-none outline-none"
               >
                 <option value="CN">CN</option>
@@ -226,6 +232,18 @@ const Sidebar: React.FC<SidebarProps> = ({
             className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
           >
             <Bot className="w-4 h-4" /> Prompt Editor
+          </button>
+          <button
+            onClick={onOpenSchedulerPanel}
+            className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
+          >
+            <Zap className="w-4 h-4" /> Scheduler
+          </button>
+          <button
+            onClick={onOpenAIConfig}
+            className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md text-gray-400 hover:bg-gray-800 hover:text-white transition-colors"
+          >
+            <Cpu className="w-4 h-4" /> AI Config
           </button>
           <a
             href="#"

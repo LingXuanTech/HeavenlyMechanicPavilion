@@ -10,13 +10,15 @@ services:
     ports:
       - "8000:8000"
     environment:
+      # Environment
+      - ENV=${ENV:-development}
       # Database
       - DATABASE_MODE=${DATABASE_MODE:-sqlite}
       - DATABASE_URL=${DATABASE_URL:-sqlite:///./db/trading.db}
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER is required}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       - POSTGRES_DB=${POSTGRES_DB:-trading}
       # LLM API Keys
       - OPENAI_API_KEY=${OPENAI_API_KEY}
@@ -25,8 +27,9 @@ services:
       # Data Provider Keys
       - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY}
       # Security
-      - API_KEY=${API_KEY:-dev-key-12345}
+      - API_KEY=${API_KEY}
       - API_KEY_ENABLED=${API_KEY_ENABLED:-false}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000}
       # Scheduler
       - DAILY_ANALYSIS_ENABLED=${DAILY_ANALYSIS_ENABLED:-false}
       - DAILY_ANALYSIS_HOUR=${DAILY_ANALYSIS_HOUR:-9}
@@ -62,8 +65,8 @@ services:
     image: postgres:15-alpine
     container_name: stock-agents-postgres
     environment:
-      - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_USER=${POSTGRES_USER:?POSTGRES_USER is required}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       - POSTGRES_DB=${POSTGRES_DB:-trading}
     volumes:
       - postgres_data:/var/lib/postgresql/data

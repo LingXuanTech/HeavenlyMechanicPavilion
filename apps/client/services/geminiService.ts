@@ -209,9 +209,13 @@ export const analyzeStockWithAgent = async (symbol: string, stockName: string, c
     // Extract grounding chunks
     const webSources: WebSource[] = [];
     const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-    
+
     if (groundingChunks) {
-      groundingChunks.forEach((chunk: any) => {
+      // Grounding chunk structure from Gemini API
+      interface GroundingChunk {
+        web?: { uri?: string; title?: string };
+      }
+      groundingChunks.forEach((chunk: GroundingChunk) => {
         if (chunk.web?.uri && chunk.web?.title) {
           webSources.push({
             uri: chunk.web.uri,
@@ -506,7 +510,11 @@ export const playAudioBriefing = async (symbol: string, analysisText: string): P
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     if (!base64Audio) throw new Error("No audio data returned");
 
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    // Safari compatibility: webkitAudioContext fallback
+    type AudioContextConstructor = typeof AudioContext;
+    const AudioContextClass: AudioContextConstructor =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: AudioContextConstructor }).webkitAudioContext;
     const audioContext = new AudioContextClass({ sampleRate: 24000 });
     
     const audioBytes = decode(base64Audio);
