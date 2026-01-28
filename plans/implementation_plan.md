@@ -1,94 +1,72 @@
-# 股票 Agents 监控大屏开发计划 (Final Version)
+# 股票 Agents 监控系统迭代实施计划 (Implementation Plan)
 
-## 1. 项目概述
-本项目旨在将现有的 `TradingAgents` 逻辑封装为 Web 服务，并提供一个实时监控大屏，展示 AI Agent 对股票的分析建议、技术指标和新闻摘要。
+本计划旨在基于现有架构，进一步增强系统的发现能力、数据稳定性和决策智能化水平。我们将通过架构重构最大化多 Agent 的协同潜力，并引入工业级的观测、评估与自我进化机制。
 
-## 2. 系统架构
+## 阶段 1: Scout Agent 联网能力增强 (Discovery Capability) - **P0 (Current)**
+**目标**: 赋予 Scout Agent 实时搜索市场热点的能力，解决 LLM 知识滞后问题。
 
-```mermaid
-graph TD
-    subgraph Frontend [React Dashboard (Vite)]
-        UI[Dashboard UI]
-        API_Client[API Service]
-    end
+### 1.1 集成搜索工具
+- [ ] **引入搜索服务**: 集成 `DuckDuckGo` 或 `Google Serper`。
+- [ ] **封装 ToolNode**: 创建 `SearchTool`，供 LangGraph 调用。
 
-    subgraph Backend [FastAPI Server]
-        API[FastAPI Routes]
-        Scheduler[APScheduler]
-        Graph[TradingAgentsGraph]
-        DB[(SQLite)]
-    end
+### 1.2 优化发现工作流
+- [ ] **Query 理解**: 优化 Prompt，让 Agent 先分析用户意图。
+- [ ] **代码验证**: 调用 `MarketRouter` 验证提取的 Ticker 是否有效。
 
-    subgraph External_Data
-        YF[yfinance]
-        AV[Alpha Vantage]
-        LLM[Gemini/GPT-4o-mini]
-    end
+---
 
-    UI <--> API_Client
-    API_Client <--> API
-    API <--> DB
-    API <--> Graph
-    Scheduler --> Graph
-    Graph <--> External_Data
-    Graph --> DB
-```
+## 阶段 2: 架构深度重构与工程化 (Architecture & Engineering) - **P1**
+**目标**: 从“串行流水线”转向“并行协同网络”，并提升系统的鲁棒性与可观测性。
 
-## 3. 核心任务分解
+### 2.1 并行分析与灵活状态
+- [ ] **重构 `setup.py`**: 实现 Analyst 节点的并行执行。
+- [ ] **结构化输出优化**: 全面改用 LLM 的 **Structured Output (Pydantic)** 特性，确保后端 JSON 合约 100% 稳定。
+- [ ] **动态状态管理**: 将 `AgentState` 中的固定报告字段改为动态字典，支持任意数量的专家节点。
 
-### 后端 (Python/FastAPI)
-- **API 基础架构**: 搭建 FastAPI 框架，配置 CORS 以支持前端调用。
-- **数据库设计**: 
-    - `Watchlist`: 存储用户关注的股票代码（如 `AAPL`, `600276.SH`）。
-    - `AnalysisResult`: 存储 Agent 运行后的完整状态（JSON）和核心决策（Buy/Sell/Hold）。
-- **Agent 增强 (对齐 README)**:
-    - **Scout Agent**: 实现股票发现逻辑，对接前端 "AI Market Scout"。
-    - **Macro Analyst**: 增加宏观经济分析节点，追踪利率、GDP 等。
-    - **Portfolio Agent**: 实现跨股票相关性分析，提供组合建议。
-    - **Memory Module**: 激活并优化基于 ChromaDB 的记忆反射机制。
-- **系统优化 (架构补充)**:
-    - **SSE (Server-Sent Events)**: 实现分析进度的实时推送，对齐前端 Workflow Timeline。
-    - **Task & Session Management**: 引入 `task_id` 机制支持 SSE 断线重连，引入 `thread_id` 支持对话记忆持久化。
-    - **DataProvider 抽象层 (Smart Router)**: 统一处理 A/港/美股代码转换，根据市场自动切换数据源（yfinance/akshare），增加市场开收盘逻辑适配。
-    - **静态资源服务**: 配置 FastAPI 托管 Agent 头像等静态资源。
-    - **语言优化**: 统一后端 Prompt 为简体中文输出，确保分析理由和主播稿的阅读体验。
-    - **Pydantic 模型对齐**: 在后端定义与前端 `types.ts` 完全一致的 Pydantic 模型，确保 JSON 序列化无缝对接。
-    - **Prompt 管理系统**:
-        - 建立 `apps/server/config/prompts.yaml` 存储各 Agent 的 System Prompt。
-        - 实现热加载机制，支持通过 API 动态更新 Prompt 而无需重启。
-    - **环境配置**: 补充 `GOOGLE_API_KEY` (Gemini), `AKSHARE_TOKEN` 等必要环境变量。
-- **API 严格对齐**:
-    - **分析接口**: `POST /api/analyze` 必须返回与前端 `AgentAnalysis` 类型完全一致的 JSON 结构。
-    - **市场接口**: 实现 `GET /api/market/global` 对齐前端 `GlobalMarketAnalysis`。
-    - **发现接口**: 实现 `POST /api/scout` 对齐前端 `MarketOpportunity`。
-    - **快讯接口**: 实现 `GET /api/news/flash` 对齐前端 `FlashNews`。
-    - **对话接口**: 实现 `POST /api/chat` 对齐前端 Fund Manager 对话功能，支持上下文记忆。
-    - **语音脚本**: 在分析结果中增加专门为 TTS 优化的 "Anchor Script"。
-    - **Prompt 接口**: 实现 `GET/PUT /api/settings/prompts`，允许在前端管理 Agent 的 Prompt。
-    - **诊断信息**: 在 API 返回中增加 Token 消耗、运行耗时等诊断数据。
-- **Agent 集成**: 将 `TradingAgentsGraph` 实例化并作为单例或依赖注入到路由中。
-- **部署优化**: 增加 `docker-compose` 支持，实现一键部署。
-- **定时任务**: 实现每日定时触发全量 Watchlist 分析的逻辑。
+### 2.2 可观测性与评估 (Observability & Eval)
+- [ ] **LangSmith 接入**: 集成 LangSmith 用于追踪 Trace、分析 Token 消耗和调试逻辑跳转。
+- [ ] **自动化评估 (LLM-as-a-Judge)**: 引入评估框架，对 Agent 生成的报告进行质量评分。
 
-### 前端 (React/Vite) 重构
-- **状态管理迁移**:
-    - 将 `INITIAL_STOCKS` 和 `localStorage` 逻辑迁移至后端数据库。
-    - 实现 `useWatchlist` hook，统一管理股票列表的增删改查。
-- **API 服务层**:
-    - 编写 `services/api.ts`，封装 Axios 拦截器，支持后端不可用时自动回退至 Mock 数据。
-    - 实现 `useSSE` hook，用于订阅分析进度和实时快讯。
-- **交互增强**:
-    - **Workflow Timeline**: 监听 SSE 事件，动态更新 `StockDetailModal` 中的进度条。
-    - **AI Scout**: 对接后端 `/api/scout`，展示带行情的搜索结果。
-    - **Chat**: 对接后端 `/api/chat`，支持基于 `thread_id` 的有记忆对话。
-- **实时性**:
-    - 移除前端模拟的 `setInterval` 价格跳动，改为从后端获取准实时价格。
+---
 
-## 4. 待讨论问题
-- **数据源**: 目前 `main.py` 使用 `yfinance` 和 `alpha_vantage`。对于 A 股，是否需要优先配置 `akshare` 或 `tushare`？
-- **LLM 选择**: 默认使用 `gpt-4o-mini`，是否需要支持在 UI 上切换模型？
-- **部署**: 是否需要 Docker 化以便于一键部署？
+## 阶段 3: 市场差异化与专家子图 (Market-Specific) - **P2**
+**目标**: 针对 A 股、港股、美股的不同特性，提供定制化的分析逻辑。
 
-## 5. 后续步骤
-1. 确认此计划。
-2. 切换至 **Code** 模式开始后端基础架构开发。
+### 3.1 A 股深度适配
+- [ ] **政策分析 Agent**: 增加专门解读国内政策、行业规划的节点。
+- [ ] **特色数据**: 接入北向资金、龙虎榜、涨跌停状态。
+
+### 3.2 美/港股适配
+- [ ] **宏观对冲逻辑**: 强化利率、非农数据对估值的影响分析。
+
+---
+
+## 阶段 4: 数据底座加固 (Data Reliability) - **P2**
+- [ ] **Redis 集成**: 引入 Redis 替代内存缓存，支持分布式部署。
+- [ ] **AkShare 鲁棒性**: 增加针对 A 股接口的自动重试与备用源切换。
+
+---
+
+## 阶段 5: 信任、回测与舆情 (Trust & Insight) - **P3**
+- [ ] **回测专家 (BacktestAgent)**: 负责历史模拟与胜率统计。
+- [ ] **舆情分析师 (SentimentAgent)**: 监控 Reddit/Twitter/东财吧。
+
+---
+
+## 阶段 6: 智能进化与人机协同 (Evolution & Collaboration) - **P4 (New)**
+**目标**: 实现 Agent 的自我优化和深度用户交互。
+
+### 6.1 Agent 自我进化
+- [ ] **反思闭环**: 实现 Agent 定期回顾预测准确率并自动微调 System Prompt 的机制。
+- [ ] **多模型赛马**: 引入多模型共识机制，自动选择表现最优的模型结论。
+
+### 6.2 人机共创决策 (Human-in-the-loop)
+- [ ] **论点修正**: 允许用户在前端修正 Agent 的某个论点，并触发 Graph 的局部重新运行。
+- [ ] **协作作战室**: 支持多用户共同向 Agent 提问并汇总决策。
+
+---
+
+## 阶段 7: 前端体验升级 (UX Enhancement) - **P5**
+- [ ] **专业图表**: 引入 `TradingView Lightweight Charts`。
+- [ ] **流式 UI 响应**: 优化 SSE，支持报告内容的实时流式打字机效果。
+- [ ] **高保真 TTS**: 接入 OpenAI/Gemini TTS 替换浏览器原生语音。
