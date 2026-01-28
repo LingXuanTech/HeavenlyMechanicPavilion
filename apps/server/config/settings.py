@@ -60,6 +60,19 @@ class Settings(BaseSettings):
     DAILY_ANALYSIS_HOUR: int = int(os.getenv("DAILY_ANALYSIS_HOUR", "9"))
     DAILY_ANALYSIS_MINUTE: int = int(os.getenv("DAILY_ANALYSIS_MINUTE", "30"))
 
+    # Scout Agent / DuckDuckGo Settings
+    DUCKDUCKGO_ENABLED: bool = os.getenv("DUCKDUCKGO_ENABLED", "true").lower() == "true"
+    DUCKDUCKGO_TIMEOUT: int = int(os.getenv("DUCKDUCKGO_TIMEOUT", "10"))
+    SCOUT_SEARCH_LIMIT: int = int(os.getenv("SCOUT_SEARCH_LIMIT", "5"))
+    SCOUT_ENABLE_VALIDATION: bool = os.getenv("SCOUT_ENABLE_VALIDATION", "true").lower() == "true"
+
+    # LangSmith Settings (可观测性)
+    LANGSMITH_ENABLED: bool = os.getenv("LANGSMITH_ENABLED", "false").lower() == "true"
+    LANGSMITH_API_KEY: Optional[str] = os.getenv("LANGSMITH_API_KEY")
+    LANGSMITH_PROJECT: str = os.getenv("LANGSMITH_PROJECT", "stock-agents")
+    LANGSMITH_ENDPOINT: str = os.getenv("LANGSMITH_ENDPOINT", "https://api.smith.langchain.com")
+    LANGSMITH_TRACE_SAMPLING_RATE: float = float(os.getenv("LANGSMITH_TRACE_SAMPLING_RATE", "1.0"))
+
     @property
     def database_url(self) -> str:
         """动态生成数据库连接 URL"""

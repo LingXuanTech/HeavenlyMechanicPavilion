@@ -10,6 +10,8 @@ dependencies = [
     "backtrader>=1.9.78.123",
     "chainlit>=2.5.5",
     "chromadb>=1.0.12",
+    "duckduckgo-search>=6.0.0",
+    "langsmith>=0.1.100",
     "eodhd>=1.0.32",
     "fastapi>=0.115.9",
     "feedparser>=6.0.11",
@@ -41,6 +43,8 @@ dependencies = [
     "typing-extensions>=4.14.0",
     "uvicorn>=0.34.3",
     "yfinance>=0.2.63",
+    "cryptography>=46.0.4",
+    "psutil>=7.2.1",
 ]
 
 [project.optional-dependencies]

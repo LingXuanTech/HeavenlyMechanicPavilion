@@ -19,6 +19,7 @@ from .alpha_vantage import (
     get_news as get_alpha_vantage_news
 )
 from .alpha_vantage_common import AlphaVantageRateLimitError
+from .duckduckgo_search import search_market_news as ddg_search_market_news, search_stock_info as ddg_search_stock_info, search_trending_stocks as ddg_search_trending
 
 # Configuration and routing logic
 from .config import get_config
@@ -54,6 +55,14 @@ TOOLS_CATEGORIES = {
             "get_insider_sentiment",
             "get_insider_transactions",
         ]
+    },
+    "search_data": {
+        "description": "Web search and stock discovery",
+        "tools": [
+            "search_market_news",
+            "search_stock_info",
+            "search_trending_stocks",
+        ]
     }
 }
 
@@ -61,7 +70,8 @@ VENDOR_LIST = [
     "local",
     "yfinance",
     "openai",
-    "google"
+    "google",
+    "duckduckgo"
 ]
 
 # Mapping of methods to their vendor-specific implementations
@@ -116,6 +126,16 @@ VENDOR_METHODS = {
         "alpha_vantage": get_alpha_vantage_insider_transactions,
         "yfinance": get_yfinance_insider_transactions,
         "local": get_finnhub_company_insider_transactions,
+    },
+    # search_data
+    "search_market_news": {
+        "duckduckgo": ddg_search_market_news,
+    },
+    "search_stock_info": {
+        "duckduckgo": ddg_search_stock_info,
+    },
+    "search_trending_stocks": {
+        "duckduckgo": ddg_search_trending,
     },
 }
 

@@ -5,12 +5,14 @@ from pathlib import Path
 import json
 from datetime import date
 from typing import Dict, Any, Tuple, List, Optional
+import time
 
 from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from langgraph.prebuilt import ToolNode
+import structlog
 
 from tradingagents.agents import *
 from tradingagents.agents.analysts.scout_agent import create_scout_agent
@@ -44,6 +46,8 @@ from .setup import GraphSetup
 from .propagation import Propagator
 from .reflection import Reflector
 from .signal_processing import SignalProcessor
+
+logger = structlog.get_logger(__name__)
 
 
 class TradingAgentsGraph:
@@ -171,9 +175,22 @@ class TradingAgentsGraph:
         }
 
     def propagate(self, company_name, trade_date):
-        """Run the trading agents graph for a company on a specific date."""
+        """Run the trading agents graph for a company on a specific date.
 
+        Args:
+            company_name: Stock symbol to analyze
+            trade_date: Date of analysis
+
+        Returns:
+            Tuple of (final_state, processed_signal)
+        """
         self.ticker = company_name
+        start_time = time.time()
+
+        logger.info("Starting analysis", symbol=company_name, date=trade_date)
+
+        # 设置 LangSmith 追踪标签
+        self._setup_langsmith_tracing(company_name, trade_date)
 
         # Initialize state
         init_agent_state = self.propagator.create_initial_state(
@@ -202,8 +219,28 @@ class TradingAgentsGraph:
         # Log state
         self._log_state(trade_date, final_state)
 
+        elapsed = time.time() - start_time
+        logger.info(
+            "Analysis completed",
+            symbol=company_name,
+            elapsed_seconds=round(elapsed, 2),
+        )
+
         # Return decision and processed signal
         return final_state, self.process_signal(final_state["final_trade_decision"])
+
+    def _setup_langsmith_tracing(self, company_name: str, trade_date: str):
+        """设置 LangSmith 追踪上下文"""
+        try:
+            from services.langsmith_service import langsmith_service
+
+            if langsmith_service.is_enabled():
+                # 设置运行名称和标签
+                os.environ["LANGCHAIN_RUN_NAME"] = f"analyze_{company_name}_{trade_date}"
+                os.environ["LANGCHAIN_TAGS"] = f"stock_analysis,symbol={company_name}"
+                logger.debug("LangSmith tracing enabled", symbol=company_name)
+        except Exception as e:
+            logger.debug("LangSmith not available", error=str(e))
 
     def _log_state(self, trade_date, final_state):
         """Log the final state to a JSON file."""

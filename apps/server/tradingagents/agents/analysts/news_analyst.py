@@ -1,53 +1,127 @@
+"""News Analyst - 新闻分析师
+
+分析宏观经济新闻和公司相关新闻，返回结构化输出。
+"""
+
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-import time
-import json
+import structlog
+
 from tradingagents.agents.utils.agent_utils import get_news, get_global_news
-from tradingagents.dataflows.config import get_config
+from tradingagents.agents.utils.output_schemas import NewsAnalystOutput
+
+logger = structlog.get_logger(__name__)
 
 
 def create_news_analyst(llm):
+    """创建 News Analyst 节点
+
+    Args:
+        llm: LangChain LLM 实例
+
+    Returns:
+        news_analyst_node: LangGraph 节点函数
+    """
+
+    # 工具列表
+    tools = [get_news, get_global_news]
+
+    # 系统提示词
+    system_message = """You are a news researcher tasked with analyzing recent news and trends over the past week.
+
+Your objective is to write a comprehensive report covering:
+1. Macroeconomic news and global market trends
+2. Industry-specific developments
+3. Company-specific news and announcements
+4. Regulatory changes and policy updates
+5. Upcoming catalysts and events
+6. Market sentiment indicators
+
+Use the available tools:
+- get_news(query, start_date, end_date): For company-specific or targeted news searches
+- get_global_news(curr_date, look_back_days, limit): For broader macroeconomic news
+
+Focus on news that could impact stock prices and trading decisions. Analyze the potential market impact of each significant news item.
+"""
+
+    # 数据收集阶段的 prompt
+    collection_prompt = ChatPromptTemplate.from_messages([
+        (
+            "system",
+            "You are a helpful AI assistant, collaborating with other assistants."
+            " Use the provided tools to progress towards answering the question."
+            " If you are unable to fully answer, that's OK; another assistant with different tools"
+            " will help where you left off. Execute what you can to make progress."
+            " You have access to the following tools: {tool_names}.\n{system_message}"
+            "\nFor your reference, the current date is {current_date}. We are looking at the company {ticker}",
+        ),
+        MessagesPlaceholder(variable_name="messages"),
+    ])
+
+    # 结构化输出阶段的 prompt
+    structured_prompt = ChatPromptTemplate.from_messages([
+        (
+            "system",
+            "You are a news analyst. Based on the news data provided, "
+            "generate a structured analysis report. Categorize news by sentiment and impact."
+        ),
+        (
+            "user",
+            "Stock: {ticker}\nDate: {current_date}\n\nNews Analysis Data:\n{analysis_content}\n\n"
+            "Please provide a structured news analysis."
+        ),
+    ])
+
     def news_analyst_node(state):
+        """News Analyst 节点函数"""
         current_date = state["trade_date"]
         ticker = state["company_of_interest"]
 
-        tools = [
-            get_news,
-            get_global_news,
-        ]
-
-        system_message = (
-            "You are a news researcher tasked with analyzing recent news and trends over the past week. Please write a comprehensive report of the current state of the world that is relevant for trading and macroeconomics. Use the available tools: get_news(query, start_date, end_date) for company-specific or targeted news searches, and get_global_news(curr_date, look_back_days, limit) for broader macroeconomic news. Do not simply state the trends are mixed, provide detailed and finegrained analysis and insights that may help traders make decisions."
-            + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
+        # 准备 prompt
+        prompt = collection_prompt.partial(
+            system_message=system_message,
+            tool_names=", ".join([tool.name for tool in tools]),
+            current_date=current_date,
+            ticker=ticker,
         )
 
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                (
-                    "system",
-                    "You are a helpful AI assistant, collaborating with other assistants."
-                    " Use the provided tools to progress towards answering the question."
-                    " If you are unable to fully answer, that's OK; another assistant with different tools"
-                    " will help where you left off. Execute what you can to make progress."
-                    " If you or any other assistant has the FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** or deliverable,"
-                    " prefix your response with FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** so the team knows to stop."
-                    " You have access to the following tools: {tool_names}.\n{system_message}"
-                    "For your reference, the current date is {current_date}. We are looking at the company {ticker}",
-                ),
-                MessagesPlaceholder(variable_name="messages"),
-            ]
-        )
-
-        prompt = prompt.partial(system_message=system_message)
-        prompt = prompt.partial(tool_names=", ".join([tool.name for tool in tools]))
-        prompt = prompt.partial(current_date=current_date)
-        prompt = prompt.partial(ticker=ticker)
-
+        # 绑定工具并调用
         chain = prompt | llm.bind_tools(tools)
         result = chain.invoke(state["messages"])
 
-        report = ""
+        # 如果有工具调用，返回让 LangGraph 处理
+        if result.tool_calls:
+            return {
+                "messages": [result],
+                "news_report": "",
+            }
 
-        if len(result.tool_calls) == 0:
+        # 工具调用完成，生成结构化输出
+        try:
+            structured_llm = llm.with_structured_output(NewsAnalystOutput)
+            structured_chain = structured_prompt | structured_llm
+
+            structured_result = structured_chain.invoke({
+                "ticker": ticker,
+                "current_date": current_date,
+                "analysis_content": result.content,
+            })
+
+            report = structured_result.model_dump_json(indent=2)
+
+            logger.info(
+                "News analyst structured output generated",
+                ticker=ticker,
+                signal=structured_result.signal,
+                confidence=structured_result.confidence,
+                sentiment=structured_result.overall_sentiment,
+            )
+
+        except Exception as e:
+            logger.warning(
+                "Structured output failed, using raw content",
+                error=str(e),
+                ticker=ticker,
+            )
             report = result.content
 
         return {
