@@ -4,9 +4,7 @@
  * 展示投资组合相关性分析和分散化建议
  */
 import React, { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft,
   TrendingUp,
   TrendingDown,
   AlertTriangle,
@@ -16,6 +14,7 @@ import {
   PieChart,
   Link2,
 } from 'lucide-react';
+import PageLayout, { LoadingState, EmptyState } from '../components/layout/PageLayout';
 import { useWatchlist } from '../hooks';
 import { usePortfolioAnalysis, PortfolioAnalysis as PortfolioAnalysisType } from '../hooks/usePortfolio';
 
@@ -75,7 +74,6 @@ const HeatmapCell: React.FC<{
 };
 
 const PortfolioPage: React.FC = () => {
-  const navigate = useNavigate();
   const { data: stocks = [] } = useWatchlist();
   const portfolioMutation = usePortfolioAnalysis();
   const [analysis, setAnalysis] = useState<PortfolioAnalysisType | null>(null);
@@ -106,65 +104,44 @@ const PortfolioPage: React.FC = () => {
   }, [analysis]);
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <header className="shrink-0 px-6 py-4 border-b border-gray-800 bg-gray-900/50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/')}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-cyan-500/10 rounded-lg">
-                <PieChart className="w-5 h-5 text-cyan-400" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">Portfolio Analysis</h1>
-                <p className="text-xs text-gray-500">{stocks.length} stocks in portfolio</p>
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={handleAnalyze}
-            disabled={portfolioMutation.isPending || stocks.length < 2}
-            className="flex items-center gap-2 px-3 py-1.5 bg-cyan-600 text-white rounded-lg hover:bg-cyan-500 transition-colors disabled:opacity-50"
-          >
-            <RefreshCw className={`w-4 h-4 ${portfolioMutation.isPending ? 'animate-spin' : ''}`} />
-            {portfolioMutation.isPending ? 'Analyzing...' : 'Refresh'}
-          </button>
-        </div>
-      </header>
-
-      {/* Content */}
-      <main className="flex-1 overflow-y-auto p-6">
-        {stocks.length < 2 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-            <AlertTriangle className="w-12 h-12 mb-4 opacity-50" />
-            <p>需要至少 2 只股票来进行组合分析</p>
-            <p className="text-sm mt-2">请在 Dashboard 添加更多股票到关注列表</p>
-          </div>
-        ) : portfolioMutation.isPending && !analysis ? (
-          <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-            <RefreshCw className="w-12 h-12 mb-4 animate-spin" />
-            <p>正在分析组合...</p>
-          </div>
-        ) : portfolioMutation.error ? (
-          <div className="flex flex-col items-center justify-center h-64 text-red-400">
-            <AlertTriangle className="w-12 h-12 mb-4" />
-            <p>分析失败: {(portfolioMutation.error as Error).message}</p>
-            <button
-              onClick={handleAnalyze}
-              className="mt-4 px-4 py-2 bg-gray-800 rounded-lg hover:bg-gray-700"
-            >
+    <PageLayout
+      title="Portfolio Analysis"
+      subtitle={`${stocks.length} stocks in portfolio`}
+      icon={PieChart}
+      iconColor="text-cyan-400"
+      iconBgColor="bg-cyan-500/10"
+      variant="wide"
+      actions={[
+        {
+          label: portfolioMutation.isPending ? '分析中...' : '刷新分析',
+          icon: RefreshCw,
+          onClick: handleAnalyze,
+          loading: portfolioMutation.isPending,
+          disabled: stocks.length < 2,
+          variant: 'primary',
+        },
+      ]}
+    >
+      {stocks.length < 2 ? (
+        <EmptyState
+          icon={AlertTriangle}
+          title="需要至少 2 只股票来进行组合分析"
+          description="请在 Dashboard 添加更多股票到关注列表"
+        />
+      ) : portfolioMutation.isPending && !analysis ? (
+        <LoadingState message="正在分析组合..." />
+      ) : portfolioMutation.error ? (
+        <EmptyState
+          icon={AlertTriangle}
+          title={`分析失败: ${(portfolioMutation.error as Error).message}`}
+          action={
+            <button onClick={handleAnalyze} className="px-4 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 text-white">
               重试
             </button>
-          </div>
-        ) : analysis ? (
-          <div className="max-w-6xl mx-auto space-y-6">
+          }
+        />
+      ) : analysis ? (
+        <div className="space-y-6">
             {/* 顶部摘要卡片 */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* 分散化评分 */}
@@ -324,9 +301,8 @@ const PortfolioPage: React.FC = () => {
               </div>
             </div>
           </div>
-        ) : null}
-      </main>
-    </div>
+      ) : null}
+    </PageLayout>
   );
 };
 

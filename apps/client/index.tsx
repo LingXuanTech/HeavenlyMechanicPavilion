@@ -13,6 +13,7 @@ import LoadingFallback from './components/layout/LoadingFallback';
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const NewsPage = lazy(() => import('./pages/NewsPage'));
 const ChinaMarketPage = lazy(() => import('./pages/ChinaMarketPage'));
 const MacroPage = lazy(() => import('./pages/MacroPage'));
 const PortfolioPage = lazy(() => import('./pages/PortfolioPage'));
@@ -66,6 +67,7 @@ root.render(
                     }
                   >
                     <Route index element={<DashboardPage />} />
+                    <Route path="news" element={<NewsPage />} />
                     <Route path="china-market" element={<ChinaMarketPage />} />
                     <Route path="macro" element={<MacroPage />} />
                     <Route path="portfolio" element={<PortfolioPage />} />

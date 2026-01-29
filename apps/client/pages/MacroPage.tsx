@@ -4,10 +4,8 @@
  * 展示宏观经济数据和影响分析
  */
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Globe,
-  ArrowLeft,
   TrendingUp,
   TrendingDown,
   Minus,
@@ -18,6 +16,7 @@ import {
   RefreshCw,
   Activity,
 } from 'lucide-react';
+import PageLayout, { LoadingState, EmptyState } from '../components/layout/PageLayout';
 import { useMacroImpactAnalysis, useRefreshMacro, MacroIndicator } from '../hooks/useMacro';
 
 // 趋势图标组件
@@ -99,7 +98,6 @@ const ImpactCard: React.FC<{
 };
 
 const MacroPage: React.FC = () => {
-  const navigate = useNavigate();
   const { data: analysis, isLoading, error, isFetching } = useMacroImpactAnalysis('US');
   const refreshMutation = useRefreshMacro();
 
@@ -112,73 +110,53 @@ const MacroPage: React.FC = () => {
                          analysis?.overview.sentiment === 'Bearish' ? 'text-red-400' :
                          'text-yellow-400';
 
+  // Header 右侧内容：情绪指示器
+  const headerRight = analysis && (
+    <div className={`flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800 ${sentimentColor}`}>
+      <Activity className="w-4 h-4" />
+      <span className="font-bold">{analysis.overview.sentiment}</span>
+    </div>
+  );
+
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <header className="shrink-0 px-6 py-4 border-b border-gray-800 bg-gray-900/50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/')}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500/10 rounded-lg">
-                <Globe className="w-5 h-5 text-blue-400" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">Macro Economic Dashboard</h1>
-                <p className="text-xs text-gray-500">
-                  {analysis?.overview.last_updated
-                    ? `Last updated: ${new Date(analysis.overview.last_updated).toLocaleString()}`
-                    : 'Loading...'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* 整体情绪 */}
-            {analysis && (
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800 ${sentimentColor}`}>
-                <Activity className="w-4 h-4" />
-                <span className="font-bold">{analysis.overview.sentiment}</span>
-              </div>
-            )}
-
+    <PageLayout
+      title="Macro Economic Dashboard"
+      subtitle={analysis?.overview.last_updated
+        ? `Last updated: ${new Date(analysis.overview.last_updated).toLocaleString()}`
+        : '加载中...'}
+      icon={Globe}
+      iconColor="text-blue-400"
+      iconBgColor="bg-blue-500/10"
+      variant="wide"
+      actions={[
+        {
+          label: '刷新',
+          icon: RefreshCw,
+          onClick: handleRefresh,
+          loading: refreshMutation.isPending || isFetching,
+          variant: 'primary',
+        },
+      ]}
+      headerRight={headerRight}
+    >
+      {isLoading ? (
+        <LoadingState message="获取宏观数据..." />
+      ) : error ? (
+        <EmptyState
+          icon={AlertTriangle}
+          title="获取宏观数据失败"
+          description="请检查网络连接后重试"
+          action={
             <button
               onClick={handleRefresh}
-              disabled={refreshMutation.isPending || isFetching}
-              className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors disabled:opacity-50"
-            >
-              <RefreshCw className={`w-4 h-4 ${(refreshMutation.isPending || isFetching) ? 'animate-spin' : ''}`} />
-              Refresh
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* Content */}
-      <main className="flex-1 overflow-y-auto p-6">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <RefreshCw className="w-12 h-12 animate-spin text-gray-600" />
-          </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center h-64 text-red-400">
-            <AlertTriangle className="w-12 h-12 mb-4" />
-            <p>获取宏观数据失败</p>
-            <button
-              onClick={handleRefresh}
-              className="mt-4 px-4 py-2 bg-gray-800 rounded-lg hover:bg-gray-700"
+              className="px-4 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 text-white"
             >
               重试
             </button>
-          </div>
-        ) : analysis ? (
-          <div className="max-w-6xl mx-auto space-y-6">
+          }
+        />
+      ) : analysis ? (
+        <div className="space-y-6">
             {/* 摘要 */}
             <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-xl p-4 border border-blue-800/50">
               <p className="text-gray-200">{analysis.overview.summary}</p>
@@ -299,9 +277,8 @@ const MacroPage: React.FC = () => {
               )}
             </div>
           </div>
-        ) : null}
-      </main>
-    </div>
+      ) : null}
+    </PageLayout>
   );
 };
 

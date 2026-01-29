@@ -19,6 +19,7 @@ import {
   Cpu,
   Landmark,
   Calendar,
+  Newspaper,
 } from 'lucide-react';
 import { useScout, useAddStock } from '../hooks';
 import SystemStatusPanel from './SystemStatusPanel';
@@ -67,6 +68,7 @@ const Sidebar: React.FC = () => {
   // 导航项配置
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/news', icon: Newspaper, label: 'News', iconColor: 'text-orange-400' },
     { path: '/china-market', icon: Landmark, label: 'A股市场', iconColor: 'text-red-400' },
     { path: '/macro', icon: Globe, label: 'Macro Economy' },
     { path: '/portfolio', icon: PieChart, label: 'Portfolio Analysis' },

@@ -2,11 +2,12 @@
  * Prompt 编辑器页面
  *
  * 用于管理和编辑 Agent Prompt 配置
+ * 使用 split 布局变体（左侧列表 + 右侧编辑器）
  */
 import React, { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Bot } from 'lucide-react';
+import { Bot, RefreshCw, Download, Upload } from 'lucide-react';
+import PageLayout from '../components/layout/PageLayout';
 import {
   getPromptList,
   getPromptDetail,
@@ -39,7 +40,6 @@ const CATEGORY_ICONS: Record<AgentCategory, string> = {
 };
 
 const PromptsPage: React.FC = () => {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedCategory, setSelectedCategory] = useState<AgentCategory | 'all'>('all');
   const [selectedPromptId, setSelectedPromptId] = useState<number | null>(null);
@@ -155,274 +155,257 @@ const PromptsPage: React.FC = () => {
 
   const prompts = promptsData?.prompts || [];
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <header className="shrink-0 px-6 py-4 border-b border-gray-800 bg-gray-900/50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/')}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-500/10 rounded-lg">
-                <Bot className="w-5 h-5 text-purple-400" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-white">Prompt 配置中心</h1>
-                <p className="text-xs text-gray-500">管理和编辑 Agent Prompt</p>
-              </div>
-            </div>
+  // 左侧面板：Prompt 列表
+  const leftPanel = (
+    <>
+      {/* Category Filter */}
+      <div className="p-3 border-b border-gray-800">
+        <select
+          value={selectedCategory}
+          onChange={(e) => setSelectedCategory(e.target.value as AgentCategory | 'all')}
+          className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+        >
+          <option value="all">全部分类</option>
+          {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {CATEGORY_ICONS[value as AgentCategory]} {label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Prompt List */}
+      <div className="flex-1 overflow-y-auto">
+        {isLoadingList ? (
+          <div className="p-4 text-center text-gray-500">加载中...</div>
+        ) : prompts.length === 0 ? (
+          <div className="p-4 text-center text-gray-500">暂无 Prompt</div>
+        ) : (
+          <div className="divide-y divide-gray-800">
+            {prompts.map((prompt) => (
+              <button
+                key={prompt.id}
+                onClick={() => {
+                  setSelectedPromptId(prompt.id);
+                  setEditMode(false);
+                }}
+                className={`w-full p-3 text-left hover:bg-gray-800/50 transition-colors ${
+                  selectedPromptId === prompt.id ? 'bg-gray-800 border-l-2 border-blue-500' : ''
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span>{CATEGORY_ICONS[prompt.category]}</span>
+                  <span className="font-medium text-white truncate">
+                    {prompt.display_name}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500 mt-1 truncate">
+                  {prompt.agent_key} · v{prompt.version}
+                </div>
+              </button>
+            ))}
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => refreshMutation.mutate()}
-              disabled={refreshMutation.isPending}
-              className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-            >
-              {refreshMutation.isPending ? '刷新中...' : '🔄 刷新缓存'}
-            </button>
-            <button
-              onClick={handleExport}
-              className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
-            >
-              📥 导出 YAML
-            </button>
-            <button
-              onClick={() => setShowYamlImport(true)}
-              className="px-3 py-1.5 text-sm bg-green-600 hover:bg-green-500 rounded-lg transition-colors"
-            >
-              📤 导入 YAML
-            </button>
+        )}
+      </div>
+    </>
+  );
+
+  return (
+    <PageLayout
+      title="Prompt 配置中心"
+      subtitle="管理和编辑 Agent Prompt"
+      icon={Bot}
+      iconColor="text-purple-400"
+      iconBgColor="bg-purple-500/10"
+      variant="split"
+      splitLeft={leftPanel}
+      splitLeftWidth="w-80"
+      actions={[
+        {
+          label: '刷新缓存',
+          icon: RefreshCw,
+          onClick: () => refreshMutation.mutate(),
+          loading: refreshMutation.isPending,
+          variant: 'ghost',
+        },
+        {
+          label: '导出 YAML',
+          icon: Download,
+          onClick: handleExport,
+          variant: 'secondary',
+        },
+        {
+          label: '导入 YAML',
+          icon: Upload,
+          onClick: () => setShowYamlImport(true),
+          variant: 'primary',
+        },
+      ]}
+    >
+      {/* Right Panel - Prompt Detail/Editor */}
+      {!selectedPromptId ? (
+        <div className="flex-1 flex items-center justify-center text-gray-500">
+          <div className="text-center">
+            <div className="text-4xl mb-3">👈</div>
+            <p>选择左侧的 Prompt 进行查看或编辑</p>
           </div>
         </div>
-      </header>
+      ) : isLoadingDetail ? (
+        <div className="flex-1 flex items-center justify-center text-gray-500">
+          加载中...
+        </div>
+      ) : promptDetail ? (
+        <>
+          {/* Detail Header */}
+          <div className="px-6 py-4 border-b border-gray-800 bg-gray-800/30">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-white">
+                  {CATEGORY_ICONS[promptDetail.category]} {promptDetail.display_name}
+                </h3>
+                <p className="text-sm text-gray-400 mt-1">{promptDetail.description}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-1 bg-gray-700 rounded text-xs">
+                  v{promptDetail.version}
+                </span>
+                {!editMode ? (
+                  <button
+                    onClick={handleStartEdit}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    ✏️ 编辑
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleCancelEdit}
+                      className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg text-sm font-medium transition-colors"
+                    >
+                      取消
+                    </button>
+                    <button
+                      onClick={handleSave}
+                      disabled={updateMutation.isPending}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      {updateMutation.isPending ? '保存中...' : '💾 保存'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
 
-      {/* Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Prompt List */}
-        <div className="w-80 border-r border-gray-800 flex flex-col shrink-0">
-          {/* Category Filter */}
-          <div className="p-3 border-b border-gray-800">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value as AgentCategory | 'all')}
-              className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
-            >
-              <option value="all">全部分类</option>
-              {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {CATEGORY_ICONS[value as AgentCategory]} {label}
-                </option>
+            {/* Variables */}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <span className="text-xs text-gray-500">可用变量：</span>
+              {promptDetail.available_variables.map((v) => (
+                <code
+                  key={v}
+                  className="px-2 py-0.5 bg-gray-700 rounded text-xs text-yellow-400"
+                >
+                  {'{'}
+                  {v}
+                  {'}'}
+                </code>
               ))}
-            </select>
+            </div>
           </div>
 
-          {/* Prompt List */}
-          <div className="flex-1 overflow-y-auto">
-            {isLoadingList ? (
-              <div className="p-4 text-center text-gray-500">加载中...</div>
-            ) : prompts.length === 0 ? (
-              <div className="p-4 text-center text-gray-500">暂无 Prompt</div>
-            ) : (
-              <div className="divide-y divide-gray-800">
-                {prompts.map((prompt) => (
-                  <button
-                    key={prompt.id}
-                    onClick={() => {
-                      setSelectedPromptId(prompt.id);
-                      setEditMode(false);
-                    }}
-                    className={`w-full p-3 text-left hover:bg-gray-800/50 transition-colors ${
-                      selectedPromptId === prompt.id ? 'bg-gray-800 border-l-2 border-blue-500' : ''
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>{CATEGORY_ICONS[prompt.category]}</span>
-                      <span className="font-medium text-white truncate">
-                        {prompt.display_name}
-                      </span>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-1 truncate">
-                      {prompt.agent_key} · v{prompt.version}
-                    </div>
-                  </button>
-                ))}
+          {/* Prompt Content */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {/* System Prompt */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                系统提示词 (System Prompt)
+              </label>
+              {editMode ? (
+                <textarea
+                  value={editedSystemPrompt}
+                  onChange={(e) => setEditedSystemPrompt(e.target.value)}
+                  className="w-full h-64 bg-gray-800 border border-gray-700 rounded-lg p-4 text-sm font-mono resize-none focus:border-blue-500 focus:outline-none"
+                  placeholder="输入系统提示词..."
+                />
+              ) : (
+                <pre className="w-full bg-gray-800/50 border border-gray-700 rounded-lg p-4 text-sm font-mono whitespace-pre-wrap text-gray-300 max-h-64 overflow-y-auto">
+                  {promptDetail.system_prompt || '(空)'}
+                </pre>
+              )}
+            </div>
+
+            {/* User Prompt Template */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                用户消息模板 (User Prompt Template)
+              </label>
+              {editMode ? (
+                <textarea
+                  value={editedUserPrompt}
+                  onChange={(e) => setEditedUserPrompt(e.target.value)}
+                  className="w-full h-32 bg-gray-800 border border-gray-700 rounded-lg p-4 text-sm font-mono resize-none focus:border-blue-500 focus:outline-none"
+                  placeholder="输入用户消息模板..."
+                />
+              ) : (
+                <pre className="w-full bg-gray-800/50 border border-gray-700 rounded-lg p-4 text-sm font-mono whitespace-pre-wrap text-gray-300">
+                  {promptDetail.user_prompt_template || '(空)'}
+                </pre>
+              )}
+            </div>
+
+            {/* Change Note (only in edit mode) */}
+            {editMode && (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  变更说明 (可选)
+                </label>
+                <input
+                  type="text"
+                  value={changeNote}
+                  onChange={(e) => setChangeNote(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  placeholder="描述本次修改的内容..."
+                />
               </div>
             )}
-          </div>
-        </div>
 
-        {/* Right Panel - Prompt Detail/Editor */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {!selectedPromptId ? (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
-              <div className="text-center">
-                <div className="text-4xl mb-3">👈</div>
-                <p>选择左侧的 Prompt 进行查看或编辑</p>
-              </div>
-            </div>
-          ) : isLoadingDetail ? (
-            <div className="flex-1 flex items-center justify-center text-gray-500">
-              加载中...
-            </div>
-          ) : promptDetail ? (
-            <>
-              {/* Detail Header */}
-              <div className="px-6 py-4 border-b border-gray-800 bg-gray-800/30">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-white">
-                      {CATEGORY_ICONS[promptDetail.category]} {promptDetail.display_name}
-                    </h3>
-                    <p className="text-sm text-gray-400 mt-1">{promptDetail.description}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-1 bg-gray-700 rounded text-xs">
-                      v{promptDetail.version}
-                    </span>
-                    {!editMode ? (
-                      <button
-                        onClick={handleStartEdit}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        ✏️ 编辑
-                      </button>
-                    ) : (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleCancelEdit}
-                          className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg text-sm font-medium transition-colors"
-                        >
-                          取消
-                        </button>
-                        <button
-                          onClick={handleSave}
-                          disabled={updateMutation.isPending}
-                          className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                        >
-                          {updateMutation.isPending ? '保存中...' : '💾 保存'}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Variables */}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <span className="text-xs text-gray-500">可用变量：</span>
-                  {promptDetail.available_variables.map((v) => (
-                    <code
-                      key={v}
-                      className="px-2 py-0.5 bg-gray-700 rounded text-xs text-yellow-400"
+            {/* Version History */}
+            {!editMode && promptDetail.version_history.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  版本历史
+                </label>
+                <div className="bg-gray-800/50 border border-gray-700 rounded-lg divide-y divide-gray-700">
+                  {promptDetail.version_history.map((v) => (
+                    <div
+                      key={v.version}
+                      className="flex items-center justify-between px-4 py-3"
                     >
-                      {'{'}
-                      {v}
-                      {'}'}
-                    </code>
+                      <div>
+                        <span className="text-sm font-medium">v{v.version}</span>
+                        <span className="text-xs text-gray-500 ml-3">
+                          {new Date(v.created_at).toLocaleString()}
+                        </span>
+                        {v.change_note && (
+                          <p className="text-xs text-gray-400 mt-1">{v.change_note}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() =>
+                          rollbackMutation.mutate({ id: promptDetail.id, version: v.version })
+                        }
+                        disabled={rollbackMutation.isPending}
+                        className="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                      >
+                        回滚
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
-
-              {/* Prompt Content */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                {/* System Prompt */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    系统提示词 (System Prompt)
-                  </label>
-                  {editMode ? (
-                    <textarea
-                      value={editedSystemPrompt}
-                      onChange={(e) => setEditedSystemPrompt(e.target.value)}
-                      className="w-full h-64 bg-gray-800 border border-gray-700 rounded-lg p-4 text-sm font-mono resize-none focus:border-blue-500 focus:outline-none"
-                      placeholder="输入系统提示词..."
-                    />
-                  ) : (
-                    <pre className="w-full bg-gray-800/50 border border-gray-700 rounded-lg p-4 text-sm font-mono whitespace-pre-wrap text-gray-300 max-h-64 overflow-y-auto">
-                      {promptDetail.system_prompt || '(空)'}
-                    </pre>
-                  )}
-                </div>
-
-                {/* User Prompt Template */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    用户消息模板 (User Prompt Template)
-                  </label>
-                  {editMode ? (
-                    <textarea
-                      value={editedUserPrompt}
-                      onChange={(e) => setEditedUserPrompt(e.target.value)}
-                      className="w-full h-32 bg-gray-800 border border-gray-700 rounded-lg p-4 text-sm font-mono resize-none focus:border-blue-500 focus:outline-none"
-                      placeholder="输入用户消息模板..."
-                    />
-                  ) : (
-                    <pre className="w-full bg-gray-800/50 border border-gray-700 rounded-lg p-4 text-sm font-mono whitespace-pre-wrap text-gray-300">
-                      {promptDetail.user_prompt_template || '(空)'}
-                    </pre>
-                  )}
-                </div>
-
-                {/* Change Note (only in edit mode) */}
-                {editMode && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      变更说明 (可选)
-                    </label>
-                    <input
-                      type="text"
-                      value={changeNote}
-                      onChange={(e) => setChangeNote(e.target.value)}
-                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
-                      placeholder="描述本次修改的内容..."
-                    />
-                  </div>
-                )}
-
-                {/* Version History */}
-                {!editMode && promptDetail.version_history.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      版本历史
-                    </label>
-                    <div className="bg-gray-800/50 border border-gray-700 rounded-lg divide-y divide-gray-700">
-                      {promptDetail.version_history.map((v) => (
-                        <div
-                          key={v.version}
-                          className="flex items-center justify-between px-4 py-3"
-                        >
-                          <div>
-                            <span className="text-sm font-medium">v{v.version}</span>
-                            <span className="text-xs text-gray-500 ml-3">
-                              {new Date(v.created_at).toLocaleString()}
-                            </span>
-                            {v.change_note && (
-                              <p className="text-xs text-gray-400 mt-1">{v.change_note}</p>
-                            )}
-                          </div>
-                          <button
-                            onClick={() =>
-                              rollbackMutation.mutate({ id: promptDetail.id, version: v.version })
-                            }
-                            disabled={rollbackMutation.isPending}
-                            className="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors"
-                          >
-                            回滚
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </>
-          ) : null}
-        </div>
-      </div>
+            )}
+          </div>
+        </>
+      ) : null}
 
       {/* YAML Import Modal */}
       {showYamlImport && (
@@ -456,7 +439,7 @@ const PromptsPage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </PageLayout>
   );
 };
 
