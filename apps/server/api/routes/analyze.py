@@ -18,6 +18,7 @@ from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 from config.settings import settings
 from db.models import AnalysisResult, engine, get_session
+from services.accuracy_tracker import accuracy_tracker
 
 router = APIRouter(prefix="/analyze", tags=["Analysis"])
 logger = structlog.get_logger()
@@ -161,7 +162,25 @@ async def run_analysis_task(task_id: str, symbol: str, trade_date: str):
             )
             session.add(analysis_result)
             session.commit()
+            session.refresh(analysis_result)
             logger.info("Analysis result saved to database", symbol=symbol, task_id=task_id)
+
+        # 记录预测到反思闭环追踪
+        try:
+            recommendation = final_json.get("recommendation", {})
+            await accuracy_tracker.record_prediction(
+                analysis_id=analysis_result.id,
+                symbol=symbol,
+                signal=final_json.get("signal", "Hold"),
+                confidence=final_json.get("confidence", 50),
+                target_price=recommendation.get("target_price"),
+                stop_loss=recommendation.get("stop_loss"),
+                entry_price=recommendation.get("entry_price"),
+                agent_key="overall",
+            )
+            logger.info("Prediction recorded for reflection loop", symbol=symbol)
+        except Exception as pred_err:
+            logger.warning("Failed to record prediction", error=str(pred_err))
 
         # 存储到向量记忆库（用于反思机制）
         try:

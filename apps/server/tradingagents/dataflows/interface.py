@@ -1,7 +1,19 @@
-from typing import Annotated
+from typing import Annotated, Optional, Callable, Any
 import structlog
+import time
+import random
 
 logger = structlog.get_logger(__name__)
+
+# Import retry utilities
+from .retry_utils import (
+    CircuitBreaker,
+    RateLimiter,
+    CircuitBreakerOpenError,
+    RateLimitExceededError,
+    get_vendor_breaker,
+    get_vendor_limiter,
+)
 
 # Import from vendor-specific modules
 from .local import get_YFin_data, get_finnhub_news, get_finnhub_company_insider_sentiment, get_finnhub_company_insider_transactions, get_simfin_balance_sheet, get_simfin_cashflow, get_simfin_income_statements, get_reddit_global_news, get_reddit_company_news
@@ -146,6 +158,117 @@ def get_category_for_method(method: str) -> str:
             return category
     raise ValueError(f"Method '{method}' not found in any category")
 
+
+def _call_with_retry(
+    func: Callable[..., Any],
+    vendor: str,
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    *args,
+    **kwargs
+) -> Any:
+    """
+    Call a vendor function with retry, circuit breaker, and rate limiting.
+
+    Args:
+        func: The function to call
+        vendor: Vendor name (for breaker/limiter lookup)
+        max_retries: Maximum number of retry attempts
+        base_delay: Base delay between retries (seconds)
+        *args, **kwargs: Arguments to pass to the function
+
+    Returns:
+        The function result
+
+    Raises:
+        CircuitBreakerOpenError: If circuit breaker is open
+        RateLimitExceededError: If rate limit exceeded
+        Exception: The last exception if all retries fail
+    """
+    # Get vendor-specific breaker and limiter
+    breaker = get_vendor_breaker(vendor)
+    limiter = get_vendor_limiter(vendor)
+
+    # Check circuit breaker
+    if breaker and not breaker.allow_request():
+        logger.warning(
+            "Circuit breaker is open",
+            vendor=vendor,
+            function=func.__name__
+        )
+        raise CircuitBreakerOpenError(f"Circuit breaker for {vendor} is open")
+
+    # Rate limiting
+    if limiter and not limiter.acquire(block=True, timeout=30.0):
+        raise RateLimitExceededError(f"Rate limit exceeded for {vendor}")
+
+    last_error: Optional[Exception] = None
+
+    for attempt in range(max_retries + 1):
+        try:
+            result = func(*args, **kwargs)
+
+            # Record success to circuit breaker
+            if breaker:
+                breaker._record_success()
+
+            return result
+
+        except (CircuitBreakerOpenError, RateLimitExceededError):
+            raise
+        except Exception as e:
+            last_error = e
+
+            # Record failure to circuit breaker
+            if breaker:
+                breaker._record_failure(e)
+
+            if attempt == max_retries:
+                logger.error(
+                    "All retry attempts failed",
+                    vendor=vendor,
+                    function=func.__name__,
+                    attempts=attempt + 1,
+                    error=str(e)
+                )
+                raise
+
+            # Check if error is retryable
+            error_str = str(e).lower()
+            retryable_keywords = [
+                "connection", "timeout", "reset", "refused",
+                "unavailable", "temporary", "rate limit",
+                "too many requests", "503", "502", "500"
+            ]
+            is_retryable = any(kw in error_str for kw in retryable_keywords)
+
+            if not is_retryable:
+                logger.debug(
+                    "Non-retryable error, not retrying",
+                    vendor=vendor,
+                    function=func.__name__,
+                    error=str(e)
+                )
+                raise
+
+            # Calculate delay with jitter
+            delay = min(base_delay * (2 ** attempt), 30.0)
+            delay = delay * (0.5 + random.random())
+
+            logger.warning(
+                "Vendor call failed, retrying",
+                vendor=vendor,
+                function=func.__name__,
+                attempt=attempt + 1,
+                max_retries=max_retries,
+                delay=round(delay, 2),
+                error=str(e)
+            )
+
+            time.sleep(delay)
+
+    raise last_error  # type: ignore
+
 def get_vendor(category: str, method: str = None) -> str:
     """Get the configured vendor for a data category or specific tool method.
     Tool-level configuration takes precedence over category-level.
@@ -228,15 +351,30 @@ def route_to_vendor(method: str, *args, **kwargs):
         else:
             vendor_methods = [(vendor_impl, vendor)]
 
-        # Run methods for this vendor
+        # Run methods for this vendor with retry support
         vendor_results = []
         for impl_func, vendor_name in vendor_methods:
             try:
                 logger.debug("Calling vendor function", function=impl_func.__name__, vendor=vendor_name)
-                result = impl_func(*args, **kwargs)
+                # Use retry wrapper for robustness
+                result = _call_with_retry(impl_func, vendor_name, 3, 1.0, *args, **kwargs)
                 vendor_results.append(result)
                 logger.info("Vendor function succeeded", function=impl_func.__name__, vendor=vendor_name)
 
+            except CircuitBreakerOpenError as e:
+                logger.warning(
+                    "Circuit breaker open, skipping vendor",
+                    vendor=vendor_name,
+                    error=str(e)
+                )
+                continue
+            except RateLimitExceededError as e:
+                logger.warning(
+                    "Rate limit exceeded, skipping vendor",
+                    vendor=vendor_name,
+                    error=str(e)
+                )
+                continue
             except AlphaVantageRateLimitError as e:
                 if vendor == "alpha_vantage":
                     logger.warning(

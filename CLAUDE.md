@@ -23,11 +23,20 @@ npm run preview       # 预览构建结果
 ```bash
 cd apps/server
 uv sync                             # 安装依赖（推荐，或 pip install -r requirements.txt）
+uv sync --group dev                 # 安装开发依赖（测试、lint）
 python main.py                      # 启动 FastAPI (http://localhost:8000)，内置热重载
 uvicorn main:app --reload           # 备选热重载方式
 python -m cli.main                  # CLI 交互式分析
-pytest                              # 运行测试
+
+# 测试
+pytest                              # 运行所有测试
 pytest tests/test_xxx.py -v         # 运行单个测试
+pytest --cov=. --cov-report=html    # 生成覆盖率报告
+
+# 代码质量
+ruff check .                        # Lint 检查
+ruff check . --fix                  # 自动修复 lint 问题
+mypy api/ services/ config/ db/     # 类型检查
 ```
 
 ### Docker 全栈
@@ -149,6 +158,14 @@ MarketRouter 根据 symbol 后缀自动选择数据源，支持降级和缓存�
 - **quick_think_llm**: 快速响应模型（默认 `gpt-4o-mini`）
 - **data_vendors**: 按数据类别配置数据源（`core_stock_apis`, `technical_indicators`, `fundamental_data`, `news_data`）
 
+### 动态 AI 配置系统
+
+支持通过 UI 界面（侧边栏 → AI Config）动态配置 AI 提供商，无需重启服务：
+- **支持类型**: `openai` | `openai_compatible` (NewAPI/OneAPI) | `google` | `anthropic` | `deepseek`
+- **模型分配场景**: `deep_think`（复杂推理）| `quick_think`（快速任务）| `synthesis`（报告合成）
+- **API 端点**: `/api/ai/providers`（CRUD）、`/api/ai/models`（模型配置）、`/api/ai/status`（状态检查）
+- **安全**: API 密钥使用 Fernet 加密存储
+
 ## 前后端 JSON 合约
 
 前端 `types.ts` 中的 `AgentAnalysis` 接口是核心数据合约。后端 `synthesizer.py` 的 `ResponseSynthesizer` 负责将 Agent 的 Markdown 报告通过 LLM 合成为严格匹配此接口的 JSON。修改 `AgentAnalysis` 时必须同步更新 synthesizer 的 prompt。
@@ -173,8 +190,23 @@ API_KEY_ENABLED=false             # 启用后 admin 路由需要 X-API-Key 头
 DAILY_ANALYSIS_ENABLED=false
 ```
 
+## 代码规范
+
+### Python (后端)
+- **Ruff**: line-length 120, target Python 3.10, lint rules: `E, F, W, I, N, UP, B, C4`（忽略 E501）
+- **mypy**: strict_optional, check_untyped_defs, show_error_codes
+- **pytest**: asyncio_mode="auto", testpaths=["tests"], 当前 58 个测试（unit 29 + integration 29）
+
+### TypeScript (前端)
+- 前端无 lint/ESLint 配置，使用 `npx tsc --noEmit` 做类型检查
+
+### 提交规范
+使用 [Conventional Commits](https://www.conventionalcommits.org/)：`feat(<scope>): <description>`
+
 ## 文档
 
 - `docs/ARCH.md` — 系统架构设计（含 Mermaid 图、API 规范、数据源映射表）
 - `docs/PRD.md` — 产品需求文档
+- `docs/CONTRIB.md` — 贡献指南（环境变量完整列表、AI 配置系统 API）
+- `docs/RUNBOOK.md` — 运维手册（部署、监控、故障排查）
 - `plans/implementation_plan.md` — 实现计划

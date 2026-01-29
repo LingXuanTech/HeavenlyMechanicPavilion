@@ -2,7 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Stock, StockPrice, AgentAnalysis, ChatMessage } from '../types';
 import StockChart from './StockChart';
 import { TradingViewChart } from './TradingViewChart';
+import { ChartToolbar } from './ChartToolbar';
 import { AnalysisTypewriter } from './TypewriterText';
+import { useChartIndicators } from '../hooks';
 import * as api from '../services/api';
 import { X, Send, MessageSquare, FileText, Bot, Volume2, VolumeX, Pause, Play, Square, Copy, Check, TrendingUp, TrendingDown, BrainCircuit, BarChart2, Target, ShieldAlert, Scale, Swords, CheckCircle2, Search, Gavel, UserCog, Sparkles, CandlestickChart, LineChart } from 'lucide-react';
 
@@ -202,7 +204,31 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
 
   // 图表类型切换状态
   const [chartType, setChartType] = useState<'area' | 'candlestick'>('candlestick');
-  const [showIndicators, setShowIndicators] = useState<('ma20' | 'ma60')[]>(['ma20']);
+
+  // 图表指标状态（时间周期、技术指标、成交量、全屏、K 线数据）
+  const {
+    period,
+    indicators: chartIndicators,
+    showVolume,
+    isFullscreen: isChartFullscreen,
+    setPeriod,
+    setIndicators: setChartIndicators,
+    toggleVolume,
+    toggleFullscreen: toggleChartFullscreen,
+    klineData,
+    isLoading: isChartLoading,
+  } = useChartIndicators({ symbol: stock.symbol });
+
+  // ESC 键退出全屏
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isChartFullscreen) {
+        toggleChartFullscreen();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isChartFullscreen, toggleChartFullscreen]);
 
   // Chat State
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -390,96 +416,95 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
                 
                 {/* --- LEFT COLUMN: Chart & Deep Dive --- */}
                 <div className="lg:col-span-2 space-y-6">
-                    {/* 图表区域 */}
-                    <div className="bg-gray-950 rounded-lg border border-gray-800 overflow-hidden">
-                      {/* 图表工具栏 */}
-                      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-900/50">
-                        <div className="flex items-center gap-2">
-                          {/* 图表类型切换 */}
-                          <div className="flex bg-gray-800 rounded-md p-0.5">
-                            <button
-                              onClick={() => setChartType('candlestick')}
-                              className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-all ${
-                                chartType === 'candlestick'
-                                  ? 'bg-gray-700 text-white'
-                                  : 'text-gray-400 hover:text-gray-200'
-                              }`}
-                              title="K 线图"
-                            >
-                              <CandlestickChart className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={() => setChartType('area')}
-                              className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-all ${
-                                chartType === 'area'
-                                  ? 'bg-gray-700 text-white'
-                                  : 'text-gray-400 hover:text-gray-200'
-                              }`}
-                              title="面积图"
-                            >
-                              <LineChart className="w-3 h-3" />
-                            </button>
-                          </div>
-
-                          {/* 指标选择（仅 K 线图显示） */}
-                          {chartType === 'candlestick' && (
-                            <div className="flex items-center gap-1 ml-2">
-                              <button
-                                onClick={() => setShowIndicators(prev =>
-                                  prev.includes('ma20')
-                                    ? prev.filter(i => i !== 'ma20')
-                                    : [...prev, 'ma20']
-                                )}
-                                className={`px-2 py-1 text-[10px] font-medium rounded transition-all ${
-                                  showIndicators.includes('ma20')
-                                    ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30'
-                                    : 'text-gray-500 hover:text-gray-300'
-                                }`}
-                              >
-                                MA20
-                              </button>
-                              <button
-                                onClick={() => setShowIndicators(prev =>
-                                  prev.includes('ma60')
-                                    ? prev.filter(i => i !== 'ma60')
-                                    : [...prev, 'ma60']
-                                )}
-                                className={`px-2 py-1 text-[10px] font-medium rounded transition-all ${
-                                  showIndicators.includes('ma60')
-                                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                                    : 'text-gray-500 hover:text-gray-300'
-                                }`}
-                              >
-                                MA60
-                              </button>
-                            </div>
-                          )}
+                    {/* 图表区域 - 支持全屏 */}
+                    <div className={`bg-gray-950 rounded-lg border border-gray-800 overflow-hidden ${
+                      isChartFullscreen ? 'fixed inset-0 z-[60] rounded-none' : ''
+                    }`}>
+                      {/* 图表类型切换栏 */}
+                      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-800 bg-gray-900/50">
+                        <div className="flex bg-gray-800 rounded-md p-0.5">
+                          <button
+                            onClick={() => setChartType('candlestick')}
+                            className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-all ${
+                              chartType === 'candlestick'
+                                ? 'bg-gray-700 text-white'
+                                : 'text-gray-400 hover:text-gray-200'
+                            }`}
+                            title="K 线图"
+                          >
+                            <CandlestickChart className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => setChartType('area')}
+                            className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-all ${
+                              chartType === 'area'
+                                ? 'bg-gray-700 text-white'
+                                : 'text-gray-400 hover:text-gray-200'
+                            }`}
+                            title="面积图"
+                          >
+                            <LineChart className="w-3 h-3" />
+                          </button>
                         </div>
-
-                        {/* 股票信息 */}
-                        <div className="text-xs text-gray-500">
-                          {stock.symbol} · {stock.market}
-                        </div>
+                        <div className="w-px h-4 bg-gray-700" />
+                        <span className="text-xs text-gray-500">{stock.symbol} · {stock.market}</span>
+                        {isChartFullscreen && (
+                          <button
+                            onClick={toggleChartFullscreen}
+                            className="ml-auto px-2 py-1 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded transition-colors"
+                          >
+                            ✕ 退出全屏
+                          </button>
+                        )}
                       </div>
 
+                      {/* 专业工具栏（仅 K 线模式） */}
+                      {chartType === 'candlestick' && (
+                        <ChartToolbar
+                          activePeriod={period}
+                          onPeriodChange={setPeriod}
+                          activeIndicators={chartIndicators}
+                          onIndicatorsChange={setChartIndicators}
+                          showVolume={showVolume}
+                          onVolumeToggle={toggleVolume}
+                          isFullscreen={isChartFullscreen}
+                          onFullscreenToggle={toggleChartFullscreen}
+                        />
+                      )}
+
                       {/* 图表内容 */}
-                      <div className="h-64 p-2">
-                        {priceData ? (
+                      <div
+                        className={isChartFullscreen ? 'flex-1 p-2' : 'h-64 p-2'}
+                        style={isChartFullscreen ? { height: 'calc(100vh - 90px)' } : undefined}
+                      >
+                        {priceData || klineData.length > 0 ? (
                           chartType === 'candlestick' ? (
                             <TradingViewChart
-                              simpleData={priceData.history}
+                              data={klineData.length > 0 ? klineData : undefined}
+                              simpleData={klineData.length === 0 ? priceData?.history : undefined}
                               symbol={stock.symbol}
-                              height={240}
-                              showVolume={false}
-                              indicators={showIndicators}
+                              height={isChartFullscreen ? window.innerHeight - 100 : 240}
+                              showVolume={showVolume}
+                              indicators={chartIndicators}
                               isUp={isUp}
                               crosshair
                               grid
                               timeScale
                             />
                           ) : (
-                            <StockChart data={priceData.history} color={chartColor} height={240} />
+                            <StockChart
+                              data={priceData?.history}
+                              color={chartColor}
+                              height={isChartFullscreen ? window.innerHeight - 100 : 240}
+                            />
                           )
+                        ) : isChartLoading ? (
+                          <div className="h-full flex items-center justify-center text-gray-600">
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="w-6 h-6 border-2 border-gray-600 border-t-blue-500 rounded-full animate-spin" />
+                              <span className="text-sm">加载图表数据...</span>
+                            </div>
+                          </div>
                         ) : (
                           <div className="h-full flex items-center justify-center text-gray-600">
                             <div className="flex flex-col items-center gap-2">

@@ -197,6 +197,26 @@ app.include_router(oauth.router, prefix=settings.API_V1_STR)
 from api.routes import passkey
 app.include_router(passkey.router, prefix=settings.API_V1_STR)
 
+# TTS 语音合成路由
+from api.routes import tts
+app.include_router(tts.router, prefix=settings.API_V1_STR)
+
+# 反思闭环路由
+from api.routes import reflection
+app.include_router(reflection.router, prefix=settings.API_V1_STR)
+
+# 多模型赛马路由
+from api.routes import model_racing
+app.include_router(model_racing.router, prefix=settings.API_V1_STR)
+
+# 回测路由
+from api.routes import backtest
+app.include_router(backtest.router, prefix=settings.API_V1_STR)
+
+# 舆情分析路由
+from api.routes import sentiment
+app.include_router(sentiment.router, prefix=settings.API_V1_STR)
+
 
 if __name__ == "__main__":
     import uvicorn

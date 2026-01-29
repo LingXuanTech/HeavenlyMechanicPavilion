@@ -203,6 +203,200 @@ class RefreshToken(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.now)
 
 
+# ============ 预测追踪模型 ============
+
+class PredictionOutcome(SQLModel, table=True):
+    """预测结果追踪（用于反思闭环）"""
+    __tablename__ = "prediction_outcomes"
+    __table_args__ = (
+        Index("ix_prediction_symbol_date", "symbol", "prediction_date"),
+        Index("ix_prediction_agent", "agent_key"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # 预测信息
+    analysis_id: int = Field(foreign_key="analysisresult.id", index=True)
+    symbol: str = Field(index=True)
+    prediction_date: str = Field(index=True)           # 预测日期
+    signal: str                                        # 预测信号：Strong Buy/Buy/Hold/Sell/Strong Sell
+    confidence: int                                    # 预测置信度 0-100
+    target_price: Optional[float] = Field(default=None)
+    stop_loss: Optional[float] = Field(default=None)
+    entry_price: Optional[float] = Field(default=None)
+
+    # Agent 信息
+    agent_key: str = Field(default="overall")          # 哪个 Agent 的预测
+
+    # 实际结果
+    outcome_date: Optional[str] = Field(default=None)  # 结果日期
+    actual_price: Optional[float] = Field(default=None)
+    actual_return: Optional[float] = Field(default=None)  # 百分比收益
+    outcome: Optional[str] = Field(default=None)       # Win/Loss/Partial/Pending
+
+    # 分析
+    is_correct: Optional[bool] = Field(default=None)   # 方向是否正确
+    return_vs_benchmark: Optional[float] = Field(default=None)  # 相对基准收益
+    notes: Optional[str] = Field(default=None)         # 备注
+
+    # 时间戳
+    created_at: datetime = Field(default_factory=datetime.now)
+    evaluated_at: Optional[datetime] = Field(default=None)
+
+
+class AgentPerformance(SQLModel, table=True):
+    """Agent 表现统计（定期聚合）"""
+    __tablename__ = "agent_performance"
+    __table_args__ = (
+        Index("ix_agent_perf_key_period", "agent_key", "period_start"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    agent_key: str = Field(index=True)                 # Agent 标识
+    period_start: str = Field(index=True)              # 统计周期开始日期
+    period_end: str                                    # 统计周期结束日期
+
+    # 统计指标
+    total_predictions: int = Field(default=0)          # 总预测数
+    correct_predictions: int = Field(default=0)        # 正确预测数
+    win_rate: float = Field(default=0.0)               # 胜率
+    avg_return: float = Field(default=0.0)             # 平均收益
+    avg_confidence: float = Field(default=0.0)         # 平均置信度
+
+    # 细分统计
+    strong_buy_accuracy: Optional[float] = Field(default=None)
+    buy_accuracy: Optional[float] = Field(default=None)
+    hold_accuracy: Optional[float] = Field(default=None)
+    sell_accuracy: Optional[float] = Field(default=None)
+    strong_sell_accuracy: Optional[float] = Field(default=None)
+
+    # 偏差分析
+    overconfidence_bias: Optional[float] = Field(default=None)  # 过度自信偏差
+    direction_bias: Optional[str] = Field(default=None)         # 方向偏差：bullish/bearish/neutral
+
+    # 时间戳
+    calculated_at: datetime = Field(default_factory=datetime.now)
+
+
+class ModelPerformance(SQLModel, table=True):
+    """模型表现追踪（多模型赛马）"""
+    __tablename__ = "model_performance"
+    __table_args__ = (
+        Index("ix_model_perf_key_period", "model_key", "period_start"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    model_key: str = Field(index=True)                 # 模型配置键（deep_think, quick_think 等）
+    model_name: str = Field(default="")                # 实际模型名（gpt-4o, claude-3-sonnet 等）
+    provider: str = Field(default="")                  # 提供商（openai, anthropic, google）
+    period_start: str = Field(index=True)              # 统计周期开始日期
+    period_end: str                                    # 统计周期结束日期
+
+    # 统计指标
+    total_predictions: int = Field(default=0)          # 总预测数
+    correct_predictions: int = Field(default=0)        # 正确预测数
+    win_rate: float = Field(default=0.0)               # 胜率
+    avg_return: float = Field(default=0.0)             # 平均收益
+    avg_confidence: float = Field(default=0.0)         # 平均置信度
+    avg_response_time: float = Field(default=0.0)      # 平均响应时间（秒）
+
+    # 共识一致率
+    consensus_agreement_rate: float = Field(default=0.0)  # 与最终共识的一致率
+
+    # 细分统计
+    strong_buy_accuracy: Optional[float] = Field(default=None)
+    buy_accuracy: Optional[float] = Field(default=None)
+    sell_accuracy: Optional[float] = Field(default=None)
+
+    # 偏差分析
+    overconfidence_bias: Optional[float] = Field(default=None)
+    direction_bias: Optional[str] = Field(default=None)
+
+    # 时间戳
+    calculated_at: datetime = Field(default_factory=datetime.now)
+
+
+class RacingAnalysisResult(SQLModel, table=True):
+    """赛马分析结果记录"""
+    __tablename__ = "racing_analysis_results"
+    __table_args__ = (
+        Index("ix_racing_symbol_created", "symbol", "created_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    symbol: str = Field(index=True)
+    market: str = Field(default="US")
+    analysis_date: str = Field(index=True)
+
+    # 共识结果
+    consensus_signal: str                              # 最终共识信号
+    consensus_confidence: int                          # 共识置信度
+    consensus_method: str                              # 使用的共识方法
+    agreement_rate: float                              # 一致率
+
+    # 各模型结果（JSON 存储）
+    model_results_json: str = Field(default="{}")      # JSON: {model_key: {signal, confidence, ...}}
+    dissenting_models: str = Field(default="[]")       # JSON: ["model_key1", "model_key2"]
+
+    # 元数据
+    total_models: int = Field(default=0)
+    successful_models: int = Field(default=0)
+    total_elapsed_seconds: float = Field(default=0.0)
+
+    # 时间戳
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
+class BacktestResultRecord(SQLModel, table=True):
+    """回测结果记录"""
+    __tablename__ = "backtest_results"
+    __table_args__ = (
+        Index("ix_backtest_symbol_created", "symbol", "created_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    symbol: str = Field(index=True)
+    market: str = Field(default="US")
+    start_date: str
+    end_date: str
+
+    # 资金指标
+    initial_capital: float = Field(default=100000)
+    final_capital: float = Field(default=100000)
+    total_return_pct: float = Field(default=0)
+    annualized_return_pct: float = Field(default=0)
+    max_drawdown_pct: float = Field(default=0)
+    sharpe_ratio: Optional[float] = Field(default=None)
+
+    # 交易统计
+    total_trades: int = Field(default=0)
+    winning_trades: int = Field(default=0)
+    losing_trades: int = Field(default=0)
+    win_rate: float = Field(default=0)
+    avg_win_pct: float = Field(default=0)
+    avg_loss_pct: float = Field(default=0)
+    profit_factor: Optional[float] = Field(default=None)
+
+    # 基准对比
+    benchmark_return_pct: Optional[float] = Field(default=None)
+    alpha: Optional[float] = Field(default=None)
+
+    # 交易明细（JSON 存储）
+    trades_json: str = Field(default="[]")
+
+    # 配置参数
+    holding_days: int = Field(default=5)
+    stop_loss_pct: float = Field(default=-5.0)
+    take_profit_pct: float = Field(default=10.0)
+
+    # 时间戳
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
 def get_engine():
     """根据配置创建数据库引擎"""
     db_url = settings.database_url

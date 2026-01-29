@@ -155,8 +155,8 @@ class TradingAgentsGraph:
         base_analysts = ["market", "social", "news", "fundamentals"]
 
         if market == "CN":
-            # A股市场：添加散户情绪分析师和政策分析师
-            return base_analysts + ["sentiment", "policy"]
+            # A股市场：添加散户情绪分析师、政策分析师和资金流向分析师
+            return base_analysts + ["sentiment", "policy", "fund_flow"]
         elif market == "HK":
             # 港股市场：仅添加散户情绪分析师（港股也受 A 股情绪影响）
             return base_analysts + ["sentiment"]
@@ -282,6 +282,7 @@ class TradingAgentsGraph:
             # A-share focused reports
             "retail_sentiment_report": final_state.get("retail_sentiment_report", ""),
             "policy_report": final_state.get("policy_report", ""),
+            "china_flow_data": final_state.get("china_flow_data", ""),
             "investment_debate_state": {
                 "bull_history": final_state["investment_debate_state"]["bull_history"],
                 "bear_history": final_state["investment_debate_state"]["bear_history"],

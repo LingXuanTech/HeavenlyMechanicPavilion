@@ -6,6 +6,8 @@ from functools import lru_cache
 import httpx
 import yfinance as yf
 import akshare as ak
+import time
+import random
 from services.models import StockPrice, KlineData, CompanyFundamentals, NewsItem
 from config.settings import settings
 import structlog
@@ -18,6 +20,11 @@ _CACHE_TTL_SECONDS = 60  # 缓存有效期 60 秒
 
 # 复用的 HTTP 客户端（避免每次请求创建新连接）
 _http_client: Optional[httpx.AsyncClient] = None
+
+# 数据源失败计数（简易熔断）
+_provider_failures: Dict[str, Dict[str, Any]] = {}
+_FAILURE_THRESHOLD = 5      # 连续失败次数阈值
+_FAILURE_COOLDOWN = 60.0    # 熔断冷却时间（秒）
 
 
 async def get_http_client() -> httpx.AsyncClient:
@@ -41,6 +48,127 @@ class DataSourceError(Exception):
     def __init__(self, source: str, message: str):
         self.source = source
         super().__init__(f"[{source}] {message}")
+
+
+def _is_provider_available(provider: str) -> bool:
+    """检查数据源是否可用（未被熔断）"""
+    if provider not in _provider_failures:
+        return True
+
+    failure_info = _provider_failures[provider]
+    if failure_info["count"] < _FAILURE_THRESHOLD:
+        return True
+
+    # 检查冷却时间
+    last_failure = failure_info.get("last_failure")
+    if last_failure:
+        elapsed = (datetime.now() - last_failure).total_seconds()
+        if elapsed >= _FAILURE_COOLDOWN:
+            # 冷却期过，重置计数器并允许重试
+            logger.info(
+                "Provider cooldown expired, resetting",
+                provider=provider,
+                cooldown_seconds=_FAILURE_COOLDOWN
+            )
+            _provider_failures[provider] = {"count": 0, "last_failure": None}
+            return True
+
+    logger.warning(
+        "Provider is circuit-broken",
+        provider=provider,
+        failure_count=failure_info["count"],
+        threshold=_FAILURE_THRESHOLD
+    )
+    return False
+
+
+def _record_provider_success(provider: str):
+    """记录数据源成功"""
+    if provider in _provider_failures:
+        _provider_failures[provider] = {"count": 0, "last_failure": None}
+
+
+def _record_provider_failure(provider: str, error: Exception):
+    """记录数据源失败"""
+    if provider not in _provider_failures:
+        _provider_failures[provider] = {"count": 0, "last_failure": None}
+
+    _provider_failures[provider]["count"] += 1
+    _provider_failures[provider]["last_failure"] = datetime.now()
+
+    logger.warning(
+        "Provider failure recorded",
+        provider=provider,
+        failure_count=_provider_failures[provider]["count"],
+        error=str(error)
+    )
+
+
+async def _call_with_retry(
+    coro_func,
+    provider: str,
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    *args,
+    **kwargs
+) -> Any:
+    """
+    带重试的异步调用
+
+    Args:
+        coro_func: 协程函数
+        provider: 数据源名称
+        max_retries: 最大重试次数
+        base_delay: 基础延迟（秒）
+
+    Returns:
+        调用结果
+
+    Raises:
+        DataSourceError: 所有重试失败后抛出
+    """
+    import asyncio
+
+    last_error = None
+
+    for attempt in range(max_retries + 1):
+        try:
+            result = await coro_func(*args, **kwargs)
+            _record_provider_success(provider)
+            return result
+        except Exception as e:
+            last_error = e
+            _record_provider_failure(provider, e)
+
+            if attempt == max_retries:
+                raise DataSourceError(provider, str(e))
+
+            # 判断是否可重试
+            error_str = str(e).lower()
+            retryable = any(kw in error_str for kw in [
+                "connection", "timeout", "reset", "refused",
+                "unavailable", "temporary", "rate limit"
+            ])
+
+            if not retryable:
+                raise DataSourceError(provider, str(e))
+
+            # 指数退避 + 抖动
+            delay = min(base_delay * (2 ** attempt), 30.0)
+            delay = delay * (0.5 + random.random())
+
+            logger.warning(
+                "Provider call failed, retrying",
+                provider=provider,
+                attempt=attempt + 1,
+                max_retries=max_retries,
+                delay=round(delay, 2),
+                error=str(e)
+            )
+
+            await asyncio.sleep(delay)
+
+    raise DataSourceError(provider, str(last_error))
 
 
 class MarketRouter:
@@ -179,13 +307,15 @@ class MarketRouter:
     @classmethod
     async def get_stock_price(cls, symbol: str) -> StockPrice:
         """
-        获取股票价格（带降级机制）
+        获取股票价格（带降级和熔断机制）
 
         优先级：
         - CN: akshare -> yfinance
         - HK/US: yfinance -> alpha_vantage
 
-        失败时尝试使用缓存数据。
+        特性：
+        - 熔断保护：连续失败 5 次后跳过该数据源 60 秒
+        - 失败时尝试使用缓存数据
         """
         market = cls.get_market(symbol)
         providers = cls._get_providers_for_market(market)
@@ -193,8 +323,20 @@ class MarketRouter:
         logger.info("Fetching stock price", symbol=symbol, market=market, providers=providers)
 
         last_error = None
+        attempted_providers = []
 
         for provider in providers:
+            # 检查熔断状态
+            if not _is_provider_available(provider):
+                logger.debug(
+                    "Skipping circuit-broken provider",
+                    symbol=symbol,
+                    provider=provider
+                )
+                continue
+
+            attempted_providers.append(provider)
+
             try:
                 if provider == "akshare":
                     price = await cls._get_price_akshare(symbol)
@@ -205,16 +347,19 @@ class MarketRouter:
                 else:
                     continue
 
-                # 成功获取，缓存并返回
+                # 成功获取，记录成功并缓存
+                _record_provider_success(provider)
                 cls._set_cached_price(symbol, price)
                 logger.info("Price fetched successfully", symbol=symbol, provider=provider)
                 return price
 
             except DataSourceError as e:
+                _record_provider_failure(provider, e)
                 logger.warning("Data source failed, trying next", symbol=symbol, source=e.source, error=str(e))
                 last_error = e
                 continue
             except Exception as e:
+                _record_provider_failure(provider, e)
                 logger.warning("Unexpected error, trying next provider", symbol=symbol, provider=provider, error=str(e))
                 last_error = DataSourceError(provider, str(e))
                 continue
@@ -222,7 +367,11 @@ class MarketRouter:
         # 所有数据源都失败，尝试使用缓存
         cached = cls._get_cached_price(symbol)
         if cached:
-            logger.warning("All providers failed, using stale cache", symbol=symbol)
+            logger.warning(
+                "All providers failed, using stale cache",
+                symbol=symbol,
+                attempted=attempted_providers
+            )
             return cached
 
         # 完全失败
@@ -230,22 +379,31 @@ class MarketRouter:
 
     @classmethod
     async def get_history(cls, symbol: str, period: str = "1mo") -> List[KlineData]:
-        """获取历史 K 线数据（带降级机制）"""
+        """获取历史 K 线数据（带降级和熔断机制）"""
         market = cls.get_market(symbol)
 
-        # 尝试主数据源
-        if market == "CN":
+        # 尝试主数据源（A 股用 AkShare）
+        if market == "CN" and _is_provider_available("akshare"):
             try:
-                return await cls._get_history_akshare(symbol)
+                result = await cls._get_history_akshare(symbol)
+                _record_provider_success("akshare")
+                return result
             except Exception as e:
+                _record_provider_failure("akshare", e)
                 logger.warning("AkShare history failed, trying yfinance", symbol=symbol, error=str(e))
 
         # 降级到 yfinance
-        try:
-            return await cls._get_history_yfinance(symbol, period)
-        except Exception as e:
-            logger.error("All history sources failed", symbol=symbol, error=str(e))
-            raise
+        if _is_provider_available("yfinance"):
+            try:
+                result = await cls._get_history_yfinance(symbol, period)
+                _record_provider_success("yfinance")
+                return result
+            except Exception as e:
+                _record_provider_failure("yfinance", e)
+                logger.error("yfinance history failed", symbol=symbol, error=str(e))
+                raise
+
+        raise DataSourceError("all", f"All history sources unavailable for {symbol}")
 
     @classmethod
     async def _get_history_akshare(cls, symbol: str) -> List[KlineData]:
@@ -309,3 +467,42 @@ class MarketRouter:
         global _price_cache
         _price_cache.clear()
         logger.info("Price cache cleared")
+
+    @staticmethod
+    def get_provider_status() -> Dict[str, Any]:
+        """获取所有数据源的状态"""
+        status = {}
+        for provider in ["akshare", "yfinance", "alpha_vantage"]:
+            if provider in _provider_failures:
+                failure_info = _provider_failures[provider]
+                is_available = _is_provider_available(provider)
+                status[provider] = {
+                    "available": is_available,
+                    "failure_count": failure_info["count"],
+                    "threshold": _FAILURE_THRESHOLD,
+                    "last_failure": failure_info["last_failure"].isoformat() if failure_info["last_failure"] else None,
+                    "cooldown_seconds": _FAILURE_COOLDOWN,
+                }
+            else:
+                status[provider] = {
+                    "available": True,
+                    "failure_count": 0,
+                    "threshold": _FAILURE_THRESHOLD,
+                    "last_failure": None,
+                    "cooldown_seconds": _FAILURE_COOLDOWN,
+                }
+        return status
+
+    @staticmethod
+    def reset_provider(provider: str):
+        """重置指定数据源的熔断状态"""
+        if provider in _provider_failures:
+            _provider_failures[provider] = {"count": 0, "last_failure": None}
+            logger.info("Provider reset", provider=provider)
+
+    @staticmethod
+    def reset_all_providers():
+        """重置所有数据源的熔断状态"""
+        global _provider_failures
+        _provider_failures.clear()
+        logger.info("All providers reset")

@@ -129,6 +129,13 @@ export type {
   UseStreamTypewriterReturn,
 } from './useTypewriter';
 
+// 流式分析
+export { useStreamingAnalysis } from './useStreamingAnalysis';
+export type {
+  StreamingAnalysisState,
+  UseStreamingAnalysisOptions,
+} from './useStreamingAnalysis';
+
 // A 股特有功能
 export {
   // 北向资金
@@ -158,3 +165,7 @@ export {
   useJiejinWarning,
   JIEJIN_KEY,
 } from './useChinaMarket';
+
+// 图表指标
+export { useChartIndicators } from './useChartIndicators';
+export type { default as UseChartIndicatorsOptions } from './useChartIndicators';

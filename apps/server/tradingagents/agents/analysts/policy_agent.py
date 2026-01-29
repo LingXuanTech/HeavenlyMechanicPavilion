@@ -5,12 +5,12 @@
 """
 
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.tools import tool
 from typing import Optional
 import structlog
 
 from tradingagents.agents.utils.agent_utils import get_news
 from tradingagents.agents.utils.output_schemas import PolicyAgentOutput
+from tradingagents.agents.utils.policy_tools import POLICY_TOOLS
 
 logger = structlog.get_logger(__name__)
 
@@ -98,46 +98,6 @@ def _get_system_prompt() -> str:
     return DEFAULT_SYSTEM_PROMPT
 
 
-# 定义政策分析专用工具
-@tool
-def search_policy_news(query: str, source: str = "all") -> str:
-    """搜索政策相关新闻
-
-    Args:
-        query: 搜索关键词（行业、公司名或政策关键词）
-        source: 来源筛选 (gov/央行/证监会/发改委/all)
-
-    Returns:
-        政策相关新闻和文件
-    """
-    # 实际实现中会调用政府网站 API 或新闻聚合
-    return f"Searching policy news for '{query}' from {source}..."
-
-
-@tool
-def get_regulatory_calendar() -> str:
-    """获取监管日历
-
-    Returns:
-        近期重要监管事件和政策发布时间表
-    """
-    # 实际实现中会返回两会、经济工作会议等时间表
-    return "Regulatory calendar data..."
-
-
-@tool
-def get_sector_policy_status(sector: str) -> str:
-    """获取行业政策状态
-
-    Args:
-        sector: 行业名称（如：新能源、房地产、互联网）
-
-    Returns:
-        该行业当前的政策导向和监管态度
-    """
-    return f"Policy status for {sector} sector..."
-
-
 def create_policy_agent(llm):
     """创建 Policy Agent 节点
 
@@ -148,8 +108,8 @@ def create_policy_agent(llm):
         policy_agent_node: LangGraph 节点函数
     """
 
-    # 工具列表
-    tools = [get_news, search_policy_news, get_regulatory_calendar, get_sector_policy_status]
+    # 工具列表：使用 policy_tools.py 中导入的真实工具
+    tools = [get_news] + POLICY_TOOLS
 
     # 从配置服务获取系统提示词
     system_message = _get_system_prompt()
@@ -279,5 +239,5 @@ def create_policy_tools_node(llm):
     """
     from langgraph.prebuilt import ToolNode
 
-    tools = [get_news, search_policy_news, get_regulatory_calendar, get_sector_policy_status]
+    tools = [get_news] + POLICY_TOOLS
     return ToolNode(tools)

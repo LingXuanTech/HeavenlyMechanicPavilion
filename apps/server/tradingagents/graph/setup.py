@@ -13,6 +13,7 @@ from tradingagents.agents.analysts.macro_analyst import create_macro_analyst
 from tradingagents.agents.analysts.portfolio_agent import create_portfolio_agent
 from tradingagents.agents.analysts.sentiment_agent import create_sentiment_agent, create_sentiment_tools_node
 from tradingagents.agents.analysts.policy_agent import create_policy_agent, create_policy_tools_node
+from tradingagents.agents.analysts.fund_flow_agent import create_fund_flow_agent, create_fund_flow_tools_node
 from tradingagents.agents.utils.agent_states import AgentState
 
 from .conditional_logic import ConditionalLogic
@@ -69,6 +70,7 @@ class GraphSetup:
             optional_reports = {
                 "retail_sentiment_report": state.get("retail_sentiment_report", ""),
                 "policy_report": state.get("policy_report", ""),
+                "china_flow_data": state.get("china_flow_data", ""),
             }
 
             missing = [k for k, v in required_reports.items() if not v]
@@ -107,6 +109,7 @@ class GraphSetup:
                 - "fundamentals": Fundamentals analyst
                 - "sentiment": Retail sentiment analyst (FOMO/FUD detection)
                 - "policy": Policy analyst (A-share regulations, CN market only)
+                - "fund_flow": Fund flow analyst (North money + LHB, CN market only)
         """
         if len(selected_analysts) == 0:
             raise ValueError("Trading Agents Graph Setup Error: no analysts selected!")
@@ -160,6 +163,14 @@ class GraphSetup:
             )
             delete_nodes["policy"] = create_msg_delete()
             tool_nodes["policy"] = create_policy_tools_node(self.quick_thinking_llm)
+
+        # 资金流向分析师（北向资金 + 龙虎榜）
+        if "fund_flow" in selected_analysts:
+            analyst_nodes["fund_flow"] = create_fund_flow_agent(
+                self.quick_thinking_llm
+            )
+            delete_nodes["fund_flow"] = create_msg_delete()
+            tool_nodes["fund_flow"] = create_fund_flow_tools_node(self.quick_thinking_llm)
 
         # Create researcher and manager nodes
         bull_researcher_node = create_bull_researcher(

@@ -69,6 +69,9 @@ class AgentState(MessagesState):
     retail_sentiment_report: Annotated[str, "Report from the Retail Sentiment Analyst (FOMO/FUD analysis)"]
     policy_report: Annotated[str, "Report from the Policy Analyst (A-share regulatory analysis)"]
 
+    # A 股资金流向数据（北向资金 + 龙虎榜）
+    china_flow_data: Annotated[str, "A-share fund flow data: north money + LHB analysis"]
+
     # researcher team discussion step
     investment_debate_state: Annotated[
         InvestDebateState, "Current state of the debate on if to invest or not"
