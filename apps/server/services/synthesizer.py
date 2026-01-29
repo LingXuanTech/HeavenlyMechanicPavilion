@@ -30,12 +30,12 @@ class ResponseSynthesizer:
         
         prompt = f"""
         你是一个金融数据合成专家。请将以下多个 Agent 的分析报告合成一个严格符合 JSON 格式的对象。
-        
+
         股票代码: {symbol}
-        
+
         报告内容:
         {reports_combined}
-        
+
         请输出以下结构的 JSON (不要包含 Markdown 代码块标记，只输出纯 JSON):
         {{
           "symbol": "{symbol}",
@@ -68,8 +68,24 @@ class ResponseSynthesizer:
           }},
           "newsAnalysis": [{{ "headline": "标题", "sentiment": "Positive/Negative/Neutral", "summary": "摘要" }}],
           "catalysts": [{{ "name": "催化剂名称", "date": "日期", "impact": "Positive/Negative/Neutral" }}],
-          "peers": [{{ "name": "竞争对手", "comparison": "对比描述" }}]
+          "peers": [{{ "name": "竞争对手", "comparison": "对比描述" }}],
+          "chinaMarket": {{
+            "retailSentiment": {{
+              "fomoLevel": "High/Medium/Low/None",
+              "fudLevel": "High/Medium/Low/None",
+              "overallMood": "Greedy/Neutral/Fearful",
+              "keyIndicators": ["散户情绪指标列表"]
+            }},
+            "policyAnalysis": {{
+              "recentPolicies": ["最新政策列表"],
+              "impact": "Positive/Neutral/Negative",
+              "riskFactors": ["政策风险因素"],
+              "opportunities": ["政策带来的机遇"]
+            }}
+          }}
         }}
+
+        注意：如果没有 A股相关的散户情绪或政策分析报告，chinaMarket 字段可以设为 null 或省略。
         """
         
         response = await self.llm.ainvoke(prompt)

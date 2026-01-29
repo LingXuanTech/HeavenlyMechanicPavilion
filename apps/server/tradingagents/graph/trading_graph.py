@@ -55,19 +55,28 @@ class TradingAgentsGraph:
 
     def __init__(
         self,
-        selected_analysts=["market", "social", "news", "fundamentals"],
+        selected_analysts=None,
         debug=False,
         config: Dict[str, Any] = None,
+        market: str = None,
     ):
         """Initialize the trading agents graph and components.
 
         Args:
-            selected_analysts: List of analyst types to include
+            selected_analysts: List of analyst types to include. If None, auto-selects based on market.
             debug: Whether to run in debug mode
             config: Configuration dictionary. If None, uses default config
+            market: Market identifier (US, HK, CN). Used to auto-select analysts if selected_analysts is None.
         """
         self.debug = debug
         self.config = config or DEFAULT_CONFIG
+        self.market = market
+
+        # Auto-select analysts based on market if not specified
+        if selected_analysts is None:
+            selected_analysts = self._get_default_analysts(market)
+
+        self.selected_analysts = selected_analysts
 
         # Update the interface's config
         set_config(self.config)
@@ -133,9 +142,27 @@ class TradingAgentsGraph:
         # Set up the graph
         self.graph = self.graph_setup.setup_graph(selected_analysts)
         
-        # Add new agents to the graph setup if needed
-        # For now, we'll manually add them to the compiled graph or modify setup.py
-        # Let's modify setup.py to be more flexible
+    def _get_default_analysts(self, market: str) -> List[str]:
+        """Get default analyst list based on market.
+
+        Args:
+            market: Market identifier (US, HK, CN)
+
+        Returns:
+            List of analyst types to use for this market
+        """
+        # Base analysts for all markets
+        base_analysts = ["market", "social", "news", "fundamentals"]
+
+        if market == "CN":
+            # A股市场：添加散户情绪分析师和政策分析师
+            return base_analysts + ["sentiment", "policy"]
+        elif market == "HK":
+            # 港股市场：仅添加散户情绪分析师（港股也受 A 股情绪影响）
+            return base_analysts + ["sentiment"]
+        else:
+            # 美股市场：使用基础分析师
+            return base_analysts
 
     def _create_tool_nodes(self) -> Dict[str, ToolNode]:
         """Create tool nodes for different data sources using abstract methods."""
@@ -194,7 +221,7 @@ class TradingAgentsGraph:
 
         # Initialize state
         init_agent_state = self.propagator.create_initial_state(
-            company_name, trade_date
+            company_name, trade_date, market=self.market or "US"
         )
         args = self.propagator.get_graph_args()
 
@@ -247,10 +274,14 @@ class TradingAgentsGraph:
         self.log_states_dict[str(trade_date)] = {
             "company_of_interest": final_state["company_of_interest"],
             "trade_date": final_state["trade_date"],
+            "market": final_state.get("market", "US"),
             "market_report": final_state["market_report"],
             "sentiment_report": final_state["sentiment_report"],
             "news_report": final_state["news_report"],
             "fundamentals_report": final_state["fundamentals_report"],
+            # A-share focused reports
+            "retail_sentiment_report": final_state.get("retail_sentiment_report", ""),
+            "policy_report": final_state.get("policy_report", ""),
             "investment_debate_state": {
                 "bull_history": final_state["investment_debate_state"]["bull_history"],
                 "bear_history": final_state["investment_debate_state"]["bear_history"],

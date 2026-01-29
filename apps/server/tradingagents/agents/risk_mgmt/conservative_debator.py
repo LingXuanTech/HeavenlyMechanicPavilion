@@ -10,6 +10,25 @@ from tradingagents.agents.utils.output_schemas import RiskDebaterOutput
 
 logger = structlog.get_logger(__name__)
 
+# 默认系统提示词
+DEFAULT_SYSTEM_PROMPT = """As the Safe/Conservative Risk Analyst, your primary objective is to protect assets, minimize volatility, and ensure steady, reliable growth.
+
+Your task is to actively counter the arguments of the Risky and Neutral Analysts, highlighting where their views may overlook potential threats. Build a convincing case for a low-risk approach.
+
+Question their optimism and emphasize potential downsides they may have overlooked. Speak conversationally without special formatting."""
+
+
+def _get_system_prompt() -> str:
+    """从 Prompt 配置服务获取系统提示词"""
+    try:
+        from services.prompt_config_service import prompt_config_service
+        prompt = prompt_config_service.get_prompt("conservative_debator")
+        if prompt.get("system"):
+            return prompt["system"]
+    except Exception as e:
+        logger.debug("Using default conservative debator prompt", reason=str(e))
+    return DEFAULT_SYSTEM_PROMPT
+
 
 def create_safe_debator(llm):
     """创建 Safe Debater 节点
@@ -51,13 +70,12 @@ def create_safe_debator(llm):
 
         trader_decision = state["trader_investment_plan"]
 
-        # 原始 prompt
-        raw_prompt = f"""As the Safe/Conservative Risk Analyst, your primary objective is to protect assets, minimize volatility, and ensure steady, reliable growth.
+        # 获取系统提示词并构建原始 prompt
+        system_prompt = _get_system_prompt()
+        raw_prompt = f"""{system_prompt}
 
 Here is the trader's decision:
 {trader_decision}
-
-Your task is to actively counter the arguments of the Risky and Neutral Analysts, highlighting where their views may overlook potential threats. Build a convincing case for a low-risk approach.
 
 Market Research Report: {market_research_report}
 Social Media Sentiment Report: {sentiment_report}
@@ -68,9 +86,7 @@ Conversation history: {history}
 Last risky analyst argument: {current_risky_response}
 Last neutral analyst argument: {current_neutral_response}
 
-If there are no responses from others, present your point without hallucinating.
-
-Question their optimism and emphasize potential downsides they may have overlooked. Speak conversationally without special formatting."""
+If there are no responses from others, present your point without hallucinating."""
 
         # 第一阶段：获取原始论点
         raw_response = llm.invoke(raw_prompt)

@@ -11,22 +11,8 @@ from tradingagents.agents.utils.output_schemas import MarketAnalystOutput
 
 logger = structlog.get_logger(__name__)
 
-
-def create_market_analyst(llm):
-    """创建 Market Analyst 节点
-
-    Args:
-        llm: LangChain LLM 实例
-
-    Returns:
-        market_analyst_node: LangGraph 节点函数
-    """
-
-    # 工具列表
-    tools = [get_stock_data, get_indicators]
-
-    # 系统提示词
-    system_message = """You are a trading assistant tasked with analyzing financial markets. Your role is to select the **most relevant indicators** for a given market condition or trading strategy from the following list. The goal is to choose up to **8 indicators** that provide complementary insights without redundancy.
+# 默认系统提示词（当 prompt_config_service 不可用时使用）
+DEFAULT_SYSTEM_MESSAGE = """You are a trading assistant tasked with analyzing financial markets. Your role is to select the **most relevant indicators** for a given market condition or trading strategy from the following list. The goal is to choose up to **8 indicators** that provide complementary insights without redundancy.
 
 Categories and each category's indicators are:
 
@@ -59,6 +45,35 @@ Instructions:
 4. Select indicators that provide diverse and complementary information
 5. Avoid redundancy (e.g., do not select both RSI and StochRSI)
 """
+
+
+def _get_system_message() -> str:
+    """从 Prompt 配置服务获取系统提示词，失败时使用默认值"""
+    try:
+        from services.prompt_config_service import prompt_config_service
+        prompt = prompt_config_service.get_prompt("market_analyst")
+        if prompt.get("system"):
+            return prompt["system"]
+    except Exception as e:
+        logger.debug("Using default system message", reason=str(e))
+    return DEFAULT_SYSTEM_MESSAGE
+
+
+def create_market_analyst(llm):
+    """创建 Market Analyst 节点
+
+    Args:
+        llm: LangChain LLM 实例
+
+    Returns:
+        market_analyst_node: LangGraph 节点函数
+    """
+
+    # 工具列表
+    tools = [get_stock_data, get_indicators]
+
+    # 从配置服务获取系统提示词（支持动态配置）
+    system_message = _get_system_message()
 
     # 数据收集阶段的 prompt
     collection_prompt = ChatPromptTemplate.from_messages([

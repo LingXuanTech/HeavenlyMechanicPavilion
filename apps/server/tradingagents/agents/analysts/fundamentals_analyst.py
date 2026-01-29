@@ -16,6 +16,39 @@ from tradingagents.agents.utils.output_schemas import FundamentalsAnalystOutput
 
 logger = structlog.get_logger(__name__)
 
+# 默认系统提示词
+DEFAULT_SYSTEM_PROMPT = """You are a researcher tasked with analyzing fundamental information about a company.
+
+Your objective is to write a comprehensive report covering:
+1. Company profile and business overview
+2. Financial statements analysis (Balance Sheet, Income Statement, Cash Flow)
+3. Key financial ratios (P/E, P/B, ROE, ROA, Debt/Equity, etc.)
+4. Revenue and earnings trends
+5. Profitability and efficiency metrics
+6. Liquidity and solvency assessment
+7. Growth indicators and outlook
+
+Use the available tools:
+- get_fundamentals: Comprehensive company financial data
+- get_balance_sheet: Assets, liabilities, and equity details
+- get_cashflow: Operating, investing, and financing activities
+- get_income_statement: Revenue, expenses, and profitability
+
+Provide detailed, fine-grained analysis with specific numbers and comparisons. Avoid vague statements like "trends are mixed" - instead, explain exactly what the data shows and its implications for investors.
+"""
+
+
+def _get_system_prompt() -> str:
+    """从 Prompt 配置服务获取系统提示词"""
+    try:
+        from services.prompt_config_service import prompt_config_service
+        prompt = prompt_config_service.get_prompt("fundamentals_analyst")
+        if prompt.get("system"):
+            return prompt["system"]
+    except Exception as e:
+        logger.debug("Using default fundamentals analyst prompt", reason=str(e))
+    return DEFAULT_SYSTEM_PROMPT
+
 
 def create_fundamentals_analyst(llm):
     """创建 Fundamentals Analyst 节点
@@ -35,26 +68,8 @@ def create_fundamentals_analyst(llm):
         get_income_statement,
     ]
 
-    # 系统提示词
-    system_message = """You are a researcher tasked with analyzing fundamental information about a company.
-
-Your objective is to write a comprehensive report covering:
-1. Company profile and business overview
-2. Financial statements analysis (Balance Sheet, Income Statement, Cash Flow)
-3. Key financial ratios (P/E, P/B, ROE, ROA, Debt/Equity, etc.)
-4. Revenue and earnings trends
-5. Profitability and efficiency metrics
-6. Liquidity and solvency assessment
-7. Growth indicators and outlook
-
-Use the available tools:
-- get_fundamentals: Comprehensive company financial data
-- get_balance_sheet: Assets, liabilities, and equity details
-- get_cashflow: Operating, investing, and financing activities
-- get_income_statement: Revenue, expenses, and profitability
-
-Provide detailed, fine-grained analysis with specific numbers and comparisons. Avoid vague statements like "trends are mixed" - instead, explain exactly what the data shows and its implications for investors.
-"""
+    # 从配置服务获取系统提示词
+    system_message = _get_system_prompt()
 
     # 数据收集阶段的 prompt
     collection_prompt = ChatPromptTemplate.from_messages([

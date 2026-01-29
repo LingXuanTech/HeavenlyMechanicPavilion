@@ -11,6 +11,8 @@ from tradingagents.agents import *
 from tradingagents.agents.analysts.scout_agent import create_scout_agent
 from tradingagents.agents.analysts.macro_analyst import create_macro_analyst
 from tradingagents.agents.analysts.portfolio_agent import create_portfolio_agent
+from tradingagents.agents.analysts.sentiment_agent import create_sentiment_agent, create_sentiment_tools_node
+from tradingagents.agents.analysts.policy_agent import create_policy_agent, create_policy_tools_node
 from tradingagents.agents.utils.agent_states import AgentState
 
 from .conditional_logic import ConditionalLogic
@@ -63,11 +65,22 @@ class GraphSetup:
                 "fundamentals_report": state.get("fundamentals_report", ""),
             }
 
+            # 可选报告（仅 A 股市场）
+            optional_reports = {
+                "retail_sentiment_report": state.get("retail_sentiment_report", ""),
+                "policy_report": state.get("policy_report", ""),
+            }
+
             missing = [k for k, v in required_reports.items() if not v]
             if missing:
                 logger.warning("Analyst sync: missing reports", missing=missing)
             else:
-                logger.info("Analyst sync: all reports received")
+                logger.info("Analyst sync: all required reports received")
+
+            # 记录可选报告状态
+            optional_received = [k for k, v in optional_reports.items() if v]
+            if optional_received:
+                logger.info("Analyst sync: optional reports received", reports=optional_received)
 
             # 清理堆积的消息（保留最后 3 条）
             messages = state.get("messages", [])
@@ -88,10 +101,12 @@ class GraphSetup:
 
         Args:
             selected_analysts (list): List of analyst types to include. Options are:
-                - "market": Market analyst
+                - "market": Market analyst (technical analysis)
                 - "social": Social media analyst
                 - "news": News analyst
                 - "fundamentals": Fundamentals analyst
+                - "sentiment": Retail sentiment analyst (FOMO/FUD detection)
+                - "policy": Policy analyst (A-share regulations, CN market only)
         """
         if len(selected_analysts) == 0:
             raise ValueError("Trading Agents Graph Setup Error: no analysts selected!")
@@ -130,6 +145,21 @@ class GraphSetup:
             )
             delete_nodes["fundamentals"] = create_msg_delete()
             tool_nodes["fundamentals"] = self.tool_nodes["fundamentals"]
+
+        # New A-share focused analysts
+        if "sentiment" in selected_analysts:
+            analyst_nodes["sentiment"] = create_sentiment_agent(
+                self.quick_thinking_llm
+            )
+            delete_nodes["sentiment"] = create_msg_delete()
+            tool_nodes["sentiment"] = create_sentiment_tools_node(self.quick_thinking_llm)
+
+        if "policy" in selected_analysts:
+            analyst_nodes["policy"] = create_policy_agent(
+                self.quick_thinking_llm
+            )
+            delete_nodes["policy"] = create_msg_delete()
+            tool_nodes["policy"] = create_policy_tools_node(self.quick_thinking_llm)
 
         # Create researcher and manager nodes
         bull_researcher_node = create_bull_researcher(

@@ -90,6 +90,119 @@ class AIModelConfig(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.now)
 
 
+# ============ Prompt 配置模型 ============
+
+class AgentCategory(str, Enum):
+    """Agent 分类"""
+    ANALYST = "analyst"           # 分析师：market, news, fundamentals, social, sentiment, policy
+    RESEARCHER = "researcher"     # 研究员：bull, bear
+    MANAGER = "manager"           # 管理层：research_manager, risk_manager
+    RISK = "risk"                 # 风险辩论：aggressive, conservative, neutral
+    TRADER = "trader"             # 交易员
+    SYNTHESIZER = "synthesizer"   # 合成器
+
+
+class AgentPrompt(SQLModel, table=True):
+    """Agent Prompt 配置"""
+    __tablename__ = "agent_prompts"
+    __table_args__ = (
+        Index("ix_prompt_agent_active", "agent_key", "is_active"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    agent_key: str = Field(index=True)                    # "market_analyst", "bull_researcher" 等
+    category: AgentCategory = Field(default=AgentCategory.ANALYST)
+    display_name: str = Field(default="")                 # 显示名称，如 "市场分析师"
+    description: str = Field(default="")                  # Agent 职责描述
+
+    # Prompt 内容
+    system_prompt: str = Field(default="")                # 系统提示词
+    user_prompt_template: str = Field(default="")         # 用户消息模板，支持 {variable} 占位符
+
+    # 可用变量说明（JSON 数组）
+    available_variables: str = Field(default="[]")        # ["ticker", "date", "data", "market"]
+
+    # 配置元数据
+    version: int = Field(default=1)                       # 版本号
+    is_active: bool = Field(default=True)                 # 是否激活（同一 agent_key 可有多版本，仅一个激活）
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class PromptVersion(SQLModel, table=True):
+    """Prompt 版本历史（用于回滚）"""
+    __tablename__ = "prompt_versions"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    prompt_id: int = Field(foreign_key="agent_prompts.id", index=True)
+    version: int
+    system_prompt: str
+    user_prompt_template: str
+    change_note: str = Field(default="")                  # 变更说明
+    created_at: datetime = Field(default_factory=datetime.now)
+    created_by: str = Field(default="system")             # 修改人（用于审计）
+
+
+# ============ 用户认证模型 ============
+
+class User(SQLModel, table=True):
+    """用户表"""
+    __tablename__ = "users"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    email: str = Field(unique=True, index=True)
+    hashed_password: Optional[str] = Field(default=None)  # OAuth 用户可无密码
+    display_name: Optional[str] = Field(default=None)
+    avatar_url: Optional[str] = Field(default=None)
+    email_verified: bool = Field(default=False)
+    is_active: bool = Field(default=True)
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class OAuthAccount(SQLModel, table=True):
+    """OAuth 第三方账号关联"""
+    __tablename__ = "oauth_accounts"
+    __table_args__ = (
+        Index("ix_oauth_provider_user", "provider", "provider_user_id"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    provider: str  # google, github, wechat
+    provider_user_id: str
+    access_token: Optional[str] = Field(default=None)
+    refresh_token: Optional[str] = Field(default=None)
+    expires_at: Optional[datetime] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
+class WebAuthnCredential(SQLModel, table=True):
+    """WebAuthn / Passkey 凭证"""
+    __tablename__ = "webauthn_credentials"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    credential_id: str = Field(unique=True, index=True)
+    public_key: str  # Base64 编码
+    sign_count: int = Field(default=0)
+    device_name: Optional[str] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.now)
+    last_used_at: Optional[datetime] = Field(default=None)
+
+
+class RefreshToken(SQLModel, table=True):
+    """刷新令牌表"""
+    __tablename__ = "refresh_tokens"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="users.id", index=True)
+    token: str = Field(unique=True, index=True)
+    expires_at: datetime
+    revoked: bool = Field(default=False)
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
 def get_engine():
     """根据配置创建数据库引擎"""
     db_url = settings.database_url

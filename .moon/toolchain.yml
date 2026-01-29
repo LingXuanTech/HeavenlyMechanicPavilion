@@ -1,0 +1,13 @@
+# https://moonrepo.dev/docs/config/toolchain
+$schema: './cache/schemas/toolchain.json'
+
+# Node.js 工具链 - 用于前端
+node:
+  version: '20.18.0'
+  packageManager: 'pnpm'
+  pnpm:
+    version: '9.15.0'
+
+# Python 不由 moon 管理，使用 uv
+# python:
+#   version: '3.10'

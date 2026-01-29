@@ -10,6 +10,30 @@ from tradingagents.agents.utils.output_schemas import ResearcherOutput
 
 logger = structlog.get_logger(__name__)
 
+# 默认系统提示词
+DEFAULT_SYSTEM_PROMPT = """You are a Bull Analyst advocating for investing in the stock. Your task is to build a strong, evidence-based case emphasizing growth potential, competitive advantages, and positive market indicators.
+
+Key points to focus on:
+- Growth Potential: Highlight the company's market opportunities, revenue projections, and scalability.
+- Competitive Advantages: Emphasize factors like unique products, strong branding, or dominant market positioning.
+- Positive Indicators: Use financial health, industry trends, and recent positive news as evidence.
+- Bear Counterpoints: Critically analyze the bear argument with specific data and sound reasoning.
+- Historical Learning: Consider the historical analysis patterns and lessons learned.
+
+Deliver a compelling bull argument that refutes the bear's concerns."""
+
+
+def _get_system_prompt() -> str:
+    """从 Prompt 配置服务获取系统提示词"""
+    try:
+        from services.prompt_config_service import prompt_config_service
+        prompt = prompt_config_service.get_prompt("bull_researcher")
+        if prompt.get("system"):
+            return prompt["system"]
+    except Exception as e:
+        logger.debug("Using default bull researcher prompt", reason=str(e))
+    return DEFAULT_SYSTEM_PROMPT
+
 
 def create_bull_researcher(llm, memory):
     """创建 Bull Researcher 节点
@@ -66,15 +90,11 @@ def create_bull_researcher(llm, memory):
         if past_memory_str:
             reflection_context += f"\n=== Past Recommendations ===\n{past_memory_str}"
 
-        # 原始 prompt 用于生成辩论内容
-        raw_prompt = f"""You are a Bull Analyst advocating for investing in the stock. Your task is to build a strong, evidence-based case emphasizing growth potential, competitive advantages, and positive market indicators.
+        # 从配置服务获取系统提示词
+        system_prompt = _get_system_prompt()
 
-Key points to focus on:
-- Growth Potential: Highlight the company's market opportunities, revenue projections, and scalability.
-- Competitive Advantages: Emphasize factors like unique products, strong branding, or dominant market positioning.
-- Positive Indicators: Use financial health, industry trends, and recent positive news as evidence.
-- Bear Counterpoints: Critically analyze the bear argument with specific data and sound reasoning.
-- Historical Learning: Consider the historical analysis patterns and lessons learned.
+        # 构建完整 prompt（系统提示 + 上下文数据）
+        raw_prompt = f"""{system_prompt}
 
 Resources available:
 Market research report: {market_research_report}
@@ -84,8 +104,6 @@ Company fundamentals report: {fundamentals_report}
 Conversation history: {history}
 Last bear argument: {current_response}
 {reflection_context}
-
-Deliver a compelling bull argument that refutes the bear's concerns.
 """
 
         # 第一阶段：获取原始辩论内容

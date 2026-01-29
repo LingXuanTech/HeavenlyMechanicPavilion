@@ -11,6 +11,21 @@ from tradingagents.agents.utils.output_schemas import TraderOutput
 
 logger = structlog.get_logger(__name__)
 
+# 默认系统提示词
+DEFAULT_SYSTEM_PROMPT = """You are a trading agent analyzing market data to make investment decisions. Based on your analysis, provide a specific recommendation to buy, sell, or hold. End with a firm decision and always conclude your response with 'FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL**' to confirm your recommendation."""
+
+
+def _get_system_prompt() -> str:
+    """从 Prompt 配置服务获取系统提示词"""
+    try:
+        from services.prompt_config_service import prompt_config_service
+        prompt = prompt_config_service.get_prompt("trader")
+        if prompt.get("system"):
+            return prompt["system"]
+    except Exception as e:
+        logger.debug("Using default trader prompt", reason=str(e))
+    return DEFAULT_SYSTEM_PROMPT
+
 
 def create_trader(llm, memory):
     """创建 Trader 节点
@@ -57,11 +72,12 @@ def create_trader(llm, memory):
         else:
             past_memory_str = "No past memories found."
 
-        # 原始消息
+        # 获取系统提示词并构建原始消息
+        system_prompt = _get_system_prompt()
         messages = [
             {
                 "role": "system",
-                "content": f"""You are a trading agent analyzing market data to make investment decisions. Based on your analysis, provide a specific recommendation to buy, sell, or hold. End with a firm decision and always conclude your response with 'FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL**' to confirm your recommendation.
+                "content": f"""{system_prompt}
 
 Learn from past decisions:
 {past_memory_str}""",

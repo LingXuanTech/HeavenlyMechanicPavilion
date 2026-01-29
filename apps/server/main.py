@@ -26,12 +26,15 @@ structlog.configure(
 logger = structlog.get_logger()
 
 from services.scheduler import watchlist_scheduler
+from db.models import init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
     logger.info("Starting Stock Agents Monitoring Dashboard API", env=settings.ENV)
-    # Initialize DB, Scheduler, etc.
+    # Initialize DB
+    init_db()
+    # Initialize Scheduler, etc.
     watchlist_scheduler.start()
     yield
     # Shutdown logic
@@ -93,6 +96,10 @@ async def generic_exception_handler(request: Request, exc: Exception):
 # 请求追踪（必须在 CORS 之前添加，以确保所有请求都有 request_id）
 from api.middleware import RequestTracingMiddleware
 app.add_middleware(RequestTracingMiddleware)
+
+# Session 中间件（OAuth 2.0 授权流程需要 session 存储 state）
+from starlette.middleware.sessions import SessionMiddleware
+app.add_middleware(SessionMiddleware, secret_key=settings.JWT_SECRET_KEY)
 
 # Set up CORS
 app.add_middleware(
@@ -162,9 +169,34 @@ app.include_router(health_routes.router, prefix=settings.API_V1_STR)
 from api.routes import ai_config
 app.include_router(ai_config.router, prefix=settings.API_V1_STR)
 
-@app.on_event("startup")
-def on_startup():
-    init_db()
+# Prompt 配置路由
+from api.routes import prompts
+app.include_router(prompts.router, prefix=settings.API_V1_STR)
+
+# 北向资金路由
+from api.routes import north_money
+app.include_router(north_money.router, prefix=settings.API_V1_STR)
+
+# 龙虎榜路由
+from api.routes import lhb
+app.include_router(lhb.router, prefix=settings.API_V1_STR)
+
+# 限售解禁路由
+from api.routes import jiejin
+app.include_router(jiejin.router, prefix=settings.API_V1_STR)
+
+# 用户认证路由
+from api.routes import auth
+app.include_router(auth.router, prefix=settings.API_V1_STR)
+
+# OAuth 2.0 路由
+from api.routes import oauth
+app.include_router(oauth.router, prefix=settings.API_V1_STR)
+
+# Passkey (WebAuthn) 路由
+from api.routes import passkey
+app.include_router(passkey.router, prefix=settings.API_V1_STR)
+
 
 if __name__ == "__main__":
     import uvicorn

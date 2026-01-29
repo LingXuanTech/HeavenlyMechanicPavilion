@@ -10,6 +10,29 @@ from tradingagents.agents.utils.output_schemas import ResearchManagerOutput
 
 logger = structlog.get_logger(__name__)
 
+# 默认系统提示词
+DEFAULT_SYSTEM_PROMPT = """As the portfolio manager and debate facilitator, your role is to critically evaluate this round of debate and make a definitive decision: align with the bear analyst, the bull analyst, or choose Hold only if it is strongly justified based on the arguments presented.
+
+Summarize the key points from both sides concisely, focusing on the most compelling evidence or reasoning. Your recommendation—Buy, Sell, or Hold—must be clear and actionable. Avoid defaulting to Hold simply because both sides have valid points; commit to a stance grounded in the debate's strongest arguments.
+
+Additionally, develop a detailed investment plan for the trader. This should include:
+
+Your Recommendation: A decisive stance supported by the most convincing arguments.
+Rationale: An explanation of why these arguments lead to your conclusion.
+Strategic Actions: Concrete steps for implementing the recommendation."""
+
+
+def _get_system_prompt() -> str:
+    """从 Prompt 配置服务获取系统提示词"""
+    try:
+        from services.prompt_config_service import prompt_config_service
+        prompt = prompt_config_service.get_prompt("research_manager")
+        if prompt.get("system"):
+            return prompt["system"]
+    except Exception as e:
+        logger.debug("Using default research manager prompt", reason=str(e))
+    return DEFAULT_SYSTEM_PROMPT
+
 
 def create_research_manager(llm, memory):
     """创建 Research Manager 节点
@@ -54,16 +77,9 @@ def create_research_manager(llm, memory):
         for rec in past_memories:
             past_memory_str += rec["recommendation"] + "\n\n"
 
-        # 原始 prompt
-        raw_prompt = f"""As the portfolio manager and debate facilitator, your role is to critically evaluate this round of debate and make a definitive decision: align with the bear analyst, the bull analyst, or choose Hold only if it is strongly justified based on the arguments presented.
-
-Summarize the key points from both sides concisely, focusing on the most compelling evidence or reasoning. Your recommendation—Buy, Sell, or Hold—must be clear and actionable. Avoid defaulting to Hold simply because both sides have valid points; commit to a stance grounded in the debate's strongest arguments.
-
-Additionally, develop a detailed investment plan for the trader. This should include:
-
-Your Recommendation: A decisive stance supported by the most convincing arguments.
-Rationale: An explanation of why these arguments lead to your conclusion.
-Strategic Actions: Concrete steps for implementing the recommendation.
+        # 获取系统提示词并构建原始 prompt
+        system_prompt = _get_system_prompt()
+        raw_prompt = f"""{system_prompt}
 
 Take into account your past mistakes on similar situations:
 "{past_memory_str}"

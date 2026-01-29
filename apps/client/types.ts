@@ -90,6 +90,26 @@ export interface RiskAssessment {
   verdict: 'Approved' | 'Caution' | 'Rejected';
 }
 
+// A股市场专用分析数据
+export interface RetailSentimentAnalysis {
+  fomoLevel: 'High' | 'Medium' | 'Low' | 'None';
+  fudLevel: 'High' | 'Medium' | 'Low' | 'None';
+  overallMood: 'Greedy' | 'Neutral' | 'Fearful';
+  keyIndicators: string[];
+}
+
+export interface PolicyAnalysis {
+  recentPolicies: string[];
+  impact: 'Positive' | 'Neutral' | 'Negative';
+  riskFactors: string[];
+  opportunities: string[];
+}
+
+export interface ChinaMarketAnalysis {
+  retailSentiment: RetailSentimentAnalysis;
+  policyAnalysis: PolicyAnalysis;
+}
+
 export interface AgentAnalysis {
   symbol: string;
   timestamp: string;
@@ -115,6 +135,7 @@ export interface AgentAnalysis {
   macroContext?: MacroContext;
   webSources?: WebSource[];
   anchor_script?: string; // AI-generated TTS script
+  chinaMarket?: ChinaMarketAnalysis; // A股市场专用分析（仅 CN 市场股票）
 }
 
 export interface MarketIndex {
@@ -380,3 +401,187 @@ export interface ComponentHealthInfo {
 
 /** SSE 事件数据类型 */
 export type SSEEventData = Record<string, unknown>;
+
+// ============ 北向资金类型 (A股特有) ============
+
+/** 北向资金流向 */
+export interface NorthMoneyFlow {
+  date: string;
+  shanghai_connect: number;  // 沪股通（亿元）
+  shenzhen_connect: number;  // 深股通（亿元）
+  total_net: number;         // 北向合计（亿元）
+  cumulative_net: number;    // 累计净流入（亿元）
+  shanghai_buy: number;      // 沪股通买入
+  shanghai_sell: number;     // 沪股通卖出
+  shenzhen_buy: number;      // 深股通买入
+  shenzhen_sell: number;     // 深股通卖出
+}
+
+/** 北向资金历史记录 */
+export interface NorthMoneyHistory {
+  date: string;
+  total_net: number;
+  shanghai_connect: number;
+  shenzhen_connect: number;
+}
+
+/** 北向资金持股 */
+export interface NorthMoneyHolding {
+  symbol: string;
+  name: string;
+  holding_shares: number;     // 持股数量（万股）
+  holding_value: number;      // 持股市值（亿元）
+  holding_ratio: number;      // 持股比例（%）
+  change_shares: number;      // 持股变动（万股）
+  change_ratio: number;       // 变动比例（%）
+}
+
+/** 北向资金 TOP 股票 */
+export interface NorthMoneyTopStock {
+  symbol: string;
+  name: string;
+  net_buy: number;            // 净买入（亿元）
+  buy_amount: number;         // 买入金额（亿元）
+  sell_amount: number;        // 卖出金额（亿元）
+  holding_ratio: number;      // 持股比例（%）
+}
+
+/** 北向资金概览 */
+export interface NorthMoneySummary {
+  date: string;
+  flow: NorthMoneyFlow;
+  trend: 'Inflow' | 'Outflow' | 'Neutral';
+  trend_days: number;         // 连续流入/流出天数
+  recent_history: NorthMoneyHistory[];
+  top_buys: NorthMoneyTopStock[];
+  top_sells: NorthMoneyTopStock[];
+}
+
+// ============ 龙虎榜类型 (A股特有) ============
+
+/** 龙虎榜席位 */
+export interface LHBSeat {
+  seat_name: string;
+  buy_amount: number;
+  sell_amount: number;
+  net_amount: number;
+  seat_type: '机构' | '游资' | '普通';
+  hot_money_name: string | null;
+}
+
+/** 龙虎榜股票 */
+export interface LHBStock {
+  symbol: string;
+  name: string;
+  close_price: number;
+  change_percent: number;
+  turnover_rate: number;
+  lhb_net_buy: number;
+  lhb_buy_amount: number;
+  lhb_sell_amount: number;
+  reason: string;
+  buy_seats: LHBSeat[];
+  sell_seats: LHBSeat[];
+  institution_net: number;
+  hot_money_involved: boolean;
+}
+
+/** 知名游资席位 */
+export interface HotMoneySeat {
+  seat_name: string;
+  alias: string;
+  style: string;
+  recent_stocks: Array<{
+    symbol: string;
+    name: string;
+    action: string;
+    amount: number;
+  }>;
+  win_rate: number | null;
+}
+
+/** 龙虎榜概览 */
+export interface LHBSummary {
+  date: string;
+  total_stocks: number;
+  total_net_buy: number;
+  institution_net_buy: number;
+  top_buys: LHBStock[];
+  top_sells: LHBStock[];
+  hot_money_active: HotMoneySeat[];
+}
+
+// ============ 限售解禁类型 (A股特有) ============
+
+/** 解禁股票 */
+export interface JiejinStock {
+  symbol: string;
+  name: string;
+  jiejin_date: string;
+  jiejin_shares: number;        // 解禁数量（万股）
+  jiejin_market_value: number;  // 解禁市值（亿元）
+  jiejin_ratio: number;         // 解禁比例（%）
+  jiejin_type: string;
+  pressure_level: '高' | '中' | '低';
+}
+
+/** 解禁日历 */
+export interface JiejinCalendar {
+  date: string;
+  stock_count: number;
+  total_shares: number;         // 亿股
+  total_market_value: number;   // 亿元
+  stocks: JiejinStock[];
+}
+
+/** 解禁概览 */
+export interface JiejinSummary {
+  date_range: string;
+  total_stocks: number;
+  total_market_value: number;
+  daily_average: number;
+  high_pressure_stocks: JiejinStock[];
+  calendar: JiejinCalendar[];
+}
+
+// ============ Prompt 配置类型 ============
+
+/** Agent 分类 */
+export type AgentCategory = 'analyst' | 'researcher' | 'manager' | 'risk' | 'trader' | 'synthesizer';
+
+/** Agent Prompt 配置 */
+export interface AgentPrompt {
+  id: number;
+  agent_key: string;
+  category: AgentCategory;
+  display_name: string;
+  description: string;
+  system_prompt: string;
+  user_prompt_template: string;
+  available_variables: string[];
+  version: number;
+  is_active: boolean;
+  updated_at: string;
+}
+
+/** Prompt 版本历史 */
+export interface PromptVersionHistory {
+  version: number;
+  change_note: string;
+  created_at: string;
+  created_by: string;
+}
+
+/** Prompt 详情（含版本历史） */
+export interface AgentPromptDetail extends AgentPrompt {
+  created_at: string;
+  version_history: PromptVersionHistory[];
+}
+
+/** Prompt 服务状态 */
+export interface PromptServiceStatus {
+  initialized: boolean;
+  prompts_count: number;
+  cached_agents: string[];
+  last_refresh: string | null;
+}

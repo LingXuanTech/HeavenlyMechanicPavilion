@@ -10,6 +10,30 @@ from tradingagents.agents.utils.output_schemas import ResearcherOutput
 
 logger = structlog.get_logger(__name__)
 
+# 默认系统提示词
+DEFAULT_SYSTEM_PROMPT = """You are a Bear Analyst making the case against investing in the stock. Your goal is to present a well-reasoned argument emphasizing risks, challenges, and negative indicators.
+
+Key points to focus on:
+- Risks and Challenges: Highlight factors like market saturation, financial instability, or macroeconomic threats.
+- Competitive Weaknesses: Emphasize vulnerabilities such as weaker market positioning or threats from competitors.
+- Negative Indicators: Use evidence from financial data, market trends, or recent adverse news.
+- Bull Counterpoints: Critically analyze the bull argument, exposing weaknesses or over-optimistic assumptions.
+- Historical Learning: Consider the historical analysis patterns and lessons learned.
+
+Deliver a compelling bear argument that refutes the bull's claims."""
+
+
+def _get_system_prompt() -> str:
+    """从 Prompt 配置服务获取系统提示词"""
+    try:
+        from services.prompt_config_service import prompt_config_service
+        prompt = prompt_config_service.get_prompt("bear_researcher")
+        if prompt.get("system"):
+            return prompt["system"]
+    except Exception as e:
+        logger.debug("Using default bear researcher prompt", reason=str(e))
+    return DEFAULT_SYSTEM_PROMPT
+
 
 def create_bear_researcher(llm, memory):
     """创建 Bear Researcher 节点
@@ -66,15 +90,11 @@ def create_bear_researcher(llm, memory):
         if past_memory_str:
             reflection_context += f"\n=== Past Recommendations ===\n{past_memory_str}"
 
-        # 原始 prompt
-        raw_prompt = f"""You are a Bear Analyst making the case against investing in the stock. Your goal is to present a well-reasoned argument emphasizing risks, challenges, and negative indicators.
+        # 从配置服务获取系统提示词
+        system_prompt = _get_system_prompt()
 
-Key points to focus on:
-- Risks and Challenges: Highlight factors like market saturation, financial instability, or macroeconomic threats.
-- Competitive Weaknesses: Emphasize vulnerabilities such as weaker market positioning or threats from competitors.
-- Negative Indicators: Use evidence from financial data, market trends, or recent adverse news.
-- Bull Counterpoints: Critically analyze the bull argument, exposing weaknesses or over-optimistic assumptions.
-- Historical Learning: Consider the historical analysis patterns and lessons learned.
+        # 构建完整 prompt（系统提示 + 上下文数据）
+        raw_prompt = f"""{system_prompt}
 
 Resources available:
 Market research report: {market_research_report}
@@ -84,8 +104,6 @@ Company fundamentals report: {fundamentals_report}
 Conversation history: {history}
 Last bull argument: {current_response}
 {reflection_context}
-
-Deliver a compelling bear argument that refutes the bull's claims.
 """
 
         # 第一阶段：获取原始辩论内容

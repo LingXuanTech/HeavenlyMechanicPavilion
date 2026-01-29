@@ -2,36 +2,55 @@ import asyncio
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from db.models import ChatHistory, get_session
 from config.settings import settings
-from langchain_openai import ChatOpenAI
-from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 logger = structlog.get_logger()
 
+
+def _create_llm():
+    """延迟创建 LLM 实例，优雅处理 API key 缺失"""
+    if settings.GOOGLE_API_KEY:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        return ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=settings.GOOGLE_API_KEY)
+    elif settings.OPENAI_API_KEY:
+        from langchain_openai import ChatOpenAI
+        return ChatOpenAI(model="gpt-4o-mini", api_key=settings.OPENAI_API_KEY)
+    else:
+        logger.warning("No LLM API key configured (OPENAI_API_KEY or GOOGLE_API_KEY)")
+        return None
+
+
 class ChatService:
     def __init__(self):
-        if settings.GOOGLE_API_KEY:
-            self.llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=settings.GOOGLE_API_KEY)
-        else:
-            self.llm = ChatOpenAI(model="gpt-4o-mini", api_key=settings.OPENAI_API_KEY)
+        self._llm = None
+
+    @property
+    def llm(self):
+        """延迟初始化 LLM"""
+        if self._llm is None:
+            self._llm = _create_llm()
+        return self._llm
 
     async def get_response(self, thread_id: str, message: str, history: List[ChatHistory]) -> str:
+        if self.llm is None:
+            raise HTTPException(status_code=503, detail="Chat service unavailable: No LLM API key configured")
+
         messages = [
             SystemMessage(content="你是一个专业的投资顾问助手。请基于历史对话和当前问题提供专业的建议。")
         ]
-        
+
         for h in history:
             if h.role == "user":
                 messages.append(HumanMessage(content=h.content))
             else:
                 messages.append(AIMessage(content=h.content))
-        
+
         messages.append(HumanMessage(content=message))
-        
+
         response = await self.llm.ainvoke(messages)
         return response.content
 

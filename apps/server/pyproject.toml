@@ -13,7 +13,7 @@ dependencies = [
     "duckduckgo-search>=6.0.0",
     "langsmith>=0.1.100",
     "eodhd>=1.0.32",
-    "fastapi>=0.115.9",
+    "fastapi>=0.128.0",
     "feedparser>=6.0.11",
     "finnhub-python>=2.4.23",
     "grip>=4.6.2",
@@ -22,7 +22,7 @@ dependencies = [
     "langchain-experimental>=0.3.4",
     "langchain-google-genai>=2.1.5",
     "langchain-openai>=0.3.23",
-    "langgraph>=0.4.8",
+    "langgraph>=1.0.7",
     "pandas>=2.3.0",
     "parsel>=1.10.0",
     "praw>=7.8.1",
@@ -45,6 +45,13 @@ dependencies = [
     "yfinance>=0.2.63",
     "cryptography>=46.0.4",
     "psutil>=7.2.1",
+    # Auth dependencies
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "authlib>=1.3.0",
+    "webauthn>=2.0.0",
+    "email-validator>=2.0.0",
+    "itsdangerous>=2.0.0",
 ]
 
 [project.optional-dependencies]

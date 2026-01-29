@@ -31,6 +31,17 @@ import {
   ServiceStatusResponse,
   RegionSentimentInfo,
   ComponentHealthInfo,
+  NorthMoneyFlow,
+  NorthMoneySummary,
+  NorthMoneyHistory,
+  NorthMoneyHolding,
+  NorthMoneyTopStock,
+  LHBStock,
+  LHBSummary,
+  HotMoneySeat,
+  JiejinStock,
+  JiejinCalendar,
+  JiejinSummary,
 } from '../types';
 
 // ============ 基础配置 ============
@@ -662,4 +673,154 @@ export const refreshAIConfig = () =>
 
 export const getAIConfigStatus = () =>
   request<AIConfigStatus>('/ai/status');
+
+// ============ 北向资金 API (A股特有) ============
+
+export const getNorthMoneyFlow = () =>
+  request<NorthMoneyFlow>('/north-money/flow');
+
+export const getNorthMoneySummary = () =>
+  request<NorthMoneySummary>('/north-money/summary');
+
+export const getNorthMoneyHistory = (days: number = 30) =>
+  request<NorthMoneyHistory[]>(`/north-money/history?days=${days}`);
+
+export const getNorthMoneyHolding = (symbol: string) =>
+  request<NorthMoneyHolding>(`/north-money/holding/${symbol}`);
+
+export const getNorthMoneyTopBuys = (limit: number = 20) =>
+  request<NorthMoneyTopStock[]>(`/north-money/top-buys?limit=${limit}`);
+
+export const getNorthMoneyTopSells = (limit: number = 20) =>
+  request<NorthMoneyTopStock[]>(`/north-money/top-sells?limit=${limit}`);
+
+// ============ 龙虎榜 API (A股特有) ============
+
+export const getLHBDaily = (tradeDate?: string) => {
+  const query = tradeDate ? `?trade_date=${tradeDate}` : '';
+  return request<LHBStock[]>(`/lhb/daily${query}`);
+};
+
+export const getLHBSummary = () =>
+  request<LHBSummary>('/lhb/summary');
+
+export const getLHBStockHistory = (symbol: string, days: number = 30) =>
+  request<any[]>(`/lhb/stock/${symbol}?days=${days}`);
+
+export const getLHBHotMoneyActivity = (days: number = 5) =>
+  request<HotMoneySeat[]>(`/lhb/hot-money?days=${days}`);
+
+export const getLHBTopBuys = (limit: number = 10) =>
+  request<LHBStock[]>(`/lhb/top-buys?limit=${limit}`);
+
+export const getLHBTopSells = (limit: number = 10) =>
+  request<LHBStock[]>(`/lhb/top-sells?limit=${limit}`);
+
+export const getLHBInstitutionActivity = (direction: 'buy' | 'sell' | 'all' = 'all') =>
+  request<LHBStock[]>(`/lhb/institution-activity?direction=${direction}`);
+
+export const getLHBHotMoneyStocks = () =>
+  request<LHBStock[]>('/lhb/hot-money-stocks');
+
+// ============ 限售解禁 API (A股特有) ============
+
+export const getJiejinUpcoming = (days: number = 30) =>
+  request<JiejinStock[]>(`/jiejin/upcoming?days=${days}`);
+
+export const getJiejinCalendar = (days: number = 30) =>
+  request<JiejinCalendar[]>(`/jiejin/calendar?days=${days}`);
+
+export const getJiejinSummary = (days: number = 30) =>
+  request<JiejinSummary>(`/jiejin/summary?days=${days}`);
+
+export const getJiejinStockPlan = (symbol: string) =>
+  request<any>(`/jiejin/stock/${symbol}`);
+
+export const getJiejinHighPressure = (days: number = 7) =>
+  request<JiejinStock[]>(`/jiejin/high-pressure?days=${days}`);
+
+export const getJiejinWarning = (symbol: string, days: number = 30) =>
+  request<any>(`/jiejin/warning/${symbol}?days=${days}`);
+
+export const getJiejinToday = () =>
+  request<JiejinStock[]>('/jiejin/today');
+
+export const getJiejinWeek = () =>
+  request<JiejinStock[]>('/jiejin/week');
+
+// ============ Prompt 配置 API ============
+
+import type { AgentPrompt, AgentPromptDetail, AgentCategory, PromptServiceStatus } from '../types';
+
+/** 获取所有 Prompt 列表 */
+export const getPromptList = (category?: AgentCategory) => {
+  const query = category ? `?category=${category}` : '';
+  return request<{ prompts: AgentPrompt[]; total: number }>(`/prompts/${query}`);
+};
+
+/** 获取 Prompt 详情（含版本历史） */
+export const getPromptDetail = (promptId: number) =>
+  request<AgentPromptDetail>(`/prompts/${promptId}`);
+
+/** 更新 Prompt */
+export const updatePrompt = (
+  promptId: number,
+  data: {
+    system_prompt?: string;
+    user_prompt_template?: string;
+    display_name?: string;
+    description?: string;
+    available_variables?: string[];
+    change_note?: string;
+  }
+) =>
+  request<{ id: number; agent_key: string; version: number; updated: boolean }>(
+    `/prompts/${promptId}`,
+    { method: 'PUT', body: JSON.stringify(data) }
+  );
+
+/** 回滚 Prompt 到指定版本 */
+export const rollbackPrompt = (promptId: number, targetVersion: number) =>
+  request<{ id: number; agent_key: string; rolled_back_to: number; new_version: number }>(
+    `/prompts/${promptId}/rollback`,
+    { method: 'POST', body: JSON.stringify({ target_version: targetVersion }) }
+  );
+
+/** 刷新 Prompt 缓存 */
+export const refreshPromptCache = () =>
+  request<PromptServiceStatus>('/prompts/refresh', { method: 'POST' });
+
+/** 获取 Prompt 服务状态 */
+export const getPromptServiceStatus = () =>
+  request<PromptServiceStatus>('/prompts/status');
+
+/** 导出 Prompt 为 YAML */
+export const exportPromptsYaml = async (): Promise<string> => {
+  const response = await fetch(`${API_BASE}/prompts/export/yaml`);
+  if (!response.ok) throw new ApiError(response.status, response.statusText, 'Export failed');
+  return response.text();
+};
+
+/** 导入 YAML 格式的 Prompt */
+export const importPromptsYaml = (yamlContent: string) =>
+  request<{ success: boolean; created: number; updated: number }>(
+    '/prompts/import/yaml',
+    { method: 'POST', body: JSON.stringify({ yaml_content: yamlContent }) }
+  );
+
+/** 预览 Prompt（带变量注入） */
+export const previewPrompt = (agentKey: string, variables?: Record<string, unknown>) =>
+  request<{
+    agent_key: string;
+    rendered_system_prompt: string;
+    rendered_user_prompt: string;
+    variables_used: Record<string, unknown>;
+  }>(
+    `/prompts/preview?agent_key=${encodeURIComponent(agentKey)}`,
+    { method: 'POST', body: JSON.stringify(variables || {}) }
+  );
+
+/** 获取所有 Agent 分类 */
+export const getPromptCategories = () =>
+  request<{ categories: { value: string; label: string }[] }>('/prompts/categories');
 

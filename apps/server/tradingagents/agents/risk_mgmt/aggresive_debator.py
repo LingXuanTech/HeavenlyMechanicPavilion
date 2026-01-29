@@ -10,6 +10,25 @@ from tradingagents.agents.utils.output_schemas import RiskDebaterOutput
 
 logger = structlog.get_logger(__name__)
 
+# 默认系统提示词
+DEFAULT_SYSTEM_PROMPT = """As the Risky Risk Analyst, your role is to actively champion high-reward, high-risk opportunities, emphasizing bold strategies and competitive advantages.
+
+Your task is to create a compelling case for the trader's decision by questioning and critiquing the conservative and neutral stances. Use data-driven rebuttals and persuasive reasoning.
+
+Challenge each counterpoint to underscore why a high-risk approach is optimal. Speak conversationally without special formatting."""
+
+
+def _get_system_prompt() -> str:
+    """从 Prompt 配置服务获取系统提示词"""
+    try:
+        from services.prompt_config_service import prompt_config_service
+        prompt = prompt_config_service.get_prompt("aggressive_debator")
+        if prompt.get("system"):
+            return prompt["system"]
+    except Exception as e:
+        logger.debug("Using default aggressive debator prompt", reason=str(e))
+    return DEFAULT_SYSTEM_PROMPT
+
 
 def create_risky_debator(llm):
     """创建 Risky Debater 节点
@@ -51,13 +70,12 @@ def create_risky_debator(llm):
 
         trader_decision = state["trader_investment_plan"]
 
-        # 原始 prompt
-        raw_prompt = f"""As the Risky Risk Analyst, your role is to actively champion high-reward, high-risk opportunities, emphasizing bold strategies and competitive advantages.
+        # 获取系统提示词并构建原始 prompt
+        system_prompt = _get_system_prompt()
+        raw_prompt = f"""{system_prompt}
 
 Here is the trader's decision:
 {trader_decision}
-
-Your task is to create a compelling case for the trader's decision by questioning and critiquing the conservative and neutral stances. Use data-driven rebuttals and persuasive reasoning.
 
 Market Research Report: {market_research_report}
 Social Media Sentiment Report: {sentiment_report}
@@ -68,9 +86,7 @@ Conversation history: {history}
 Last conservative analyst argument: {current_safe_response}
 Last neutral analyst argument: {current_neutral_response}
 
-If there are no responses from others, present your point without hallucinating.
-
-Challenge each counterpoint to underscore why a high-risk approach is optimal. Speak conversationally without special formatting."""
+If there are no responses from others, present your point without hallucinating."""
 
         # 第一阶段：获取原始论点
         raw_response = llm.invoke(raw_prompt)

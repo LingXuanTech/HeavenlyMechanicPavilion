@@ -13,6 +13,7 @@ from api.sse import sse_manager
 from services.synthesizer import synthesizer
 from services.memory_service import memory_service, AnalysisMemory
 from services.cache_service import cache_service
+from services.data_router import MarketRouter
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 from config.settings import settings
@@ -79,10 +80,13 @@ async def run_analysis_task(task_id: str, symbol: str, trade_date: str):
 
         # Initialize graph with custom config if needed
         config = DEFAULT_CONFIG.copy()
-        ta = TradingAgentsGraph(debug=True, config=config)
+        market = MarketRouter.get_market(symbol)
+        ta = TradingAgentsGraph(debug=True, config=config, market=market)
 
-        # Initial state (with historical reflection)
-        init_state = ta.propagator.create_initial_state(symbol, trade_date, historical_reflection)
+        # Initial state (with historical reflection and market)
+        init_state = ta.propagator.create_initial_state(
+            symbol, trade_date, market=market, historical_reflection=historical_reflection
+        )
         args = ta.propagator.get_graph_args()
 
         agent_reports = {}
@@ -100,6 +104,8 @@ async def run_analysis_task(task_id: str, symbol: str, trade_date: str):
                     "News Analyst": "stage_analyst",
                     "Fundamentals Analyst": "stage_analyst",
                     "Social Analyst": "stage_analyst",
+                    "Sentiment Analyst": "stage_analyst",  # A股散户情绪分析师
+                    "Policy Analyst": "stage_analyst",     # A股政策分析师
                     "Bull Researcher": "stage_debate",
                     "Bear Researcher": "stage_debate",
                     "Risk Judge": "stage_risk",
@@ -120,6 +126,11 @@ async def run_analysis_task(task_id: str, symbol: str, trade_date: str):
                     agent_reports["fundamentals"] = node_data["fundamentals_report"]
                 if "portfolio_report" in node_data:
                     agent_reports["portfolio"] = node_data["portfolio_report"]
+                # A股专用报告
+                if "retail_sentiment_report" in node_data:
+                    agent_reports["retail_sentiment"] = node_data["retail_sentiment_report"]
+                if "policy_report" in node_data:
+                    agent_reports["policy"] = node_data["policy_report"]
 
                 event_data = {
                     "node": node_name,

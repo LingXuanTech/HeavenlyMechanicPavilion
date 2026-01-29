@@ -121,6 +121,142 @@ class SocialMediaAnalystOutput(BaseModel):
     confidence: int = Field(description="信心度 0-100", ge=0, le=100)
 
 
+class SentimentAgentOutput(BaseModel):
+    """Sentiment Agent 结构化输出 - 专注散户情绪分析"""
+    summary: str = Field(description="散户情绪分析总结")
+
+    # 散户情绪指数
+    retail_sentiment_score: int = Field(
+        description="散户情绪指数 -100 到 100（-100 极度恐慌，100 极度贪婪）",
+        ge=-100, le=100
+    )
+
+    # 情绪来源分布
+    sentiment_by_source: dict = Field(
+        description="各平台情绪分布",
+        examples=[{"reddit": 75, "twitter": 60, "stocktwits": 80}]
+    )
+
+    # 热门讨论
+    hot_discussions: List[dict] = Field(
+        description="热门讨论话题",
+        examples=[{"topic": "财报预期", "sentiment": "Bullish", "volume": 1200}]
+    )
+
+    # 散户 vs 机构背离
+    retail_institutional_divergence: Literal["Aligned", "Divergent", "Strongly Divergent"] = Field(
+        description="散户与机构情绪背离程度"
+    )
+
+    # FOMO 指标（Fear of Missing Out - 错失恐惧）
+    fomo_level: int = Field(
+        description="FOMO 程度 0-100（散户追涨情绪）",
+        ge=0, le=100
+    )
+
+    # FUD 指标（Fear, Uncertainty, Doubt - 恐惧、不确定、怀疑）
+    fud_level: int = Field(
+        description="FUD 程度 0-100（散户恐慌情绪）",
+        ge=0, le=100
+    )
+
+    # 情绪极端度
+    sentiment_extremity: Literal["Extreme Greed", "Greed", "Neutral", "Fear", "Extreme Fear"] = Field(
+        description="情绪极端度判断"
+    )
+
+    # 反向指标建议
+    contrarian_signal: Optional[str] = Field(
+        default=None,
+        description="反向操作建议（当情绪极端时）"
+    )
+
+    # 信号
+    signal: Literal["Strong Buy", "Buy", "Hold", "Sell", "Strong Sell"] = Field(
+        description="基于散户情绪的交易信号"
+    )
+    confidence: int = Field(description="信心度 0-100", ge=0, le=100)
+
+
+class PolicyAgentOutput(BaseModel):
+    """Policy Agent 结构化输出 - A 股政策分析专用"""
+    summary: str = Field(description="政策分析总结")
+
+    # 政策环境评估
+    policy_environment: Literal["Highly Supportive", "Supportive", "Neutral", "Restrictive", "Highly Restrictive"] = Field(
+        description="当前政策环境对该股票/行业的影响"
+    )
+
+    # 相关政策列表
+    relevant_policies: List[dict] = Field(
+        description="相关政策文件",
+        examples=[{
+            "title": "央行降准0.5个百分点",
+            "source": "中国人民银行",
+            "date": "2026-01-15",
+            "impact": "Positive",
+            "affected_sectors": ["银行", "地产"],
+            "summary": "释放流动性约1万亿元"
+        }]
+    )
+
+    # 行业政策导向
+    sector_policy_trend: Literal["强力支持", "鼓励发展", "中性", "规范整顿", "限制收紧"] = Field(
+        description="所属行业的政策导向"
+    )
+
+    # 监管风险
+    regulatory_risks: List[dict] = Field(
+        description="潜在监管风险",
+        examples=[{
+            "risk": "反垄断调查",
+            "probability": "Medium",
+            "impact": "High",
+            "mitigation": "公司已主动整改"
+        }]
+    )
+
+    # 政策催化剂
+    policy_catalysts: List[dict] = Field(
+        description="即将出台的政策催化剂",
+        examples=[{
+            "event": "两会",
+            "expected_date": "2026-03",
+            "potential_topics": ["新质生产力", "房地产"],
+            "expected_impact": "Positive"
+        }]
+    )
+
+    # 地方政策支持
+    local_policy_support: Optional[str] = Field(
+        default=None,
+        description="地方政府支持政策（如有）"
+    )
+
+    # 国际政策影响
+    international_policy_impact: Optional[dict] = Field(
+        default=None,
+        description="国际政策/贸易政策影响",
+        examples=[{
+            "factor": "中美关税",
+            "current_status": "部分缓和",
+            "impact_on_company": "出口业务承压"
+        }]
+    )
+
+    # 政策敏感度评分
+    policy_sensitivity: int = Field(
+        description="政策敏感度评分 0-100（100 为高度敏感）",
+        ge=0, le=100
+    )
+
+    # 信号
+    signal: Literal["Strong Buy", "Buy", "Hold", "Sell", "Strong Sell"] = Field(
+        description="基于政策面的交易信号"
+    )
+    confidence: int = Field(description="信心度 0-100", ge=0, le=100)
+
+
 class MacroAnalystOutput(BaseModel):
     """Macro Analyst 结构化输出"""
     summary: str = Field(description="宏观分析总结")

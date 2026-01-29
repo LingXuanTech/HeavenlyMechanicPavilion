@@ -11,22 +11,8 @@ from tradingagents.agents.utils.output_schemas import SocialMediaAnalystOutput
 
 logger = structlog.get_logger(__name__)
 
-
-def create_social_media_analyst(llm):
-    """创建 Social Media Analyst 节点
-
-    Args:
-        llm: LangChain LLM 实例
-
-    Returns:
-        social_media_analyst_node: LangGraph 节点函数
-    """
-
-    # 工具列表
-    tools = [get_news]
-
-    # 系统提示词
-    system_message = """You are a social media and sentiment analyst tasked with analyzing public sentiment for a specific company over the past week.
+# 默认系统提示词
+DEFAULT_SYSTEM_PROMPT = """You are a social media and sentiment analyst tasked with analyzing public sentiment for a specific company over the past week.
 
 Your objective is to write a comprehensive report covering:
 1. Social media buzz and trending topics about the company
@@ -44,6 +30,35 @@ Use the get_news(query, start_date, end_date) tool to search for:
 
 Focus on sentiment that could influence short-term price movements and retail investor behavior.
 """
+
+
+def _get_system_prompt() -> str:
+    """从 Prompt 配置服务获取系统提示词"""
+    try:
+        from services.prompt_config_service import prompt_config_service
+        prompt = prompt_config_service.get_prompt("social_media_analyst")
+        if prompt.get("system"):
+            return prompt["system"]
+    except Exception as e:
+        logger.debug("Using default social media analyst prompt", reason=str(e))
+    return DEFAULT_SYSTEM_PROMPT
+
+
+def create_social_media_analyst(llm):
+    """创建 Social Media Analyst 节点
+
+    Args:
+        llm: LangChain LLM 实例
+
+    Returns:
+        social_media_analyst_node: LangGraph 节点函数
+    """
+
+    # 工具列表
+    tools = [get_news]
+
+    # 从配置服务获取系统提示词
+    system_message = _get_system_prompt()
 
     # 数据收集阶段的 prompt
     collection_prompt = ChatPromptTemplate.from_messages([

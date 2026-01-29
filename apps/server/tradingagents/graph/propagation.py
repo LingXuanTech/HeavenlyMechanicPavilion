@@ -16,19 +16,25 @@ class Propagator:
         self.max_recur_limit = max_recur_limit
 
     def create_initial_state(
-        self, company_name: str, trade_date: str, historical_reflection: Optional[str] = None
+        self,
+        company_name: str,
+        trade_date: str,
+        market: str = "US",
+        historical_reflection: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create the initial state for the agent graph.
 
         Args:
             company_name: Stock symbol to analyze
             trade_date: Date for the analysis
+            market: Market identifier (US, HK, CN)
             historical_reflection: Optional historical analysis context from memory service
         """
         return {
             "messages": [("human", company_name)],
             "company_of_interest": company_name,
             "trade_date": str(trade_date),
+            "market": market,
             "historical_reflection": historical_reflection or "",
             "investment_debate_state": InvestDebateState(
                 {"history": "", "current_response": "", "count": 0}
@@ -42,10 +48,14 @@ class Propagator:
                     "count": 0,
                 }
             ),
+            # Standard analyst reports
             "market_report": "",
             "fundamentals_report": "",
             "sentiment_report": "",
             "news_report": "",
+            # A-share focused reports (populated only for CN/HK markets)
+            "retail_sentiment_report": "",
+            "policy_report": "",
         }
 
     def get_graph_args(self) -> Dict[str, Any]:

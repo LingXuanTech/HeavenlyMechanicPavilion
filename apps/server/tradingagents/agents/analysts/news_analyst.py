@@ -11,22 +11,8 @@ from tradingagents.agents.utils.output_schemas import NewsAnalystOutput
 
 logger = structlog.get_logger(__name__)
 
-
-def create_news_analyst(llm):
-    """创建 News Analyst 节点
-
-    Args:
-        llm: LangChain LLM 实例
-
-    Returns:
-        news_analyst_node: LangGraph 节点函数
-    """
-
-    # 工具列表
-    tools = [get_news, get_global_news]
-
-    # 系统提示词
-    system_message = """You are a news researcher tasked with analyzing recent news and trends over the past week.
+# 默认系统提示词
+DEFAULT_SYSTEM_PROMPT = """You are a news researcher tasked with analyzing recent news and trends over the past week.
 
 Your objective is to write a comprehensive report covering:
 1. Macroeconomic news and global market trends
@@ -42,6 +28,35 @@ Use the available tools:
 
 Focus on news that could impact stock prices and trading decisions. Analyze the potential market impact of each significant news item.
 """
+
+
+def _get_system_prompt() -> str:
+    """从 Prompt 配置服务获取系统提示词"""
+    try:
+        from services.prompt_config_service import prompt_config_service
+        prompt = prompt_config_service.get_prompt("news_analyst")
+        if prompt.get("system"):
+            return prompt["system"]
+    except Exception as e:
+        logger.debug("Using default news analyst prompt", reason=str(e))
+    return DEFAULT_SYSTEM_PROMPT
+
+
+def create_news_analyst(llm):
+    """创建 News Analyst 节点
+
+    Args:
+        llm: LangChain LLM 实例
+
+    Returns:
+        news_analyst_node: LangGraph 节点函数
+    """
+
+    # 工具列表
+    tools = [get_news, get_global_news]
+
+    # 从配置服务获取系统提示词
+    system_message = _get_system_prompt()
 
     # 数据收集阶段的 prompt
     collection_prompt = ChatPromptTemplate.from_messages([

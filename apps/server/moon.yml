@@ -1,0 +1,90 @@
+# https://moonrepo.dev/docs/config/project
+$schema: '../../.moon/cache/schemas/project.json'
+
+# 项目元数据
+type: 'application'
+language: 'python'
+platform: 'system'  # Python 项目使用系统命令
+
+# 项目标签
+tags:
+  - 'backend'
+  - 'fastapi'
+  - 'python'
+
+# 任务定义
+tasks:
+  # 安装依赖
+  install:
+    command: 'uv sync'
+    inputs:
+      - 'pyproject.toml'
+      - 'uv.lock'
+
+  # 开发服务器
+  dev:
+    command: 'uv run python main.py'
+    local: true
+    options:
+      persistent: true
+      cache: false
+
+  # 生产服务器（使用 uvicorn）
+  start:
+    command: 'uv run uvicorn main:app --host 0.0.0.0 --port 8000'
+    local: true
+    options:
+      persistent: true
+
+  # 运行测试
+  test:
+    command: 'uv run pytest'
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+      - 'pyproject.toml'
+
+  # 运行带覆盖率的测试
+  test-cov:
+    command: 'uv run pytest --cov=. --cov-report=html'
+    inputs:
+      - '@group(sources)'
+      - '@group(tests)'
+    outputs:
+      - 'htmlcov'
+
+  # 类型检查
+  typecheck:
+    command: 'uv run mypy .'
+    inputs:
+      - '@group(sources)'
+
+  # 代码格式化
+  format:
+    command: 'uv run ruff format .'
+    local: true
+
+  # 代码检查
+  lint:
+    command: 'uv run ruff check .'
+    inputs:
+      - '@group(sources)'
+
+  # CLI 交互模式
+  cli:
+    command: 'uv run python -m cli.main'
+    local: true
+    options:
+      persistent: true
+
+# 文件分组
+fileGroups:
+  sources:
+    - '**/*.py'
+    - '!tests/**'
+    - '!**/__pycache__/**'
+  tests:
+    - 'tests/**/*.py'
+  configs:
+    - 'config/**/*.py'
+    - 'config/**/*.yaml'

@@ -1,0 +1,74 @@
+# https://moonrepo.dev/docs/config/project
+$schema: '../../.moon/cache/schemas/project.json'
+
+# 项目元数据
+type: 'application'
+language: 'typescript'
+platform: 'node'
+
+# 项目标签
+tags:
+  - 'frontend'
+  - 'react'
+  - 'vite'
+
+# 依赖于 server 项目（开发时需要后端 API）
+dependsOn:
+  - 'server'
+
+# 任务定义
+tasks:
+  # 安装依赖
+  install:
+    command: 'pnpm install'
+    inputs:
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+
+  # 开发服务器
+  dev:
+    command: 'pnpm run dev'
+    local: true
+    options:
+      persistent: true
+      cache: false
+
+  # 生产构建
+  build:
+    command: 'pnpm run build'
+    inputs:
+      - '@group(sources)'
+      - 'package.json'
+      - 'tsconfig.json'
+      - 'vite.config.ts'
+      - 'index.html'
+    outputs:
+      - 'dist'
+
+  # 预览构建产物
+  preview:
+    command: 'pnpm run preview'
+    deps:
+      - '~:build'
+    local: true
+    options:
+      persistent: true
+
+  # 类型检查
+  typecheck:
+    command: 'pnpm exec tsc --noEmit'
+    inputs:
+      - '@group(sources)'
+      - 'tsconfig.json'
+
+# 文件分组
+fileGroups:
+  sources:
+    - '*.tsx'
+    - '*.ts'
+    - 'components/**/*'
+    - 'contexts/**/*'
+    - 'hooks/**/*'
+    - 'pages/**/*'
+    - 'services/**/*'
+    - 'types.ts'

@@ -1,14 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Stock, StockPrice, AgentAnalysis, ChatMessage } from '../types';
 import StockChart from './StockChart';
+import { TradingViewChart } from './TradingViewChart';
+import { AnalysisTypewriter } from './TypewriterText';
 import * as api from '../services/api';
-import { X, Send, MessageSquare, FileText, Bot, Volume2, VolumeX, Pause, Play, Square, Copy, Check, TrendingUp, TrendingDown, BrainCircuit, BarChart2, Target, ShieldAlert, Scale, Swords, CheckCircle2, Search, Gavel, UserCog } from 'lucide-react';
+import { X, Send, MessageSquare, FileText, Bot, Volume2, VolumeX, Pause, Play, Square, Copy, Check, TrendingUp, TrendingDown, BrainCircuit, BarChart2, Target, ShieldAlert, Scale, Swords, CheckCircle2, Search, Gavel, UserCog, Sparkles, CandlestickChart, LineChart } from 'lucide-react';
 
 interface StockDetailModalProps {
   stock: Stock;
   priceData?: StockPrice;
   analysis?: AgentAnalysis;
   onClose: () => void;
+  /** 是否启用打字机效果（新分析时为 true） */
+  enableTypewriter?: boolean;
 }
 
 const WorkflowStep: React.FC<{ icon: React.ReactNode; label: string; active?: boolean; completed?: boolean }> = ({ icon, label, active, completed }) => (
@@ -165,15 +169,40 @@ const RiskGauge: React.FC<{ score: number; verdict: string }> = ({ score, verdic
   );
 };
 
-const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, analysis, onClose }) => {
+const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, analysis, onClose, enableTypewriter = false }) => {
   const isUp = priceData && priceData.change >= 0;
   const chartColor = isUp ? '#10B981' : '#EF4444';
   const [activeTab, setActiveTab] = useState<'report' | 'chat'>('report');
+
+  // 打字机效果状态 - 只在组件首次接收到 analysis 时启用一次
+  const [typewriterEnabled, setTypewriterEnabled] = useState(enableTypewriter);
+  const analysisRef = useRef<string | null>(null);
+
+  // 当 analysis 变化时，决定是否启用打字机
+  useEffect(() => {
+    if (analysis?.reasoning && analysis.reasoning !== analysisRef.current) {
+      // 新的分析结果到来
+      if (enableTypewriter) {
+        setTypewriterEnabled(true);
+      }
+      analysisRef.current = analysis.reasoning;
+    }
+  }, [analysis?.reasoning, enableTypewriter]);
+
+  // 打字机完成回调
+  const handleTypewriterComplete = () => {
+    // 打字完成后禁用，避免重新打字
+    setTypewriterEnabled(false);
+  };
 
   // Audio State - 增强版
   const [audioState, setAudioState] = useState<'idle' | 'playing' | 'paused'>('idle');
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const [isCopied, setIsCopied] = useState(false);
+
+  // 图表类型切换状态
+  const [chartType, setChartType] = useState<'area' | 'candlestick'>('candlestick');
+  const [showIndicators, setShowIndicators] = useState<('ma20' | 'ma60')[]>(['ma20']);
 
   // Chat State
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -361,12 +390,105 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
                 
                 {/* --- LEFT COLUMN: Chart & Deep Dive --- */}
                 <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-gray-950 rounded-lg p-4 border border-gray-800 h-64">
-                      {priceData ? (
-                        <StockChart data={priceData.history} color={chartColor} height={220} />
-                      ) : (
-                        <div className="h-full flex items-center justify-center text-gray-600">Loading Chart...</div>
-                      )}
+                    {/* 图表区域 */}
+                    <div className="bg-gray-950 rounded-lg border border-gray-800 overflow-hidden">
+                      {/* 图表工具栏 */}
+                      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800 bg-gray-900/50">
+                        <div className="flex items-center gap-2">
+                          {/* 图表类型切换 */}
+                          <div className="flex bg-gray-800 rounded-md p-0.5">
+                            <button
+                              onClick={() => setChartType('candlestick')}
+                              className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-all ${
+                                chartType === 'candlestick'
+                                  ? 'bg-gray-700 text-white'
+                                  : 'text-gray-400 hover:text-gray-200'
+                              }`}
+                              title="K 线图"
+                            >
+                              <CandlestickChart className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => setChartType('area')}
+                              className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-all ${
+                                chartType === 'area'
+                                  ? 'bg-gray-700 text-white'
+                                  : 'text-gray-400 hover:text-gray-200'
+                              }`}
+                              title="面积图"
+                            >
+                              <LineChart className="w-3 h-3" />
+                            </button>
+                          </div>
+
+                          {/* 指标选择（仅 K 线图显示） */}
+                          {chartType === 'candlestick' && (
+                            <div className="flex items-center gap-1 ml-2">
+                              <button
+                                onClick={() => setShowIndicators(prev =>
+                                  prev.includes('ma20')
+                                    ? prev.filter(i => i !== 'ma20')
+                                    : [...prev, 'ma20']
+                                )}
+                                className={`px-2 py-1 text-[10px] font-medium rounded transition-all ${
+                                  showIndicators.includes('ma20')
+                                    ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30'
+                                    : 'text-gray-500 hover:text-gray-300'
+                                }`}
+                              >
+                                MA20
+                              </button>
+                              <button
+                                onClick={() => setShowIndicators(prev =>
+                                  prev.includes('ma60')
+                                    ? prev.filter(i => i !== 'ma60')
+                                    : [...prev, 'ma60']
+                                )}
+                                className={`px-2 py-1 text-[10px] font-medium rounded transition-all ${
+                                  showIndicators.includes('ma60')
+                                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                    : 'text-gray-500 hover:text-gray-300'
+                                }`}
+                              >
+                                MA60
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 股票信息 */}
+                        <div className="text-xs text-gray-500">
+                          {stock.symbol} · {stock.market}
+                        </div>
+                      </div>
+
+                      {/* 图表内容 */}
+                      <div className="h-64 p-2">
+                        {priceData ? (
+                          chartType === 'candlestick' ? (
+                            <TradingViewChart
+                              simpleData={priceData.history}
+                              symbol={stock.symbol}
+                              height={240}
+                              showVolume={false}
+                              indicators={showIndicators}
+                              isUp={isUp}
+                              crosshair
+                              grid
+                              timeScale
+                            />
+                          ) : (
+                            <StockChart data={priceData.history} color={chartColor} height={240} />
+                          )
+                        ) : (
+                          <div className="h-full flex items-center justify-center text-gray-600">
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="w-6 h-6 border-2 border-gray-600 border-t-blue-500 rounded-full animate-spin" />
+                              <span className="text-sm">Loading Chart...</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {analysis && (
@@ -412,14 +534,13 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
                           </div>
                         </div>
 
-                        {/* Executive Summary */}
-                        <div className="prose prose-invert prose-sm max-w-none bg-gray-900/50 p-4 rounded-lg border border-gray-800 shadow-inner">
-                            {analysis.reasoning.split('\n').map((line, i) => (
-                              <p key={i} className={`mb-2 ${line.startsWith('#') ? 'font-bold text-lg text-blue-200' : ''}`}>
-                                {line.replace(/\*\*/g, '')}
-                              </p>
-                            ))}
-                        </div>
+                        {/* Executive Summary - 使用打字机效果 */}
+                        <AnalysisTypewriter
+                          reasoning={analysis.reasoning}
+                          enabled={typewriterEnabled}
+                          speed={15}
+                          onComplete={handleTypewriterComplete}
+                        />
                         
                         {/* --- RESEARCHER TEAM DEBATE (ENHANCED UI) --- */}
                         {analysis.debate && (

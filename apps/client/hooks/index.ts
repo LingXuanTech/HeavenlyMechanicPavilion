@@ -119,3 +119,42 @@ export {
   SCHEDULER_KEY,
 } from './useScheduler';
 export type { SchedulerJob, SchedulerStatus, SchedulerJobsResponse } from './useScheduler';
+
+// 打字机效果
+export { useTypewriter, useStreamTypewriter } from './useTypewriter';
+export type {
+  UseTypewriterOptions,
+  UseTypewriterReturn,
+  UseStreamTypewriterOptions,
+  UseStreamTypewriterReturn,
+} from './useTypewriter';
+
+// A 股特有功能
+export {
+  // 北向资金
+  useNorthMoneyFlow,
+  useNorthMoneySummary,
+  useNorthMoneyHistory,
+  useNorthMoneyHolding,
+  useNorthMoneyTopBuys,
+  useNorthMoneyTopSells,
+  NORTH_MONEY_KEY,
+  // 龙虎榜
+  useLHBDaily,
+  useLHBSummary,
+  useLHBHotMoney,
+  useLHBTopBuys,
+  useLHBTopSells,
+  useLHBInstitution,
+  useLHBHotMoneyStocks,
+  LHB_KEY,
+  // 限售解禁
+  useJiejinUpcoming,
+  useJiejinCalendar,
+  useJiejinSummary,
+  useJiejinHighPressure,
+  useJiejinToday,
+  useJiejinWeek,
+  useJiejinWarning,
+  JIEJIN_KEY,
+} from './useChinaMarket';

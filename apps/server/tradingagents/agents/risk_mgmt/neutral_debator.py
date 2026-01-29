@@ -10,6 +10,25 @@ from tradingagents.agents.utils.output_schemas import RiskDebaterOutput
 
 logger = structlog.get_logger(__name__)
 
+# 默认系统提示词
+DEFAULT_SYSTEM_PROMPT = """As the Neutral Risk Analyst, your role is to provide a balanced perspective, weighing both the potential benefits and risks of the trader's decision.
+
+Your task is to challenge both the Risky and Safe Analysts, pointing out where each may be overly optimistic or overly cautious. Support a moderate, sustainable strategy.
+
+Analyze both sides critically, showing why a balanced view leads to the most reliable outcomes. Speak conversationally without special formatting."""
+
+
+def _get_system_prompt() -> str:
+    """从 Prompt 配置服务获取系统提示词"""
+    try:
+        from services.prompt_config_service import prompt_config_service
+        prompt = prompt_config_service.get_prompt("neutral_debator")
+        if prompt.get("system"):
+            return prompt["system"]
+    except Exception as e:
+        logger.debug("Using default neutral debator prompt", reason=str(e))
+    return DEFAULT_SYSTEM_PROMPT
+
 
 def create_neutral_debator(llm):
     """创建 Neutral Debater 节点
@@ -51,13 +70,12 @@ def create_neutral_debator(llm):
 
         trader_decision = state["trader_investment_plan"]
 
-        # 原始 prompt
-        raw_prompt = f"""As the Neutral Risk Analyst, your role is to provide a balanced perspective, weighing both the potential benefits and risks of the trader's decision.
+        # 获取系统提示词并构建原始 prompt
+        system_prompt = _get_system_prompt()
+        raw_prompt = f"""{system_prompt}
 
 Here is the trader's decision:
 {trader_decision}
-
-Your task is to challenge both the Risky and Safe Analysts, pointing out where each may be overly optimistic or overly cautious. Support a moderate, sustainable strategy.
 
 Market Research Report: {market_research_report}
 Social Media Sentiment Report: {sentiment_report}
@@ -68,9 +86,7 @@ Conversation history: {history}
 Last risky analyst argument: {current_risky_response}
 Last safe analyst argument: {current_safe_response}
 
-If there are no responses from others, present your point without hallucinating.
-
-Analyze both sides critically, showing why a balanced view leads to the most reliable outcomes. Speak conversationally without special formatting."""
+If there are no responses from others, present your point without hallucinating."""
 
         # 第一阶段：获取原始论点
         raw_response = llm.invoke(raw_prompt)

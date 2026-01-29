@@ -24,6 +24,13 @@ os.environ.setdefault("OPENAI_API_KEY", "sk-test-dummy-key-for-testing-only")
 os.environ.setdefault("GOOGLE_API_KEY", "")
 os.environ.setdefault("ALPHA_VANTAGE_API_KEY", "")
 
+# 导入所有模型以确保 SQLModel.metadata 包含所有表
+from db.models import (
+    Watchlist, AnalysisResult, ChatHistory,
+    AIProvider, AIModelConfig,
+    AgentPrompt, PromptVersion
+)
+
 
 # =============================================================================
 # 数据库 Fixtures
@@ -64,6 +71,10 @@ def override_get_session(db_session):
 @pytest.fixture(scope="function")
 def client(override_get_session) -> Generator[TestClient, None, None]:
     """创建 FastAPI 测试客户端（使用内存数据库）"""
+    # 在导入 main 之前，先确保生产数据库表存在（用于 prompt_config_service 初始化）
+    from db.models import engine as production_engine
+    SQLModel.metadata.create_all(production_engine)
+
     from main import app
     from db.models import get_session
 
@@ -79,6 +90,11 @@ def client(override_get_session) -> Generator[TestClient, None, None]:
 def async_client(override_get_session):
     """创建异步 httpx 测试客户端"""
     import httpx
+
+    # 确保生产数据库表存在
+    from db.models import engine as production_engine
+    SQLModel.metadata.create_all(production_engine)
+
     from main import app
     from db.models import get_session
 

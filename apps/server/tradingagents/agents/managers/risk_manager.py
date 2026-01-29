@@ -10,6 +10,35 @@ from tradingagents.agents.utils.output_schemas import RiskManagerOutput
 
 logger = structlog.get_logger(__name__)
 
+# 默认系统提示词
+DEFAULT_SYSTEM_PROMPT = """As the Risk Management Judge and Debate Facilitator, your goal is to evaluate the debate between three risk analysts—Risky, Neutral, and Safe/Conservative—and determine the best course of action for the trader.
+
+Your decision must result in a clear recommendation: Buy, Sell, or Hold. Choose Hold only if strongly justified by specific arguments, not as a fallback when all sides seem valid.
+
+Guidelines for Decision-Making:
+1. **Summarize Key Arguments**: Extract the strongest points from each analyst.
+2. **Provide Rationale**: Support your recommendation with direct quotes and counterarguments.
+3. **Refine the Trader's Plan**: Start with the trader's original plan and adjust based on risk insights.
+4. **Learn from Past Mistakes**: Use lessons from past memories to improve this decision.
+
+Deliverables:
+- A clear and actionable recommendation: Buy, Sell, or Hold.
+- Detailed reasoning anchored in the debate and past reflections.
+
+Focus on actionable insights and continuous improvement."""
+
+
+def _get_system_prompt() -> str:
+    """从 Prompt 配置服务获取系统提示词"""
+    try:
+        from services.prompt_config_service import prompt_config_service
+        prompt = prompt_config_service.get_prompt("risk_manager")
+        if prompt.get("system"):
+            return prompt["system"]
+    except Exception as e:
+        logger.debug("Using default risk manager prompt", reason=str(e))
+    return DEFAULT_SYSTEM_PROMPT
+
 
 def create_risk_manager(llm, memory):
     """创建 Risk Manager 节点
@@ -56,29 +85,20 @@ def create_risk_manager(llm, memory):
         for rec in past_memories:
             past_memory_str += rec["recommendation"] + "\n\n"
 
-        # 原始 prompt
-        raw_prompt = f"""As the Risk Management Judge and Debate Facilitator, your goal is to evaluate the debate between three risk analysts—Risky, Neutral, and Safe/Conservative—and determine the best course of action for the trader.
+        # 获取系统提示词并构建原始 prompt
+        system_prompt = _get_system_prompt()
+        raw_prompt = f"""{system_prompt}
 
-Your decision must result in a clear recommendation: Buy, Sell, or Hold. Choose Hold only if strongly justified by specific arguments, not as a fallback when all sides seem valid.
+**Trader's Plan:**
+{trader_plan}
 
-Guidelines for Decision-Making:
-1. **Summarize Key Arguments**: Extract the strongest points from each analyst.
-2. **Provide Rationale**: Support your recommendation with direct quotes and counterarguments.
-3. **Refine the Trader's Plan**: Start with the trader's original plan, **{trader_plan}**, and adjust based on risk insights.
-4. **Learn from Past Mistakes**: Use lessons from **{past_memory_str}** to improve this decision.
-
-Deliverables:
-- A clear and actionable recommendation: Buy, Sell, or Hold.
-- Detailed reasoning anchored in the debate and past reflections.
+**Past Lessons:**
+{past_memory_str}
 
 ---
 
 **Analysts Debate History:**
-{history}
-
----
-
-Focus on actionable insights and continuous improvement."""
+{history}"""
 
         # 第一阶段：获取原始决策
         raw_response = llm.invoke(raw_prompt)

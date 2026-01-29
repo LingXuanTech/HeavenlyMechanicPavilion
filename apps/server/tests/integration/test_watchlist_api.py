@@ -117,16 +117,12 @@ class TestAddToWatchlist:
         assert data["id"] == existing.id
 
     def test_add_invalid_symbol(self, client):
-        """无效股票代码返回错误"""
-        from services.data_router import DataSourceError
+        """无效股票代码格式返回 400"""
+        # 混合数字字母不匹配任何格式
+        response = client.post("/api/watchlist/ABC123")
 
-        with patch("api.routes.watchlist.MarketRouter.get_stock_price") as mock_price:
-            mock_price.side_effect = DataSourceError("yfinance", "Symbol not found")
-
-            response = client.post("/api/watchlist/INVALID123")
-
-            assert response.status_code == 502
-            assert "Data source error" in response.json()["detail"]
+        assert response.status_code == 400
+        assert "Invalid symbol format" in response.json()["detail"]
 
     def test_add_stock_fundamentals_unavailable(self, client):
         """基本面数据不可用时仍能添加（使用 symbol 作为名称）"""
@@ -135,7 +131,7 @@ class TestAddToWatchlist:
         with patch("api.routes.watchlist.MarketRouter.get_stock_price") as mock_price:
             with patch("api.routes.watchlist.MarketRouter.get_fundamentals") as mock_fund:
                 mock_price.return_value = StockPrice(
-                    symbol="NEWSTOCK",
+                    symbol="TEST",  # 使用有效的 5 字符内美股代码
                     price=100.0,
                     change=1.0,
                     change_percent=1.0,
@@ -145,12 +141,12 @@ class TestAddToWatchlist:
                 )
                 mock_fund.side_effect = DataSourceError("yfinance", "No fundamentals")
 
-                response = client.post("/api/watchlist/NEWSTOCK")
+                response = client.post("/api/watchlist/TEST")
 
                 assert response.status_code == 200
                 data = response.json()
                 # 使用 symbol 作为名称
-                assert data["name"] == "NEWSTOCK"
+                assert data["name"] == "TEST"
 
 
 class TestRemoveFromWatchlist:
@@ -173,7 +169,8 @@ class TestRemoveFromWatchlist:
 
     def test_remove_nonexistent_stock(self, client):
         """删除不存在的股票返回 404"""
-        response = client.delete("/api/watchlist/NONEXISTENT")
+        # 使用有效格式的 symbol（5 字符内美股代码）
+        response = client.delete("/api/watchlist/XXXXX")
 
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
@@ -199,7 +196,7 @@ class TestWatchlistEdgeCases:
         with patch("api.routes.watchlist.MarketRouter.get_stock_price") as mock_price:
             with patch("api.routes.watchlist.MarketRouter.get_fundamentals") as mock_fund:
                 mock_price.return_value = StockPrice(
-                    symbol="0700.HK",
+                    symbol="00700.HK",  # 港股需要 5 位数字
                     price=380.0,
                     change=5.0,
                     change_percent=1.33,
@@ -208,12 +205,12 @@ class TestWatchlistEdgeCases:
                     market="HK",
                 )
                 mock_fund.return_value = CompanyFundamentals(
-                    symbol="0700.HK",
+                    symbol="00700.HK",
                     name="腾讯控股",
                     sector="Communication Services",
                 )
 
-                response = client.post("/api/watchlist/0700.HK")
+                response = client.post("/api/watchlist/00700.HK")
 
                 assert response.status_code == 200
-                assert response.json()["symbol"] == "0700.HK"
+                assert response.json()["symbol"] == "00700.HK"
