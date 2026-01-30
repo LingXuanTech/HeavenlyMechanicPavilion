@@ -11,6 +11,7 @@ from config.settings import settings
 from api.exceptions import AppException
 from services.data_router import close_http_client
 from services.cache_service import cache_service
+from services.task_queue import task_queue
 
 # Load environment variables
 load_dotenv()
@@ -42,6 +43,7 @@ async def lifespan(app: FastAPI):
     watchlist_scheduler.shutdown()
     await close_http_client()  # 关闭共享 HTTP 客户端
     await cache_service.close()  # 关闭缓存连接
+    await task_queue.close()  # 关闭任务队列连接
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -216,6 +218,22 @@ app.include_router(backtest.router, prefix=settings.API_V1_STR)
 # 舆情分析路由
 from api.routes import sentiment
 app.include_router(sentiment.router, prefix=settings.API_V1_STR)
+
+# 政策-行业板块映射路由
+from api.routes import policy
+app.include_router(policy.router, prefix=settings.API_V1_STR)
+
+# 限售解禁路由
+from api.routes import unlock
+app.include_router(unlock.router, prefix=settings.API_V1_STR)
+
+# 央行 NLP 分析路由
+from api.routes import central_bank
+app.include_router(central_bank.router, prefix=settings.API_V1_STR)
+
+# 跨资产联动分析路由
+from api.routes import cross_asset
+app.include_router(cross_asset.router, prefix=settings.API_V1_STR)
 
 
 if __name__ == "__main__":

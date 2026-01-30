@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import type { TimePeriod, IndicatorType } from '@/components/ChartToolbar';
 import type { KlineDataPoint } from '@/components/TradingViewChart';
-import { API_BASE } from '@/services/api';
+import { getMarketKline } from '@/services/api';
 
 /**
  * 图表指标 Hook
@@ -56,15 +56,7 @@ const PERIOD_TO_DAYS: Record<TimePeriod, number> = {
  * 获取 K 线历史数据
  */
 async function fetchKlineData(symbol: string, days: number): Promise<KlineDataPoint[]> {
-  const response = await fetch(
-    `${API_BASE}/market/kline/${encodeURIComponent(symbol)}?days=${days}`
-  );
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch kline data: ${response.statusText}`);
-  }
-
-  const data = await response.json();
+  const data = await getMarketKline(symbol, days);
   return data.kline || [];
 }
 

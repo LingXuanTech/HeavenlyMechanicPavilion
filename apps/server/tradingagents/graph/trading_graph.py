@@ -140,10 +140,27 @@ class TradingAgentsGraph:
         self.log_states_dict = {}  # date to full state dict
 
         # Set up the graph
-        self.graph = self.graph_setup.setup_graph(selected_analysts)
+        # 默认使用 Planner + L2 完整分析模式（可通过 config 配置）
+        use_planner = self.config.get("use_planner", True)
+        analysis_level = self.config.get("analysis_level", "L2")
+        use_subgraphs = self.config.get("use_subgraphs", False)
+
+        if use_subgraphs:
+            logger.info("Using SubGraph architecture", use_planner=use_planner, analysis_level=analysis_level)
+            self.graph = self.graph_setup.setup_graph_with_subgraphs(
+                selected_analysts,
+                use_planner=use_planner,
+                analysis_level=analysis_level
+            )
+        else:
+            self.graph = self.graph_setup.setup_graph(
+                selected_analysts,
+                use_planner=use_planner,
+                analysis_level=analysis_level
+            )
         
     def _get_default_analysts(self, market: str) -> List[str]:
-        """Get default analyst list based on market.
+        """Get default analyst list based on market using MarketAnalystRouter.
 
         Args:
             market: Market identifier (US, HK, CN)
@@ -151,18 +168,24 @@ class TradingAgentsGraph:
         Returns:
             List of analyst types to use for this market
         """
-        # Base analysts for all markets
-        base_analysts = ["market", "social", "news", "fundamentals"]
+        try:
+            from services.market_analyst_router import MarketAnalystRouter, Market
 
-        if market == "CN":
-            # A股市场：添加散户情绪分析师、政策分析师和资金流向分析师
-            return base_analysts + ["sentiment", "policy", "fund_flow"]
-        elif market == "HK":
-            # 港股市场：仅添加散户情绪分析师（港股也受 A 股情绪影响）
-            return base_analysts + ["sentiment"]
-        else:
-            # 美股市场：使用基础分析师
-            return base_analysts
+            # 将字符串 market 转换为 Market 枚举
+            market_enum = Market(market) if market else Market.US
+            preset = MarketAnalystRouter.get_analysts_by_market(market_enum)
+            logger.info("Analysts selected via MarketAnalystRouter", market=market, analysts=preset)
+            return preset
+        except Exception as e:
+            logger.warning("MarketAnalystRouter unavailable, using fallback", error=str(e))
+            # Fallback: 保持原有逻辑
+            base_analysts = ["market", "social", "news", "fundamentals"]
+            if market == "CN":
+                return base_analysts + ["sentiment", "policy", "fund_flow"]
+            elif market == "HK":
+                return base_analysts + ["sentiment"]
+            else:
+                return base_analysts
 
     def _create_tool_nodes(self) -> Dict[str, ToolNode]:
         """Create tool nodes for different data sources using abstract methods."""
@@ -283,6 +306,12 @@ class TradingAgentsGraph:
             "retail_sentiment_report": final_state.get("retail_sentiment_report", ""),
             "policy_report": final_state.get("policy_report", ""),
             "china_flow_data": final_state.get("china_flow_data", ""),
+            # Planner/Scout/Macro/Portfolio reports
+            "macro_report": final_state.get("macro_report", ""),
+            "portfolio_report": final_state.get("portfolio_report", ""),
+            "scout_report": final_state.get("scout_report", ""),
+            "opportunities": final_state.get("opportunities", []),
+            "recommended_analysts": final_state.get("recommended_analysts", []),
             "investment_debate_state": {
                 "bull_history": final_state["investment_debate_state"]["bull_history"],
                 "bear_history": final_state["investment_debate_state"]["bear_history"],

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useCallback, useRef } from 'react';
 import * as api from '../services/api';
-import type { SSEConnectionState, SSEAnalysisController } from '../services/api';
+import type { SSEConnectionState, SSEAnalysisController, AnalysisOptions } from '../services/api';
 import { AgentAnalysis } from '../types';
 
 export const ANALYSIS_KEY = (symbol: string) => ['analysis', symbol];
@@ -39,9 +39,7 @@ export function useLatestAnalysis(symbol: string) {
     queryKey: LATEST_ANALYSIS_KEY(symbol),
     queryFn: async () => {
       try {
-        const response = await fetch(`/api/v1/analyze/latest/${symbol}`);
-        if (!response.ok) return null;
-        const data = await response.json();
+        const data = await api.getLatestAnalysis(symbol);
         return data.analysis as AgentAnalysis;
       } catch {
         return null;
@@ -82,16 +80,17 @@ export function useStockAnalysis() {
 
   // 执行分析
   const runAnalysis = useCallback(
-    async (symbol: string): Promise<void> => {
+    async (symbol: string, options: AnalysisOptions = {}): Promise<void> => {
       // 如果已在分析中，不重复触发
       if (analysisStates[symbol]?.isAnalyzing) {
         console.warn(`Analysis already in progress for ${symbol}`);
         return;
       }
 
+      const levelLabel = options.analysisLevel === 'L1' ? '快速扫描' : '完整分析';
       updateState(symbol, {
         isAnalyzing: true,
-        stage: 'starting',
+        stage: `starting (${levelLabel})`,
         connectionState: 'connecting',
         retryCount: 0,
         error: null,
@@ -141,7 +140,8 @@ export function useStockAnalysis() {
             initialDelay: 1000,
             maxDelay: 8000,
             backoffMultiplier: 2,
-          }
+          },
+          options
         );
 
         // 保存控制器
@@ -175,12 +175,12 @@ export function useStockAnalysis() {
 
   // 批量分析
   const runMultipleAnalyses = useCallback(
-    async (symbols: string[], delayMs = 2000) => {
+    async (symbols: string[], options: AnalysisOptions = {}, delayMs = 2000) => {
       for (let i = 0; i < symbols.length; i++) {
         if (i > 0) {
           await new Promise((resolve) => setTimeout(resolve, delayMs));
         }
-        runAnalysis(symbols[i]).catch(() => {
+        runAnalysis(symbols[i], options).catch(() => {
           // 单个失败不影响其他
         });
       }

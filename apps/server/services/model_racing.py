@@ -13,7 +13,7 @@ from sqlmodel import Session, select
 import structlog
 
 from db.models import engine
-from services.synthesizer import synthesizer
+from services.synthesizer import synthesizer, SynthesisContext
 from services.ai_config_service import ai_config_service
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
@@ -202,8 +202,17 @@ class ModelRacing:
             # 运行分析
             final_state, agent_reports = graph.propagate(symbol)
 
+            # 构建合成上下文
+            elapsed = round(time.time() - start_time, 2)
+            synthesis_context = SynthesisContext(
+                analysis_level="L2",
+                elapsed_seconds=elapsed,
+                analysts_used=selected_analysts or ["market", "news", "fundamentals"],
+                market=market,
+            )
+
             # 合成结果
-            final_json = await synthesizer.synthesize(symbol, agent_reports)
+            final_json = await synthesizer.synthesize(symbol, agent_reports, synthesis_context)
 
             elapsed = round(time.time() - start_time, 2)
 

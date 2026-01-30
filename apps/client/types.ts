@@ -110,17 +110,65 @@ export interface ChinaMarketAnalysis {
   policyAnalysis: PolicyAnalysis;
 }
 
+// ============ Agentic UI Hints ============
+// UI Hints 由 AI 生成，指导前端如何自适应展示分析结果
+
+export type AlertLevel = 'none' | 'info' | 'warning' | 'critical';
+export type VisualStyle = 'default' | 'prominent' | 'subtle' | 'highlight';
+
+/** AI 生成的 UI 展示提示 */
+export interface UIHints {
+  // 警示级别
+  alertLevel: AlertLevel;
+  alertMessage?: string;
+
+  // 突出显示的区域
+  highlightSections: Array<'signal' | 'risk' | 'debate' | 'trade_setup' | 'news' | 'planner'>;
+
+  // 关键指标（应在顶部突出显示）
+  keyMetrics: string[];
+
+  // 数据质量问题（来自 DataValidator）
+  dataQualityIssues?: string[];
+
+  // 置信度可视化建议
+  confidenceDisplay: 'gauge' | 'progress' | 'badge' | 'number';
+
+  // 辩论展示建议
+  debateDisplay: {
+    showWinnerBadge: boolean;
+    emphasisLevel: VisualStyle;
+    expandByDefault: boolean;
+  };
+
+  // Planner 决策透明度（是否展示分析师选择逻辑）
+  showPlannerReasoning: boolean;
+  plannerInsight?: string;
+
+  // 动态建议（如"高风险，建议谨慎"）
+  actionSuggestions: string[];
+
+  // 相关历史案例数量（来自分层记忆）
+  historicalCasesCount?: number;
+
+  // 分析级别标记
+  analysisLevel: 'L1' | 'L2';
+
+  // 市场特殊提示（如 A股政策敏感期）
+  marketSpecificHints?: string[];
+}
+
 export interface AgentAnalysis {
   symbol: string;
   timestamp: string;
   signal: SignalType;
   confidence: number;
   reasoning: string; // Final synthesis by Fund Manager
-  
+
   // Simulation Components
   debate: ResearcherDebate;
   riskAssessment: RiskAssessment;
-  
+
   // Supporting Data
   catalysts?: CatalystEvent[];
   priceLevels?: PriceLevels;
@@ -136,6 +184,17 @@ export interface AgentAnalysis {
   webSources?: WebSource[];
   anchor_script?: string; // AI-generated TTS script
   chinaMarket?: ChinaMarketAnalysis; // A股市场专用分析（仅 CN 市场股票）
+
+  // Agentic UI Hints（AI 生成的展示指导）
+  uiHints?: UIHints;
+
+  // 诊断信息
+  diagnostics?: {
+    task_id?: string;
+    elapsed_seconds?: number;
+    analysts_used?: string[];
+    planner_decision?: string;
+  };
 }
 
 export interface MarketIndex {

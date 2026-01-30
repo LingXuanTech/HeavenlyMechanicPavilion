@@ -1,13 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AgentAnalysis, SignalType, Stock, StockPrice } from '../types';
 import StockChart from './StockChart';
-import { ArrowUp, ArrowDown, RefreshCw, Target, TrendingUp, TrendingDown, Minus, Maximize2, Calendar, Scale } from 'lucide-react';
+import { ArrowUp, ArrowDown, RefreshCw, Target, TrendingUp, TrendingDown, Minus, Maximize2, Calendar, Scale, Zap, BrainCircuit, ChevronDown } from 'lucide-react';
+import type { AnalysisOptions } from '../services/api';
 
 interface StockCardProps {
   stock: Stock;
   priceData?: StockPrice;
   analysis?: AgentAnalysis;
-  onRefresh: (symbol: string, name: string) => void;
+  onRefresh: (symbol: string, name: string, options?: AnalysisOptions) => void;
   isAnalyzing: boolean;
   currentStage?: string;
   onDelete: (symbol: string) => void;
@@ -34,14 +35,23 @@ const StockCard: React.FC<StockCardProps> = ({ stock, priceData, analysis, onRef
   const isUp = priceData && priceData.change >= 0;
   const chartColor = isUp ? '#10B981' : '#EF4444';
 
-  const handleRefresh = (e: React.MouseEvent) => {
+  // Analysis level state
+  const [showLevelMenu, setShowLevelMenu] = useState(false);
+
+  const handleRefresh = (e: React.MouseEvent, level: 'L1' | 'L2' = 'L2') => {
     e.stopPropagation();
-    onRefresh(stock.symbol, stock.name);
+    setShowLevelMenu(false);
+    onRefresh(stock.symbol, stock.name, { analysisLevel: level });
   };
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     onDelete(stock.symbol);
+  };
+
+  const handleToggleLevelMenu = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowLevelMenu(!showLevelMenu);
   };
 
   return (
@@ -173,15 +183,58 @@ const StockCard: React.FC<StockCardProps> = ({ stock, priceData, analysis, onRef
 
       {/* Actions */}
       <div className="flex gap-2 mt-auto pt-2">
-        <button 
-          onClick={handleRefresh}
-          disabled={isAnalyzing}
-          className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-xs py-2 rounded flex items-center justify-center gap-2 transition-colors disabled:opacity-50 z-10"
-        >
-          <RefreshCw className={`w-3 h-3 ${isAnalyzing ? 'animate-spin' : ''}`} />
-          {isAnalyzing ? 'Running...' : 'Run Agent'}
-        </button>
-        <button 
+        {/* Analysis Level Dropdown */}
+        <div className="relative flex-1">
+          <div className="flex">
+            {/* Main button - defaults to L2 Full Analysis */}
+            <button
+              onClick={(e) => handleRefresh(e, 'L2')}
+              disabled={isAnalyzing}
+              className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-xs py-2 rounded-l flex items-center justify-center gap-2 transition-colors disabled:opacity-50 z-10"
+            >
+              <RefreshCw className={`w-3 h-3 ${isAnalyzing ? 'animate-spin' : ''}`} />
+              {isAnalyzing ? 'Running...' : 'Run Agent'}
+            </button>
+
+            {/* Dropdown trigger */}
+            <button
+              onClick={handleToggleLevelMenu}
+              disabled={isAnalyzing}
+              className="px-2 bg-gray-800 hover:bg-gray-700 text-gray-400 border-l border-gray-700 rounded-r transition-colors disabled:opacity-50 z-10"
+              title="选择分析级别"
+            >
+              <ChevronDown className={`w-3 h-3 transition-transform ${showLevelMenu ? 'rotate-180' : ''}`} />
+            </button>
+          </div>
+
+          {/* Dropdown menu */}
+          {showLevelMenu && !isAnalyzing && (
+            <div className="absolute bottom-full left-0 right-8 mb-1 bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-20 animate-in fade-in slide-in-from-bottom-1 duration-150">
+              <button
+                onClick={(e) => handleRefresh(e, 'L1')}
+                className="w-full px-3 py-2 text-left hover:bg-gray-800 transition-colors flex items-center gap-2"
+              >
+                <Zap className="w-4 h-4 text-yellow-400" />
+                <div className="flex-1">
+                  <div className="text-xs font-medium text-white">快速扫描 (L1)</div>
+                  <div className="text-[10px] text-gray-500">Market + News + Macro，~15秒</div>
+                </div>
+              </button>
+              <button
+                onClick={(e) => handleRefresh(e, 'L2')}
+                className="w-full px-3 py-2 text-left hover:bg-gray-800 transition-colors flex items-center gap-2 border-t border-gray-700"
+              >
+                <BrainCircuit className="w-4 h-4 text-blue-400" />
+                <div className="flex-1">
+                  <div className="text-xs font-medium text-white">完整分析 (L2)</div>
+                  <div className="text-[10px] text-gray-500">全部分析师 + 辩论，~60秒</div>
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
+
+        <button
           onClick={handleDelete}
           className="px-3 bg-gray-800 hover:bg-red-900/30 text-gray-400 hover:text-red-400 rounded transition-colors z-10"
         >

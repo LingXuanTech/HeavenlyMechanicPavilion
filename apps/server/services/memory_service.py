@@ -616,5 +616,370 @@ class MemoryService:
             return {"status": "error", "reason": str(e)}
 
 
+# ==============================================================================
+# 分层记忆扩展（Phase 4）
+# ==============================================================================
+
+class LayeredMemoryService(MemoryService):
+    """
+    分层记忆服务 - 支持多维度检索
+
+    Collections:
+    - analysis_history: 按 symbol 检索（继承自基类）
+    - macro_cycles: 按宏观周期检索（新增）
+    - pattern_cases: 按技术形态/基本面特征检索（新增）
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._macro_collection = None
+        self._pattern_collection = None
+        if CHROMADB_AVAILABLE and self._client:
+            self._init_layered_collections()
+
+    def _init_layered_collections(self):
+        """初始化额外的分层集合"""
+        try:
+            # 宏观周期集合
+            self._macro_collection = self._client.get_or_create_collection(
+                name="macro_cycles",
+                metadata={"description": "Stock analyses indexed by macro economic cycles"}
+            )
+
+            # 技术形态集合
+            self._pattern_collection = self._client.get_or_create_collection(
+                name="pattern_cases",
+                metadata={"description": "Stock analyses indexed by technical/fundamental patterns"}
+            )
+
+            logger.info("Layered memory collections initialized")
+        except Exception as e:
+            logger.error("Failed to init layered collections", error=str(e))
+
+    def _classify_macro_cycle(self, date_str: str, signal: str) -> str:
+        """基于缓存的宏观数据分类当前经济周期
+
+        分类逻辑优先级：
+        1. 从 MacroDataService 缓存获取实际指标
+        2. 基于利率趋势、GDP、VIX 等多维度综合判断
+        3. 缓存不可用时降级为基于信号的启发式推断
+
+        Returns:
+            周期标签: rate_cut | rate_hike | bull_market | bear_market |
+                      recovery | recession | neutral
+        """
+        try:
+            from services.macro_service import _macro_cache
+
+            cached = _macro_cache.get("macro_overview")
+            if cached:
+                overview, _ts = cached
+                return self._infer_cycle_from_macro(overview)
+
+        except Exception as e:
+            logger.debug("Macro cache unavailable for cycle classification", error=str(e))
+
+        # 降级：基于信号的启发式推断
+        if signal in ("Strong Buy", "Buy"):
+            return "bull_market"
+        elif signal in ("Strong Sell", "Sell"):
+            return "bear_market"
+        return "neutral"
+
+    @staticmethod
+    def _infer_cycle_from_macro(overview) -> str:
+        """根据宏观指标推断经济周期
+
+        决策矩阵：
+        - rate_cut:     利率下降趋势
+        - rate_hike:    利率上升趋势
+        - recession:    GDP < 0 或 失业率 > 6%
+        - recovery:     GDP > 0 且从衰退中恢复（失业率下降）
+        - bull_market:  VIX < 15 且整体 Bullish
+        - bear_market:  VIX > 25 且整体 Bearish
+        - neutral:      以上条件均不满足
+        """
+        # 利率周期（最高优先级 — 直接影响估值模型）
+        if overview.fed_rate and overview.fed_rate.trend == "down":
+            return "rate_cut"
+        if overview.fed_rate and overview.fed_rate.trend == "up":
+            return "rate_hike"
+
+        # 衰退 / 复苏判断
+        gdp_negative = overview.gdp_growth and overview.gdp_growth.value < 0
+        high_unemployment = overview.unemployment and overview.unemployment.value > 6
+        unemployment_declining = (
+            overview.unemployment
+            and overview.unemployment.change is not None
+            and overview.unemployment.change < 0
+        )
+
+        if gdp_negative or high_unemployment:
+            return "recession"
+        if overview.gdp_growth and overview.gdp_growth.value > 0 and unemployment_declining:
+            return "recovery"
+
+        # 市场情绪周期
+        if overview.vix and overview.vix.value < 15 and overview.sentiment == "Bullish":
+            return "bull_market"
+        if overview.vix and overview.vix.value > 25 and overview.sentiment == "Bearish":
+            return "bear_market"
+
+        return "neutral"
+
+    def _classify_pattern(self, memory: AnalysisMemory) -> str:
+        """基于信号强度、置信度和风险评分分类分析形态
+
+        分类维度：
+        - 信号方向 + 置信度 → 定性
+        - 风险评分 → 风险特征
+        - 价格目标关系 → 盈亏比特征
+
+        Returns:
+            形态标签: strong_conviction | high_risk_high_reward |
+                      contrarian_play | breakout | defensive |
+                      uncertain | normal
+        """
+        signal = memory.signal
+        conf = memory.confidence
+        risk = memory.risk_score or 50
+
+        # 强信念型：高置信度强信号
+        if conf >= 75 and signal in ("Strong Buy", "Strong Sell"):
+            return "strong_conviction"
+
+        # 高风险高收益型：风险评分高但信号明确
+        if risk >= 70 and conf >= 60 and signal in ("Buy", "Strong Buy", "Sell", "Strong Sell"):
+            return "high_risk_high_reward"
+
+        # 逆向操作型：信号与辩论赢家不一致（暗示市场分歧）
+        if memory.debate_winner:
+            winner_lower = memory.debate_winner.lower()
+            is_bull_signal = signal in ("Buy", "Strong Buy")
+            is_bear_winner = "bear" in winner_lower
+            is_bull_winner = "bull" in winner_lower
+            if (is_bull_signal and is_bear_winner) or (not is_bull_signal and is_bull_winner):
+                return "contrarian_play"
+
+        # 突破型：有明确的价格目标且盈亏比可观
+        if memory.entry_price and memory.target_price and memory.stop_loss:
+            try:
+                entry = float(memory.entry_price)
+                target = float(memory.target_price)
+                stop = float(memory.stop_loss)
+                if entry > 0 and stop > 0:
+                    reward = abs(target - entry)
+                    risk_amt = abs(entry - stop)
+                    if risk_amt > 0 and reward / risk_amt >= 3.0:
+                        return "breakout"
+            except (ValueError, TypeError):
+                pass
+
+        # 防御型：低风险 + Hold 信号
+        if risk <= 30 and signal == "Hold":
+            return "defensive"
+
+        # 不确定型
+        if conf < 40:
+            return "uncertain"
+
+        return "normal"
+
+    async def store_layered_analysis(
+        self,
+        memory: AnalysisMemory,
+        sector: Optional[str] = None,
+        macro_cycle: Optional[str] = None,
+        pattern_type: Optional[str] = None,
+    ) -> bool:
+        """存储分析到多个分层集合
+
+        Args:
+            memory: 分析记忆
+            sector: 行业（可选，自动推断）
+            macro_cycle: 宏观周期（可选，自动推断）
+            pattern_type: 技术形态（可选，自动推断）
+
+        Returns:
+            是否成功
+        """
+        # 先存储到主集合
+        success = await super().store_analysis(memory)
+        if not success:
+            return False
+
+        # 自动分类
+        if not macro_cycle:
+            macro_cycle = self._classify_macro_cycle(memory.date, memory.signal)
+        if not pattern_type:
+            pattern_type = self._classify_pattern(memory)
+
+        doc_id = self._generate_id(memory.symbol, memory.date)
+        embedding_text = self._create_embedding_text(memory)
+
+        metadata = {
+            "symbol": memory.symbol,
+            "date": memory.date,
+            "signal": memory.signal,
+            "confidence": memory.confidence,
+            "sector": sector or "unknown",
+            "macro_cycle": macro_cycle,
+            "pattern_type": pattern_type,
+            "outcome": memory.outcome or "pending",
+        }
+
+        try:
+            # 存储到宏观周期集合
+            if self._macro_collection:
+                self._macro_collection.upsert(
+                    ids=[doc_id],
+                    documents=[embedding_text],
+                    metadatas=[{**metadata, "index_type": "macro"}]
+                )
+
+            # 存储到技术形态集合
+            if self._pattern_collection:
+                self._pattern_collection.upsert(
+                    ids=[doc_id],
+                    documents=[embedding_text],
+                    metadatas=[{**metadata, "index_type": "pattern"}]
+                )
+
+            logger.info(
+                "Layered analysis stored",
+                symbol=memory.symbol,
+                macro=macro_cycle,
+                pattern=pattern_type,
+            )
+            return True
+
+        except Exception as e:
+            logger.error("Failed to store layered analysis", error=str(e))
+            return False
+
+    async def retrieve_by_macro_cycle(
+        self,
+        macro_cycle: str,
+        n_results: int = 10,
+    ) -> List[MemoryRetrievalResult]:
+        """按宏观周期检索相似案例
+
+        Args:
+            macro_cycle: 宏观周期（rate_cut, bull_market 等）
+            n_results: 返回结果数量
+
+        Returns:
+            相似记忆列表
+        """
+        if not self._macro_collection:
+            logger.warning("Macro collection not available")
+            return []
+
+        try:
+            results = self._macro_collection.query(
+                query_texts=[f"Stock analysis during {macro_cycle}"],
+                n_results=n_results,
+                where={"macro_cycle": macro_cycle}
+            )
+
+            memories = []
+            for i, doc_id in enumerate(results.get("ids", [[]])[0]):
+                metadata = results["metadatas"][0][i]
+                distance = results["distances"][0][i] if "distances" in results else 0
+
+                memory = AnalysisMemory(
+                    symbol=metadata["symbol"],
+                    date=metadata["date"],
+                    signal=metadata["signal"],
+                    confidence=metadata["confidence"],
+                    reasoning_summary="",  # 不存储完整推理
+                    outcome=metadata.get("outcome"),
+                )
+
+                memories.append(MemoryRetrievalResult(
+                    memory=memory,
+                    similarity=1 - distance if distance else 0.5,
+                    days_ago=0  # 跨时间检索，不计算天数
+                ))
+
+            return memories
+
+        except Exception as e:
+            logger.error("Failed to retrieve by macro cycle", error=str(e))
+            return []
+
+    async def retrieve_by_pattern(
+        self,
+        pattern_type: str,
+        sector: Optional[str] = None,
+        n_results: int = 10,
+    ) -> List[MemoryRetrievalResult]:
+        """按技术形态检索相似案例
+
+        Args:
+            pattern_type: 技术形态
+            sector: 行业筛选（可选）
+            n_results: 返回结果数量
+
+        Returns:
+            相似记忆列表
+        """
+        if not self._pattern_collection:
+            logger.warning("Pattern collection not available")
+            return []
+
+        try:
+            where_filter = {"pattern_type": pattern_type}
+            if sector:
+                where_filter["sector"] = sector
+
+            results = self._pattern_collection.query(
+                query_texts=[f"Stock with {pattern_type} pattern"],
+                n_results=n_results,
+                where=where_filter
+            )
+
+            memories = []
+            for i, doc_id in enumerate(results.get("ids", [[]])[0]):
+                metadata = results["metadatas"][0][i]
+                distance = results["distances"][0][i] if "distances" in results else 0
+
+                memory = AnalysisMemory(
+                    symbol=metadata["symbol"],
+                    date=metadata["date"],
+                    signal=metadata["signal"],
+                    confidence=metadata["confidence"],
+                    reasoning_summary="",
+                    outcome=metadata.get("outcome"),
+                )
+
+                memories.append(MemoryRetrievalResult(
+                    memory=memory,
+                    similarity=1 - distance if distance else 0.5,
+                    days_ago=0
+                ))
+
+            return memories
+
+        except Exception as e:
+            logger.error("Failed to retrieve by pattern", error=str(e))
+            return []
+
+    def get_layered_stats(self) -> Dict[str, Any]:
+        """获取分层记忆统计"""
+        stats = self.get_stats()
+
+        try:
+            if self._macro_collection:
+                stats["macro_memories"] = self._macro_collection.count()
+            if self._pattern_collection:
+                stats["pattern_memories"] = self._pattern_collection.count()
+        except Exception as e:
+            logger.error("Failed to get layered stats", error=str(e))
+
+        return stats
+
+
 # 全局单例
 memory_service = MemoryService()
+layered_memory = LayeredMemoryService()

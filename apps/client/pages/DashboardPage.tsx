@@ -19,6 +19,7 @@ import {
   useFlashNews,
   useMarketStatus,
 } from '../hooks';
+import type { AnalysisOptions } from '../services/api';
 
 const DashboardPage: React.FC = () => {
   // === TanStack Query Hooks ===
@@ -77,11 +78,11 @@ const DashboardPage: React.FC = () => {
 
   // === 事件处理 ===
   const handleRunAnalysis = useCallback(
-    async (symbol: string, _stockName: string) => {
+    async (symbol: string, _stockName: string, options?: AnalysisOptions) => {
       try {
         // 标记为新鲜分析（用于打字机效果）
         setFreshAnalyses(prev => new Set(prev).add(symbol));
-        await runAnalysis(symbol);
+        await runAnalysis(symbol, options);
       } catch (error) {
         console.error(`Analysis failed for ${symbol}`, error);
         // 失败时移除新鲜标记

@@ -11,7 +11,15 @@ from fastapi import APIRouter, Query, HTTPException
 from typing import Optional
 import structlog
 
-from services.lhb_service import lhb_service, LHBStock, LHBRecord, HotMoneySeat, LHBSummary
+from services.lhb_service import (
+    lhb_service,
+    LHBStock,
+    LHBRecord,
+    HotMoneySeat,
+    LHBSummary,
+    HotMoneyProfile,
+    HotMoneyMovementSignal,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -181,3 +189,99 @@ async def get_hot_money_stocks():
     except Exception as e:
         logger.error("Failed to fetch hot money stocks", error=str(e))
         raise HTTPException(status_code=500, detail=f"获取游资股票失败: {str(e)}")
+
+
+# ============ 游资席位画像 API ============
+
+@router.get("/hot-money/profiles", response_model=list[HotMoneyProfile])
+async def get_hot_money_profiles(
+    tier: Optional[str] = Query(
+        None,
+        description="筛选层级: 一线/二线，不填则返回全部",
+        pattern="^(一线|二线)$"
+    )
+):
+    """获取知名游资画像列表
+
+    返回所有知名游资的完整画像，包括：
+    - 基本信息（席位名称、别名、层级、风格）
+    - 历史统计（上榜次数、买卖金额、平均净买入）
+    - 操作偏好（偏好板块、偏好市值）
+    - 近期操作记录
+
+    Args:
+        tier: 可选，按层级筛选（一线/二线）
+    """
+    try:
+        result = await lhb_service.get_all_hot_money_profiles(tier)
+        logger.info("Hot money profiles fetched", count=len(result), tier=tier)
+        return result
+    except Exception as e:
+        logger.error("Failed to fetch hot money profiles", error=str(e))
+        raise HTTPException(status_code=500, detail=f"获取游资画像列表失败: {str(e)}")
+
+
+@router.get("/hot-money/profile/{alias}", response_model=HotMoneyProfile)
+async def get_hot_money_profile(alias: str):
+    """获取单个游资画像
+
+    根据游资别名获取完整画像信息。
+
+    Args:
+        alias: 游资别名，如 "溧阳路"、"赵老哥"、"拉萨天团"
+    """
+    try:
+        result = await lhb_service.get_hot_money_profile(alias)
+        if not result:
+            raise HTTPException(status_code=404, detail=f"未找到游资: {alias}")
+        logger.info("Hot money profile fetched", alias=alias)
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to fetch hot money profile", alias=alias, error=str(e))
+        raise HTTPException(status_code=500, detail=f"获取游资画像失败: {str(e)}")
+
+
+@router.get("/hot-money/movement-signal", response_model=HotMoneyMovementSignal)
+async def get_hot_money_movement_signal():
+    """获取游资动向信号
+
+    分析当日知名游资的操作，识别共识买入/卖出信号。
+
+    返回：
+    - 信号类型（consensus_buy/consensus_sell/divergence/new_entry/no_activity）
+    - 信号强度（0-100）
+    - 涉及的游资席位
+    - 目标股票列表
+    - 信号解读
+    """
+    try:
+        result = await lhb_service.get_hot_money_movement_signal()
+        logger.info(
+            "Hot money movement signal fetched",
+            signal_type=result.signal_type,
+            strength=result.signal_strength,
+        )
+        return result
+    except Exception as e:
+        logger.error("Failed to fetch hot money movement signal", error=str(e))
+        raise HTTPException(status_code=500, detail=f"获取游资动向信号失败: {str(e)}")
+
+
+@router.get("/hot-money/correlation/{alias}")
+async def get_seat_correlation(alias: str):
+    """获取游资席位关联分析
+
+    分析与指定游资经常一起出现的席位，用于识别游资联盟或跟风关系。
+
+    Args:
+        alias: 游资别名
+    """
+    try:
+        result = await lhb_service.get_seat_correlation(alias)
+        logger.info("Seat correlation fetched", alias=alias, count=len(result))
+        return result
+    except Exception as e:
+        logger.error("Failed to fetch seat correlation", alias=alias, error=str(e))
+        raise HTTPException(status_code=500, detail=f"获取席位关联失败: {str(e)}")

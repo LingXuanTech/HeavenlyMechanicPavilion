@@ -4,6 +4,8 @@
 - 政策新闻搜索
 - 监管日历
 - 行业政策状态
+- 个股政策影响评估
+- 政策情绪量化分析
 """
 
 from datetime import datetime, date
@@ -147,13 +149,41 @@ def get_regulatory_calendar() -> str:
 def get_sector_policy_status(sector: str) -> str:
     """获取行业政策状态
 
+    使用 PolicySectorService 获取行业的政策立场、情绪分数和核心政策。
+
     Args:
         sector: 行业名称（如：新能源、房地产、互联网、半导体、医药）
 
     Returns:
-        该行业当前的政策导向和监管态度
+        该行业当前的政策导向和监管态度，包括政策敏感度评分
     """
-    # 预定义的行业政策状态（可从数据库或配置文件加载）
+    try:
+        from services.policy_sector_service import policy_sector_service
+
+        policy = policy_sector_service.get_sector_policy(sector)
+        if policy:
+            output_lines = [f"## {policy.sector_name}行业政策状态\n"]
+            output_lines.append(f"**政策立场**: {policy.policy_stance.value}")
+            output_lines.append(f"**政策情绪分数**: {policy.sentiment_score} (范围: -100 到 +100)")
+            output_lines.append(f"**政策敏感度**: {policy.sensitivity}/100\n")
+
+            output_lines.append("### 核心政策")
+            for p in policy.key_policies:
+                output_lines.append(f"- {p}")
+
+            output_lines.append("\n### 主要风险")
+            for r in policy.risks:
+                output_lines.append(f"- ⚠️ {r}")
+
+            output_lines.append("\n### 潜在催化剂")
+            for c in policy.catalysts:
+                output_lines.append(f"- ✨ {c}")
+
+            return "\n".join(output_lines)
+    except Exception as e:
+        logger.warning("PolicySectorService unavailable", error=str(e))
+
+    # 降级到原有的硬编码逻辑
     sector_policies = {
         "房地产": {
             "policy_stance": "宽松",
@@ -307,10 +337,228 @@ def search_industry_planning(industry: str) -> str:
     return "\n".join(output_lines)
 
 
+@tool
+def get_stock_policy_impact(symbol: str) -> str:
+    """获取个股受政策影响的综合评估
+
+    根据股票所属行业板块，评估其受政策影响的程度和方向。
+    使用 PolicySectorService 自动识别股票所属行业并计算加权政策情绪。
+
+    Args:
+        symbol: 股票代码（如 600519.SH, 000001.SZ, 00700.HK）
+
+    Returns:
+        个股政策影响评估报告，包括：
+        - 政策情绪评级（strong_bullish/bullish/neutral/bearish/strong_bearish）
+        - 情绪分数（-100 到 +100）
+        - 关联行业及其影响
+        - 核心政策、风险和催化剂
+    """
+    try:
+        from services.policy_sector_service import policy_sector_service
+
+        result = policy_sector_service.get_stock_policy_impact(symbol)
+
+        if result.get("policy_impact") == "unknown":
+            return f"⚠️ 无法获取 {symbol} 的行业信息：{result.get('message', '未知错误')}"
+
+        output_lines = [f"## {result['name']}（{symbol}）政策影响评估\n"]
+
+        # 基本信息
+        output_lines.append(f"**主行业**: {result['primary_sector']}")
+        if result['secondary_sectors']:
+            output_lines.append(f"**关联行业**: {', '.join(result['secondary_sectors'])}")
+        output_lines.append(f"**政策情绪**: {result['policy_impact']}")
+        output_lines.append(f"**综合情绪分数**: {result['sentiment_score']} (范围: -100 到 +100)\n")
+
+        # 行业影响明细
+        if result['sector_impacts']:
+            output_lines.append("### 行业政策影响明细")
+            for impact in result['sector_impacts']:
+                output_lines.append(
+                    f"- **{impact['sector']}**: 立场={impact['stance']}, "
+                    f"情绪={impact['sentiment_score']}, 敏感度={impact['sensitivity']}, "
+                    f"权重={impact['weight']:.1%}"
+                )
+            output_lines.append("")
+
+        # 核心政策
+        if result['key_policies']:
+            output_lines.append("### 核心政策")
+            for p in result['key_policies']:
+                output_lines.append(f"- {p}")
+            output_lines.append("")
+
+        # 风险
+        if result['risks']:
+            output_lines.append("### 主要风险")
+            for r in result['risks']:
+                output_lines.append(f"- ⚠️ {r}")
+            output_lines.append("")
+
+        # 催化剂
+        if result['catalysts']:
+            output_lines.append("### 潜在催化剂")
+            for c in result['catalysts']:
+                output_lines.append(f"- ✨ {c}")
+
+        return "\n".join(output_lines)
+
+    except Exception as e:
+        logger.warning("get_stock_policy_impact failed", symbol=symbol, error=str(e))
+        return f"⚠️ 获取 {symbol} 政策影响评估失败：{str(e)}"
+
+
+@tool
+def analyze_policy_sentiment(text: str) -> str:
+    """分析政策文本的情绪
+
+    对输入的政策文本进行情绪分析，识别利好/利空关键词，
+    并自动关联影响的行业板块。
+
+    Args:
+        text: 政策文本内容（10-5000字）
+
+    Returns:
+        政策情绪分析结果，包括：
+        - 情绪分类（strong_bullish/bullish/neutral/bearish/strong_bearish）
+        - 情绪分数（-100 到 +100）
+        - 关联的行业板块
+        - 解读说明
+    """
+    if len(text) < 10:
+        return "⚠️ 政策文本过短，请提供至少 10 个字符的内容。"
+
+    if len(text) > 5000:
+        text = text[:5000]
+        logger.info("Policy text truncated to 5000 chars")
+
+    try:
+        from services.policy_sector_service import policy_sector_service
+
+        sentiment, score, sectors = policy_sector_service.analyze_policy_text(text)
+
+        output_lines = ["## 政策文本情绪分析\n"]
+        output_lines.append(f"**情绪分类**: {sentiment.value}")
+        output_lines.append(f"**情绪分数**: {score} (范围: -100 到 +100)")
+
+        if sectors:
+            output_lines.append(f"**关联行业**: {', '.join(sectors)}\n")
+        else:
+            output_lines.append("**关联行业**: 未识别到特定行业\n")
+
+        # 生成解读
+        output_lines.append("### 解读")
+        if score >= 50:
+            interpretation = "该政策文本呈现**明显利好**信号，包含多个支持性关键词。"
+        elif score >= 20:
+            interpretation = "该政策文本整体**偏积极**，但力度有限。"
+        elif score >= -20:
+            interpretation = "该政策文本态度**中性**，无明显政策倾向。"
+        elif score >= -50:
+            interpretation = "该政策文本包含一定**监管信号**，需关注执行力度。"
+        else:
+            interpretation = "该政策文本呈现**明显利空**信号，包含多个限制性关键词。"
+
+        output_lines.append(interpretation)
+
+        if sectors:
+            output_lines.append(f"\n**投资建议**: 关注{', '.join(sectors)}板块相关标的，结合政策情绪调整仓位。")
+
+        return "\n".join(output_lines)
+
+    except Exception as e:
+        logger.warning("analyze_policy_sentiment failed", error=str(e))
+
+        # 降级到简单关键词分析
+        bullish_words = ["支持", "鼓励", "促进", "补贴", "减税", "降息", "放松", "扩大"]
+        bearish_words = ["限制", "禁止", "整治", "打击", "处罚", "收紧", "规范", "反垄断"]
+
+        bullish_count = sum(1 for w in bullish_words if w in text)
+        bearish_count = sum(1 for w in bearish_words if w in text)
+
+        if bullish_count > bearish_count:
+            return f"## 政策文本情绪分析（简化版）\n\n**初步判断**: 偏利好\n利好关键词数: {bullish_count}\n利空关键词数: {bearish_count}"
+        elif bearish_count > bullish_count:
+            return f"## 政策文本情绪分析（简化版）\n\n**初步判断**: 偏利空\n利好关键词数: {bullish_count}\n利空关键词数: {bearish_count}"
+        else:
+            return f"## 政策文本情绪分析（简化版）\n\n**初步判断**: 中性\n利好关键词数: {bullish_count}\n利空关键词数: {bearish_count}"
+
+
+@tool
+def get_high_sensitivity_sectors(threshold: int = 80) -> str:
+    """获取高政策敏感度行业列表
+
+    政策敏感度反映行业受政策影响的程度（0-100）。
+    高敏感度行业对政策变化反应更剧烈，投资时需特别关注政策动向。
+
+    Args:
+        threshold: 敏感度阈值（默认 80，范围 0-100）
+
+    Returns:
+        高敏感度行业列表及其政策状态
+    """
+    try:
+        from services.policy_sector_service import policy_sector_service
+
+        sectors = policy_sector_service.get_high_sensitivity_sectors(threshold)
+        policies = policy_sector_service.get_all_sector_policies()
+
+        if not sectors:
+            return f"未找到敏感度高于 {threshold} 的行业。"
+
+        output_lines = [f"## 高政策敏感度行业（敏感度 ≥ {threshold}）\n"]
+
+        for sector, sensitivity in sectors:
+            if sector in policies:
+                policy = policies[sector]
+                output_lines.append(f"### {sector}")
+                output_lines.append(f"- **敏感度**: {sensitivity}/100")
+                output_lines.append(f"- **政策立场**: {policy.policy_stance.value}")
+                output_lines.append(f"- **情绪分数**: {policy.sentiment_score}")
+                output_lines.append("")
+
+        output_lines.append("---")
+        output_lines.append("⚠️ **风险提示**: 高敏感度行业对政策变化反应剧烈，建议密切关注政策动向，控制仓位风险。")
+
+        return "\n".join(output_lines)
+
+    except Exception as e:
+        logger.warning("get_high_sensitivity_sectors failed", error=str(e))
+        # 降级返回硬编码的高敏感度行业
+        return """## 高政策敏感度行业（敏感度 ≥ 80）
+
+### 教育
+- **敏感度**: 98/100
+- **政策立场**: 严格监管
+
+### 房地产
+- **敏感度**: 95/100
+- **政策立场**: 宽松支持
+
+### 半导体
+- **敏感度**: 90/100
+- **政策立场**: 战略支持
+
+### 医药
+- **敏感度**: 85/100
+- **政策立场**: 分化监管
+
+### 互联网
+- **敏感度**: 80/100
+- **政策立场**: 常态化监管
+
+---
+⚠️ **风险提示**: 高敏感度行业对政策变化反应剧烈，建议密切关注政策动向，控制仓位风险。"""
+
+
 # 导出所有工具
 POLICY_TOOLS = [
     search_policy_news,
     get_regulatory_calendar,
     get_sector_policy_status,
     search_industry_planning,
+    get_stock_policy_impact,
+    analyze_policy_sentiment,
+    get_high_sensitivity_sectors,
 ]

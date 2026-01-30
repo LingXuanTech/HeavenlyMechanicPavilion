@@ -4,6 +4,18 @@ import StockChart from './StockChart';
 import { TradingViewChart } from './TradingViewChart';
 import { ChartToolbar } from './ChartToolbar';
 import { AnalysisTypewriter } from './TypewriterText';
+import {
+  AlertBanner,
+  KeyMetricsBar,
+  ConfidenceDisplay,
+  PlannerInsight,
+  DataQualityWarning,
+  ActionSuggestions,
+  AnalysisLevelBadge,
+  DiagnosticsPanel,
+  HistoricalCasesCount,
+  MarketHints,
+} from './AgenticUI';
 import { useChartIndicators } from '../hooks';
 import * as api from '../services/api';
 import { X, Send, MessageSquare, FileText, Bot, Volume2, VolumeX, Pause, Play, Square, Copy, Check, TrendingUp, TrendingDown, BrainCircuit, BarChart2, Target, ShieldAlert, Scale, Swords, CheckCircle2, Search, Gavel, UserCog, Sparkles, CandlestickChart, LineChart } from 'lucide-react';
@@ -350,6 +362,10 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
                 <h2 className="text-2xl font-bold text-white flex items-center gap-3">
                   {stock.symbol}
                   <span className="text-sm font-normal text-gray-400 bg-gray-800 px-2 py-1 rounded-md">{stock.market}</span>
+                  {/* Analysis Level Badge */}
+                  {analysis?.uiHints?.analysisLevel && (
+                    <AnalysisLevelBadge level={analysis.uiHints.analysisLevel} />
+                  )}
                 </h2>
                 <p className="text-gray-400">{stock.name}</p>
               </div>
@@ -396,13 +412,30 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
                 <div className="flex justify-between items-center max-w-3xl mx-auto relative">
                     {/* Connecting Line */}
                     <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-800 -z-0"></div>
-                    
+
                     <WorkflowStep icon={<Search className="w-4 h-4" />} label="Analyst Team" completed />
                     <WorkflowStep icon={<Swords className="w-4 h-4" />} label="Bull/Bear Debate" completed />
                     <WorkflowStep icon={<ShieldAlert className="w-4 h-4" />} label="Risk Check" completed />
                     <WorkflowStep icon={<UserCog className="w-4 h-4" />} label="Fund Manager" completed active />
                 </div>
             </div>
+        )}
+
+        {/* Agentic UI Alerts & Key Metrics */}
+        {analysis?.uiHints && (
+          <div className="px-6 py-3 space-y-3 border-b border-gray-800/50 bg-gray-900/30">
+            {/* Alert Banner */}
+            <AlertBanner hints={analysis.uiHints} />
+
+            {/* Key Metrics & Market Hints Row */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <KeyMetricsBar metrics={analysis.uiHints.keyMetrics} />
+              <div className="flex items-center gap-3">
+                <MarketHints hints={analysis.uiHints.marketSpecificHints} />
+                <HistoricalCasesCount count={analysis.uiHints.historicalCasesCount} />
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Content Area */}
@@ -641,13 +674,20 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
                       <div className="space-y-6">
                         {/* Signal & Trade Setup Card */}
                         <div className="bg-gray-800/40 rounded-xl p-5 border border-gray-700">
-                            <div className={`text-center py-4 rounded-lg border-2 mb-6 ${
+                            <div className={`text-center py-4 rounded-lg border-2 mb-4 ${
                                 analysis.signal.includes('Buy') ? 'border-green-500 bg-green-500/10 text-green-400' :
                                 analysis.signal.includes('Sell') ? 'border-red-500 bg-red-500/10 text-red-400' :
                                 'border-yellow-500 bg-yellow-500/10 text-yellow-400'
                             }`}>
                               <div className="text-2xl font-black uppercase tracking-wider">{analysis.signal}</div>
-                              <div className="text-sm font-mono opacity-80">{analysis.confidence}% Confidence</div>
+                            </div>
+
+                            {/* Confidence Display - Adaptive based on uiHints */}
+                            <div className="flex justify-center mb-6">
+                              <ConfidenceDisplay
+                                value={analysis.confidence}
+                                mode={analysis.uiHints?.confidenceDisplay || 'number'}
+                              />
                             </div>
 
                             {/* Trade Setup Visualizer */}
@@ -777,6 +817,23 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
                             </div>
                           </div>
                         )}
+
+                        {/* Agentic UI Components */}
+                        {analysis.uiHints && (
+                          <div className="space-y-4">
+                            {/* Planner Insight */}
+                            <PlannerInsight hints={analysis.uiHints} />
+
+                            {/* Data Quality Warning */}
+                            <DataQualityWarning issues={analysis.uiHints.dataQualityIssues} />
+
+                            {/* Action Suggestions */}
+                            <ActionSuggestions suggestions={analysis.uiHints.actionSuggestions} />
+                          </div>
+                        )}
+
+                        {/* Diagnostics Panel */}
+                        <DiagnosticsPanel diagnostics={analysis.diagnostics} />
 
                       </div>
                     ) : (

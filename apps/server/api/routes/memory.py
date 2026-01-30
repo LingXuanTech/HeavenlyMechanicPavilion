@@ -5,6 +5,7 @@ from typing import List, Optional
 
 from services.memory_service import (
     memory_service,
+    layered_memory,
     AnalysisMemory,
     MemoryRetrievalResult,
     ReflectionReport
@@ -171,3 +172,82 @@ async def search_memories(
     except Exception as e:
         logger.error("Memory search failed", error=str(e))
         raise HTTPException(status_code=500, detail=f"搜索失败: {str(e)}")
+
+
+# ============ 分层记忆 API ============
+
+
+@router.get("/layered/status")
+async def get_layered_memory_status():
+    """获取分层记忆服务统计"""
+    return layered_memory.get_layered_stats()
+
+
+@router.get("/layered/macro/{cycle}")
+async def retrieve_by_macro_cycle(
+    cycle: str,
+    n_results: int = Query(10, ge=1, le=50),
+):
+    """按宏观周期检索历史分析案例
+
+    Args:
+        cycle: 宏观周期标签（rate_cut, rate_hike, bull_market, bear_market, recovery, recession, neutral）
+        n_results: 返回结果数量
+    """
+    results = await layered_memory.retrieve_by_macro_cycle(
+        macro_cycle=cycle,
+        n_results=n_results,
+    )
+
+    return {
+        "macro_cycle": cycle,
+        "results": [
+            {
+                "symbol": r.memory.symbol,
+                "date": r.memory.date,
+                "signal": r.memory.signal,
+                "confidence": r.memory.confidence,
+                "similarity": round(r.similarity, 3),
+                "outcome": r.memory.outcome or "pending",
+            }
+            for r in results
+        ],
+        "count": len(results),
+    }
+
+
+@router.get("/layered/pattern/{pattern}")
+async def retrieve_by_pattern(
+    pattern: str,
+    sector: Optional[str] = None,
+    n_results: int = Query(10, ge=1, le=50),
+):
+    """按技术形态/基本面特征检索历史案例
+
+    Args:
+        pattern: 形态类型（strong_conviction, uncertain, normal, breakout, double_bottom 等）
+        sector: 行业筛选（可选）
+        n_results: 返回结果数量
+    """
+    results = await layered_memory.retrieve_by_pattern(
+        pattern_type=pattern,
+        sector=sector,
+        n_results=n_results,
+    )
+
+    return {
+        "pattern_type": pattern,
+        "sector": sector,
+        "results": [
+            {
+                "symbol": r.memory.symbol,
+                "date": r.memory.date,
+                "signal": r.memory.signal,
+                "confidence": r.memory.confidence,
+                "similarity": round(r.similarity, 3),
+                "outcome": r.memory.outcome or "pending",
+            }
+            for r in results
+        ],
+        "count": len(results),
+    }

@@ -1,30 +1,38 @@
 import asyncio
 import json
+import os
 import time
 import uuid
 import structlog
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from typing import AsyncGenerator, Optional, Iterator, Any
+from typing import AsyncGenerator, Optional, Iterator, Any, List, Literal
+from pydantic import BaseModel, Field
 from sse_starlette.sse import ServerSentEvent, EventSourceResponse
 from sqlmodel import Session, select
 from api.sse import sse_manager
-from services.synthesizer import synthesizer
-from services.memory_service import memory_service, AnalysisMemory
+from services.synthesizer import synthesizer, SynthesisContext
+from services.memory_service import memory_service, layered_memory, AnalysisMemory
 from services.cache_service import cache_service
 from services.data_router import MarketRouter
+from services.market_analyst_router import MarketAnalystRouter
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 from config.settings import settings
 from db.models import AnalysisResult, engine, get_session
 from services.accuracy_tracker import accuracy_tracker
+from services.task_queue import task_queue
 
 router = APIRouter(prefix="/analyze", tags=["Analysis"])
 logger = structlog.get_logger()
 
 # Thread pool for running synchronous graph execution
 _graph_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="graph_worker")
+
+# 是否使用任务队列（生产环境）而非 BackgroundTasks（开发环境）
+# 当配置了 REDIS_URL 且 USE_TASK_QUEUE=true 时启用
+USE_TASK_QUEUE = bool(settings.REDIS_URL) and os.getenv("USE_TASK_QUEUE", "false").lower() == "true"
 
 
 async def async_stream_wrapper(sync_iterator: Iterator[Any]) -> AsyncGenerator[Any, None]:
@@ -47,9 +55,33 @@ async def async_stream_wrapper(sync_iterator: Iterator[Any]) -> AsyncGenerator[A
         yield result
 
 
-async def run_analysis_task(task_id: str, symbol: str, trade_date: str):
-    """执行分析任务并将结果保存到数据库"""
-    logger.info("Starting analysis task", task_id=task_id, symbol=symbol)
+async def run_analysis_task(
+    task_id: str,
+    symbol: str,
+    trade_date: str,
+    override_analysts: Optional[list] = None,
+    exclude_analysts: Optional[list] = None,
+    analysis_level: Literal["L1", "L2"] = "L2",
+    use_planner: bool = True,
+):
+    """执行分析任务并将结果保存到数据库
+
+    Args:
+        task_id: 任务唯一 ID
+        symbol: 股票代码
+        trade_date: 分析日期
+        override_analysts: 完全覆盖默认分析师配置
+        exclude_analysts: 排除指定分析师
+        analysis_level: 分析深度级别 (L1: 快速扫描, L2: 完整分析)
+        use_planner: 是否使用 Planner 动态选择分析师
+    """
+    logger.info(
+        "Starting analysis task",
+        task_id=task_id,
+        symbol=symbol,
+        analysis_level=analysis_level,
+        use_planner=use_planner,
+    )
     start_time = time.time()
 
     # 初始化任务状态（缓存层）和 SSE 事件队列（分布式）
@@ -81,8 +113,30 @@ async def run_analysis_task(task_id: str, symbol: str, trade_date: str):
 
         # Initialize graph with custom config if needed
         config = DEFAULT_CONFIG.copy()
+        config["analysis_level"] = analysis_level
+        config["use_planner"] = use_planner
         market = MarketRouter.get_market(symbol)
-        ta = TradingAgentsGraph(debug=True, config=config, market=market)
+
+        # 使用智能路由器选择分析师
+        selected_analysts = MarketAnalystRouter.get_analysts(
+            symbol=symbol,
+            override_analysts=override_analysts,
+            exclude_analysts=exclude_analysts,
+        )
+        logger.info(
+            "Analyst selection",
+            symbol=symbol,
+            market=market,
+            analysts=selected_analysts,
+            override=override_analysts is not None,
+        )
+
+        ta = TradingAgentsGraph(
+            selected_analysts=selected_analysts,
+            debug=True,
+            config=config,
+            market=market,
+        )
 
         # Initial state (with historical reflection and market)
         init_state = ta.propagator.create_initial_state(
@@ -141,9 +195,34 @@ async def run_analysis_task(task_id: str, symbol: str, trade_date: str):
                 }
                 await cache_service.push_sse_event(task_id, current_stage, event_data)
 
+                # 收集 Planner 决策信息（如有）
+                if "recommended_analysts" in node_data:
+                    planner_decision = f"Planner 推荐使用: {', '.join(node_data['recommended_analysts'])}"
+                elif "planner_decision" not in locals():
+                    planner_decision = None
+
+        # 计算耗时
+        elapsed_seconds = round(time.time() - start_time, 2)
+
+        # 构建合成上下文
+        historical_cases_count = None
+        if 'reflection' in locals() and reflection:
+            historical_cases_count = len(reflection.historical_analyses)
+
+        synthesis_context = SynthesisContext(
+            analysis_level=analysis_level,
+            task_id=task_id,
+            elapsed_seconds=elapsed_seconds,
+            analysts_used=selected_analysts,
+            planner_decision=planner_decision if 'planner_decision' in locals() else None,
+            data_quality_issues=None,  # 未来可集成 DataValidator
+            historical_cases_count=historical_cases_count,
+            market=market,
+        )
+
         # Final Synthesis
         logger.info("Starting final synthesis", symbol=symbol)
-        final_json = await synthesizer.synthesize(symbol, agent_reports)
+        final_json = await synthesizer.synthesize(symbol, agent_reports, synthesis_context)
 
         elapsed_seconds = round(time.time() - start_time, 2)
 
@@ -196,16 +275,26 @@ async def run_analysis_task(task_id: str, symbol: str, trade_date: str):
                 target_price=final_json.get("recommendation", {}).get("target_price"),
                 stop_loss=final_json.get("recommendation", {}).get("stop_loss"),
             )
-            await memory_service.store_analysis(analysis_memory)
-            logger.info("Analysis stored to memory service", symbol=symbol)
+
+            # 使用分层记忆存储（同时存入 macro_cycles 和 pattern_cases 集合）
+            sector = final_json.get("company_overview", {}).get("sector")
+            await layered_memory.store_layered_analysis(
+                analysis_memory,
+                sector=sector,
+                macro_cycle=None,  # 自动推断
+                pattern_type=None,  # 自动推断
+            )
+            logger.info("Analysis stored to layered memory service", symbol=symbol)
         except Exception as mem_err:
             logger.warning("Failed to store analysis to memory", error=str(mem_err))
 
-        # 添加诊断信息到返回结果
-        final_json["diagnostics"] = {
-            "task_id": task_id,
-            "elapsed_seconds": elapsed_seconds,
-        }
+        # 确保 diagnostics 存在（synthesizer 应已添加，此处为降级保护）
+        if "diagnostics" not in final_json:
+            final_json["diagnostics"] = {
+                "task_id": task_id,
+                "elapsed_seconds": elapsed_seconds,
+                "analysts_used": selected_analysts,
+            }
 
         await cache_service.push_sse_event(task_id, "stage_final", final_json)
         await cache_service.set_sse_status(task_id, "completed")
@@ -237,16 +326,89 @@ async def run_analysis_task(task_id: str, symbol: str, trade_date: str):
         await cache_service.set_task(task_id, {"status": "failed", "symbol": symbol, "error": str(e)})
 
 
+class AnalyzeRequest(BaseModel):
+    """分析请求参数"""
+    trade_date: Optional[str] = Field(None, description="分析日期 (ISO 格式)，默认今天")
+    analysts: Optional[List[str]] = Field(None, description="指定分析师列表（覆盖默认配置）")
+    exclude_analysts: Optional[List[str]] = Field(None, description="排除指定分析师")
+    analysis_level: Literal["L1", "L2"] = Field(
+        "L2",
+        description="分析深度: L1=快速扫描(15-20秒), L2=完整分析(30-60秒)"
+    )
+    use_planner: bool = Field(
+        True,
+        description="是否使用 Planner 动态选择分析师"
+    )
+
+
 @router.post("/{symbol}")
-async def trigger_analysis(symbol: str, background_tasks: BackgroundTasks, trade_date: str = None):
-    """触发股票分析任务"""
-    if not trade_date:
-        trade_date = date.today().isoformat()
+async def trigger_analysis(symbol: str, background_tasks: BackgroundTasks, body: AnalyzeRequest = None):
+    """触发股票分析任务
+
+    支持自定义分析师配置：
+    - 不传参数：根据市场类型自动选择（A股 7 个分析师、港股 5 个、美股 4 个）
+    - analysts: 完全覆盖，使用指定分析师列表
+    - exclude_analysts: 排除某些分析师（如排除 policy 仅做技术面分析）
+
+    支持分析级别：
+    - L1: 快速扫描 (Market + News + Macro, 无辩论, 15-20秒)
+    - L2: 完整分析 (所有分析师 + 辩论 + 风险评估, 30-60秒)
+
+    执行模式：
+    - 开发环境（默认）: 使用 BackgroundTasks 直接执行
+    - 生产环境（USE_TASK_QUEUE=true）: 入队到 Redis Stream，由 worker 处理
+    """
+    if body is None:
+        body = AnalyzeRequest()
+
+    trade_date = body.trade_date or date.today().isoformat()
 
     task_id = f"task_{symbol}_{uuid.uuid4().hex[:8]}"
-    background_tasks.add_task(run_analysis_task, task_id, symbol, trade_date)
 
-    return {"task_id": task_id, "symbol": symbol, "status": "accepted"}
+    # 返回将使用的分析师配置供前端展示
+    market_config = MarketAnalystRouter.get_market_config(symbol)
+    effective_analysts = body.analysts or MarketAnalystRouter.get_analysts(
+        symbol=symbol,
+        override_analysts=body.analysts,
+        exclude_analysts=body.exclude_analysts,
+    )
+
+    if USE_TASK_QUEUE:
+        # 生产模式：入队到 Redis Stream
+        await task_queue.enqueue_analysis(
+            task_id=task_id,
+            symbol=symbol,
+            trade_date=trade_date,
+            analysis_level=body.analysis_level,
+            use_planner=body.use_planner,
+            override_analysts=body.analysts,
+            exclude_analysts=body.exclude_analysts,
+        )
+        logger.info("Task enqueued", task_id=task_id, symbol=symbol, mode="queue")
+    else:
+        # 开发模式：使用 BackgroundTasks 直接执行
+        background_tasks.add_task(
+            run_analysis_task,
+            task_id,
+            symbol,
+            trade_date,
+            override_analysts=body.analysts,
+            exclude_analysts=body.exclude_analysts,
+            analysis_level=body.analysis_level,
+            use_planner=body.use_planner,
+        )
+        logger.info("Task scheduled", task_id=task_id, symbol=symbol, mode="background")
+
+    return {
+        "task_id": task_id,
+        "symbol": symbol,
+        "status": "accepted",
+        "market": market_config["market"],
+        "analysts": effective_analysts,
+        "analysis_level": body.analysis_level,
+        "use_planner": body.use_planner,
+        "execution_mode": "queue" if USE_TASK_QUEUE else "background",
+    }
 
 
 @router.get("/stream/{task_id}")
@@ -389,4 +551,67 @@ async def get_task_status(task_id: str, session: Session = Depends(get_session))
         "symbol": result.symbol,
         "created_at": result.created_at.isoformat(),
         "source": "database"
+    }
+
+
+@router.get("/analysts/config/{symbol}")
+async def get_analyst_config(symbol: str):
+    """获取指定 symbol 的分析师路由配置
+
+    返回该股票市场类型、默认分析师列表、所有可用分析师。
+    前端可用此接口渲染分析师选择 UI。
+    """
+    return MarketAnalystRouter.get_market_config(symbol)
+
+
+@router.get("/analysts/available")
+async def get_available_analysts():
+    """获取所有可用的分析师及其描述"""
+    return MarketAnalystRouter.get_available_analysts()
+
+
+@router.post("/quick/{symbol}")
+async def quick_scan(symbol: str, background_tasks: BackgroundTasks):
+    """快速扫描（L1 模式）
+
+    便捷端点，等同于 POST /{symbol} with analysis_level=L1。
+    适用于批量扫描、watchlist 快速刷新等场景。
+
+    特点：
+    - 仅运行 Market + News + Macro 三个分析师
+    - 跳过辩论和风险评估阶段
+    - 预计 15-20 秒完成
+    """
+    task_id = f"quick_{symbol}_{uuid.uuid4().hex[:8]}"
+    trade_date = date.today().isoformat()
+
+    if USE_TASK_QUEUE:
+        await task_queue.enqueue_analysis(
+            task_id=task_id,
+            symbol=symbol,
+            trade_date=trade_date,
+            analysis_level="L1",
+            use_planner=False,
+            override_analysts=["market", "news", "macro"],
+        )
+    else:
+        background_tasks.add_task(
+            run_analysis_task,
+            task_id,
+            symbol,
+            trade_date,
+            override_analysts=["market", "news", "macro"],
+            exclude_analysts=None,
+            analysis_level="L1",
+            use_planner=False,
+        )
+
+    return {
+        "task_id": task_id,
+        "symbol": symbol,
+        "status": "accepted",
+        "analysis_level": "L1",
+        "analysts": ["market", "news", "macro"],
+        "estimated_time_seconds": 20,
+        "execution_mode": "queue" if USE_TASK_QUEUE else "background",
     }

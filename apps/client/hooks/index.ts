@@ -19,6 +19,7 @@ export {
   LATEST_ANALYSIS_KEY,
 } from './useAnalysis';
 export type { AnalysisState } from './useAnalysis';
+export type { AnalysisOptions } from '../services/api';
 
 // 市场数据
 export {

@@ -61,42 +61,77 @@ apps/
 └── server/               # Python 3.10 + FastAPI
     ├── main.py           # 应用入口，路由注册，生命周期管理
     ├── api/
-    │   ├── routes/       # 业务路由（analyze, watchlist, market, discover, chat, portfolio, macro, memory, admin, health, market_watcher, news_aggregator, settings）
+    │   ├── routes/       # 业务路由（详见下方路由清单）
     │   ├── dependencies.py  # FastAPI 依赖注入（API Key 验证）
     │   └── sse.py        # SSE 事件流封装
-    ├── services/         # 业务服务层
-    │   ├── data_router.py     # MarketRouter：多市场数据路由 + 降级
-    │   ├── synthesizer.py     # ResponseSynthesizer：Agent 报告 -> JSON
-    │   ├── prompt_manager.py  # PromptManager（单例，YAML 热加载）
-    │   ├── scheduler.py       # APScheduler 定时分析
-    │   ├── memory_service.py  # ChromaDB 向量记忆 + 反思机制
-    │   ├── macro_service.py   # 宏观经济数据
-    │   ├── market_watcher.py  # 全球指数监控
-    │   ├── news_aggregator.py # 新闻聚合
-    │   └── health_monitor.py  # 系统健康监控
+    ├── services/         # 业务服务层（详见下方服务清单）
     ├── config/
     │   ├── settings.py   # Pydantic Settings（环境变量驱动）
     │   └── prompts.yaml  # Agent Prompt 注册表（支持热更新）
     ├── db/
     │   └── models.py     # SQLModel ORM（Watchlist, AnalysisResult, ChatHistory）
     └── tradingagents/    # 核心 AI Agent 框架（fork 自 TauricResearch/TradingAgents）
-        ├── graph/
-        │   ├── trading_graph.py  # TradingAgentsGraph 主类（LLM 初始化 + 编排）
-        │   ├── setup.py          # LangGraph StateGraph 构建
-        │   ├── propagation.py    # 初始状态 + 图执行参数
-        │   ├── reflection.py     # 决策反思 + 记忆更新
-        │   ├── signal_processing.py  # 交易信号提取
-        │   └── conditional_logic.py  # 节点跳转逻辑
-        ├── agents/
-        │   ├── analysts/     # 分析师：market, fundamentals, news, social, macro, scout, portfolio
-        │   ├── researchers/  # 研究员：bull_researcher, bear_researcher
-        │   ├── managers/     # 管理层：research_manager, risk_manager
-        │   ├── risk_mgmt/    # 风险辩论：aggressive, conservative, neutral debator
-        │   ├── trader/       # 交易员
-        │   └── utils/        # Agent 工具函数 + 状态定义
-        ├── dataflows/        # 数据源适配器（yfinance, akshare, alpha_vantage, google news 等）
-        └── default_config.py # Agent 默认配置（LLM 模型、数据源、辩论轮数）
+        ├── graph/        # LangGraph StateGraph 编排
+        ├── agents/       # Agent 实现（详见下方 Agent 清单）
+        ├── dataflows/    # 数据源适配器（yfinance, akshare, alpha_vantage 等）
+        └── default_config.py # Agent 默认配置
 ```
+
+### 路由清单 (`api/routes/`)
+| 路由 | 功能 |
+|------|------|
+| `analyze` | Agent 分析触发 + SSE 流 |
+| `watchlist` | 自选股 CRUD |
+| `market` | 实时行情 |
+| `discover` | Scout 股票发现 |
+| `chat` | Fund Manager 对话 |
+| `portfolio` | 组合分析 |
+| `macro` | 宏观经济数据 |
+| `memory` | 向量记忆管理 |
+| `reflection` | 决策反思 |
+| `ai_config` | 动态 AI 提供商配置 |
+| `auth` / `passkey` / `oauth` | 认证系统 |
+| `lhb` / `north_money` / `jiejin` | A 股特色数据（龙虎榜/北向资金/解禁） |
+| `news` / `news_aggregator` | 新闻聚合 |
+| `sentiment` | 情绪分析 |
+| `backtest` | 回测服务 |
+| `model_racing` | 模型竞赛评估 |
+| `tts` | 语音合成 |
+| `prompts` / `settings` | Prompt 管理 |
+| `market_watcher` | 全球指数监控 |
+| `health` / `admin` | 系统健康 + 管理 |
+
+### 服务清单 (`services/`)
+| 服务 | 功能 |
+|------|------|
+| `data_router` | MarketRouter：多市场数据路由 + 降级 |
+| `synthesizer` | ResponseSynthesizer：Agent 报告 -> JSON |
+| `prompt_manager` | PromptManager（单例，YAML 热加载） |
+| `scheduler` | APScheduler 定时分析 |
+| `memory_service` | ChromaDB 向量记忆 + 反思机制 |
+| `ai_config_service` | 动态 AI 提供商管理 |
+| `auth_service` | 认证服务（JWT/OAuth/Passkey） |
+| `macro_service` | 宏观经济数据 |
+| `market_watcher` | 全球指数监控 |
+| `news_aggregator` | 新闻聚合 |
+| `sentiment_aggregator` | 情绪聚合 |
+| `health_monitor` | 系统健康监控 |
+| `lhb_service` / `north_money_service` / `jiejin_service` | A 股特色数据服务 |
+| `backtest_service` | 回测服务 |
+| `model_racing` | 模型竞赛 |
+| `tts_service` | TTS 语音合成 |
+| `langsmith_service` | LangSmith 追踪 |
+| `token_monitor` | Token 使用监控 |
+| `cache_service` | 缓存服务（Redis/内存） |
+
+### Agent 清单 (`tradingagents/agents/`)
+| 分类 | Agents |
+|------|--------|
+| `analysts/` | market, fundamentals, news, social, macro, scout, portfolio, sentiment, policy, fund_flow |
+| `researchers/` | bull_researcher, bear_researcher |
+| `managers/` | research_manager, risk_manager |
+| `risk_mgmt/` | aggressive_debator, conservative_debator, neutral_debator |
+| `trader/` | trader |
 
 ### 核心数据流
 
@@ -195,7 +230,7 @@ DAILY_ANALYSIS_ENABLED=false
 ### Python (后端)
 - **Ruff**: line-length 120, target Python 3.10, lint rules: `E, F, W, I, N, UP, B, C4`（忽略 E501）
 - **mypy**: strict_optional, check_untyped_defs, show_error_codes
-- **pytest**: asyncio_mode="auto", testpaths=["tests"], 当前 58 个测试（unit 29 + integration 29）
+- **pytest**: asyncio_mode="auto", testpaths=["tests"]
 
 ### TypeScript (前端)
 - 前端无 lint/ESLint 配置，使用 `npx tsc --noEmit` 做类型检查

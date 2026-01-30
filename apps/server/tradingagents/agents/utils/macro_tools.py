@@ -502,6 +502,279 @@ def calculate_rate_sensitivity(sector: str) -> str:
     return "\n".join(output_lines)
 
 
+# ============ 央行 NLP 分析工具 ============
+
+@tool
+def analyze_central_bank_text(text: str) -> str:
+    """分析央行报告或讲话的政策倾向
+
+    识别文本的鹰派/鸽派倾向，提取政策信号。
+
+    Args:
+        text: 央行报告或讲话文本
+
+    Returns:
+        政策情绪分析报告
+    """
+    try:
+        from services.central_bank_nlp_service import central_bank_nlp_service
+
+        # 分析情绪
+        sentiment = central_bank_nlp_service.analyze_sentiment(text)
+
+        # 提取政策信号
+        signals = central_bank_nlp_service.extract_policy_signals(text)
+
+        # 预测政策变化
+        changes = central_bank_nlp_service.predict_policy_change(text)
+
+        # 构建报告
+        output_lines = ["## 央行文本分析报告\n"]
+
+        # 情绪分析
+        stance_emoji = {"hawkish": "🦅", "dovish": "🕊️", "neutral": "➡️"}
+        emoji = stance_emoji.get(sentiment.stance, "❓")
+
+        output_lines.append(f"### {emoji} 政策立场: {sentiment.stance.upper()}")
+        output_lines.append(f"- **置信度**: {sentiment.confidence:.0%}")
+        output_lines.append(f"- **情绪评分**: {sentiment.score:.3f} (-1=极度鸽派, 1=极度鹰派)\n")
+
+        # 鹰派/鸽派信号
+        if sentiment.hawkish_signals:
+            output_lines.append("### 鹰派信号")
+            for s in sentiment.hawkish_signals[:5]:
+                output_lines.append(f"- {s}")
+            output_lines.append("")
+
+        if sentiment.dovish_signals:
+            output_lines.append("### 鸽派信号")
+            for s in sentiment.dovish_signals[:5]:
+                output_lines.append(f"- {s}")
+            output_lines.append("")
+
+        # 政策信号
+        if signals:
+            output_lines.append("### 政策信号")
+            for signal in signals:
+                output_lines.append(f"- 📌 {signal}")
+            output_lines.append("")
+
+        # 政策变化预测
+        if changes:
+            output_lines.append("### 政策变化预测")
+            for change in changes:
+                output_lines.append(
+                    f"- **{change.signal_type}**: "
+                    f"概率 {change.probability:.0%}，预期 {change.timeline}"
+                )
+                output_lines.append(f"  市场影响: {change.market_impact}")
+            output_lines.append("")
+
+        return "\n".join(output_lines)
+
+    except Exception as e:
+        logger.warning("Failed to analyze central bank text", error=str(e))
+        return f"央行文本分析失败: {str(e)}"
+
+
+@tool
+def compare_central_bank_statements(current_text: str, previous_text: str) -> str:
+    """对比两次央行声明的变化
+
+    分析政策立场的变化趋势。
+
+    Args:
+        current_text: 当前声明文本
+        previous_text: 上次声明文本
+
+    Returns:
+        变化分析报告
+    """
+    try:
+        from services.central_bank_nlp_service import central_bank_nlp_service
+
+        comparison = central_bank_nlp_service.compare_statements(current_text, previous_text)
+
+        output_lines = ["## 央行声明变化分析\n"]
+
+        # 立场变化
+        change_emoji = {
+            "更加鹰派": "🔼🦅",
+            "更加鸽派": "🔽🕊️",
+            "基本不变": "➡️",
+        }
+        emoji = change_emoji.get(comparison["stance_change"], "❓")
+
+        output_lines.append(f"### {emoji} 立场变化: {comparison['stance_change']}")
+        output_lines.append(f"- **当前立场**: {comparison['current_stance']} (评分: {comparison['current_score']:.3f})")
+        output_lines.append(f"- **上次立场**: {comparison['previous_stance']} (评分: {comparison['previous_score']:.3f})")
+        output_lines.append(f"- **评分变化**: {comparison['score_change']:+.3f}\n")
+
+        # 关键词变化
+        if comparison["added_keywords"]:
+            output_lines.append("### 新增关键词")
+            output_lines.append(f"- {', '.join(comparison['added_keywords'][:10])}")
+            output_lines.append("")
+
+        if comparison["removed_keywords"]:
+            output_lines.append("### 删除关键词")
+            output_lines.append(f"- {', '.join(comparison['removed_keywords'][:10])}")
+            output_lines.append("")
+
+        # 解读
+        output_lines.append("### 变化解读")
+        output_lines.append(comparison["interpretation"])
+
+        return "\n".join(output_lines)
+
+    except Exception as e:
+        logger.warning("Failed to compare statements", error=str(e))
+        return f"声明对比分析失败: {str(e)}"
+
+
+# ============ 跨资产联动分析工具 ============
+
+@tool
+def get_cross_asset_analysis() -> str:
+    """获取跨资产联动分析
+
+    分析股、债、汇、商品之间的联动关系，包括：
+    - 核心资产价格快照
+    - Risk-On/Risk-Off 模式识别
+    - 跨资产背离信号
+    - 市场叙事和可操作建议
+
+    Returns:
+        跨资产联动分析报告
+    """
+    try:
+        import asyncio
+        from services.cross_asset_service import cross_asset_service
+
+        # 运行异步分析
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(cross_asset_service.get_full_analysis())
+        finally:
+            loop.close()
+
+        output_lines = ["## 跨资产联动分析\n"]
+        output_lines.append(f"**分析时间**: {result.analyzed_at.strftime('%Y-%m-%d %H:%M')}\n")
+
+        # 风险偏好
+        risk = result.risk_appetite
+        regime_emoji = {"risk_on": "📈", "risk_off": "📉", "neutral": "➡️"}
+        output_lines.append(f"### {regime_emoji.get(risk.regime, '❓')} 市场风险偏好: {risk.regime.upper()}")
+        output_lines.append(f"- **风险评分**: {risk.score:.0f} (-100 极避险 ~ 100 极冒险)")
+        output_lines.append(f"- **置信度**: {risk.confidence:.0%}")
+        output_lines.append(f"- **解读**: {risk.interpretation}\n")
+
+        # 支持/相反信号
+        if risk.supporting_signals:
+            output_lines.append("**支持信号**:")
+            for s in risk.supporting_signals[:5]:
+                output_lines.append(f"- {s}")
+            output_lines.append("")
+
+        if risk.contrary_signals:
+            output_lines.append("**相反信号**:")
+            for s in risk.contrary_signals[:3]:
+                output_lines.append(f"- {s}")
+            output_lines.append("")
+
+        # 资产价格摘要
+        output_lines.append("### 核心资产价格")
+        output_lines.append("| 资产 | 价格 | 日涨跌 | 5日涨跌 |")
+        output_lines.append("|------|------|--------|---------|")
+        for asset in result.asset_prices[:10]:
+            change_1d = f"{asset.change_1d:+.1f}%" if asset.change_1d else "-"
+            change_5d = f"{asset.change_5d:+.1f}%" if asset.change_5d else "-"
+            output_lines.append(f"| {asset.name} | {asset.price:.2f} | {change_1d} | {change_5d} |")
+        output_lines.append("")
+
+        # 背离信号
+        if result.divergences:
+            output_lines.append("### ⚠️ 跨资产背离信号")
+            for div in result.divergences:
+                severity_emoji = {"severe": "🔴", "moderate": "🟡", "mild": "🟢"}
+                output_lines.append(f"**{severity_emoji.get(div.severity, '⚪')} {div.signal_type}**: {div.description}")
+                output_lines.append(f"- 历史解决方式: {div.historical_resolution}")
+                output_lines.append(f"- 交易含义: {div.trading_implication}")
+                output_lines.append("")
+
+        # 市场叙事
+        output_lines.append("### 市场叙事")
+        output_lines.append(result.market_narrative + "\n")
+
+        # 可操作建议
+        output_lines.append("### 可操作建议")
+        for insight in result.actionable_insights:
+            output_lines.append(f"- {insight}")
+
+        return "\n".join(output_lines)
+
+    except Exception as e:
+        logger.warning("Failed to get cross asset analysis", error=str(e))
+        return f"跨资产分析失败: {str(e)}"
+
+
+@tool
+def get_risk_appetite_signal() -> str:
+    """获取市场风险偏好信号
+
+    基于多资产表现判断当前 Risk-On/Risk-Off 状态。
+
+    Returns:
+        风险偏好信号分析
+    """
+    try:
+        import asyncio
+        from services.cross_asset_service import cross_asset_service
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(cross_asset_service.calculate_risk_appetite())
+        finally:
+            loop.close()
+
+        output_lines = ["## 市场风险偏好信号\n"]
+        output_lines.append(f"**日期**: {result.date}\n")
+
+        regime_map = {
+            "risk_on": ("📈 Risk-On", "风险偏好上升，资金流向风险资产"),
+            "risk_off": ("📉 Risk-Off", "避险情绪主导，资金流向避险资产"),
+            "neutral": ("➡️ 中性", "多空力量平衡，方向不明"),
+        }
+        regime_label, regime_desc = regime_map.get(result.regime, ("❓", "未知"))
+
+        output_lines.append(f"### {regime_label}")
+        output_lines.append(f"**评分**: {result.score:.0f} / 100")
+        output_lines.append(f"**置信度**: {result.confidence:.0%}")
+        output_lines.append(f"**特征**: {regime_desc}\n")
+
+        output_lines.append("### 解读")
+        output_lines.append(result.interpretation + "\n")
+
+        if result.supporting_signals:
+            output_lines.append("### 支持信号")
+            for s in result.supporting_signals:
+                output_lines.append(f"- ✅ {s}")
+            output_lines.append("")
+
+        if result.contrary_signals:
+            output_lines.append("### 相反信号")
+            for s in result.contrary_signals:
+                output_lines.append(f"- ⚠️ {s}")
+
+        return "\n".join(output_lines)
+
+    except Exception as e:
+        logger.warning("Failed to get risk appetite signal", error=str(e))
+        return f"风险偏好信号获取失败: {str(e)}"
+
+
 # 导出所有工具
 MACRO_TOOLS = [
     get_fed_rate_data,
@@ -510,4 +783,8 @@ MACRO_TOOLS = [
     get_yield_curve_data,
     get_us_macro_summary,
     calculate_rate_sensitivity,
+    analyze_central_bank_text,
+    compare_central_bank_statements,
+    get_cross_asset_analysis,
+    get_risk_appetite_signal,
 ]

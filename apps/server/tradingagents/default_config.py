@@ -13,6 +13,10 @@ DEFAULT_CONFIG = {
     "deep_think_llm": "o4-mini",
     "quick_think_llm": "gpt-4o-mini",
     "backend_url": "https://api.openai.com/v1",
+    # Graph orchestration settings
+    "use_planner": True,           # Use Planner for adaptive analyst selection
+    "analysis_level": "L2",        # L1: Quick scan (Market+News+Macro), L2: Full analysis
+    "use_subgraphs": False,        # Use SubGraph architecture (experimental)
     # Debate and discussion settings
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,

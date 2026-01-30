@@ -1,61 +1,85 @@
-import asyncio
+"""News API Routes
+
+Note: This module provides backward-compatible endpoints.
+For new integrations, prefer using /news-aggregator/* endpoints.
+"""
 import structlog
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
+from fastapi.responses import RedirectResponse
 from typing import List, Dict, Any
-from services.data_router import MarketRouter
-from datetime import datetime
+
+from services.news_aggregator import news_aggregator
 
 router = APIRouter(prefix="/news", tags=["News"])
 logger = structlog.get_logger()
 
+
 @router.get("/flash")
-async def get_flash_news():
+async def get_flash_news(limit: int = Query(10, ge=1, le=50)):
     """
-    Get latest flash news for the ticker.
-    In a real app, this would fetch from a news aggregator or RSS.
+    Get latest flash news.
+
+    Note: This endpoint delegates to news_aggregator service.
+    For more options, use /news-aggregator/flash instead.
     """
-    # Mock news for now, or we could use MarketRouter if we add a global news method
-    return [
-        {
+    try:
+        news = await news_aggregator.get_flash_news(limit)
+        # Transform to legacy format for backward compatibility
+        result = []
+        for i, item in enumerate(news):
+            result.append({
+                "id": i + 1,
+                "title": item.title,
+                "time": item.published_at.strftime("%H:%M:%S") if item.published_at else "",
+                "sentiment": item.sentiment.value if item.sentiment else "neutral",
+                "source": item.source,
+                "url": item.url,
+            })
+        return result
+
+    except Exception as e:
+        logger.error("Failed to get flash news", error=str(e))
+        # Fallback to minimal mock if service fails
+        return [{
             "id": 1,
-            "title": "美股三大股指集体收涨，纳指涨超1%",
-            "time": datetime.now().strftime("%H:%M:%S"),
-            "sentiment": "positive"
-        },
-        {
-            "id": 2,
-            "title": "英伟达股价创历史新高，市值突破3万亿美元",
-            "time": datetime.now().strftime("%H:%M:%S"),
-            "sentiment": "positive"
-        },
-        {
-            "id": 3,
-            "title": "美联储维持利率不变，暗示年内仅降息一次",
-            "time": datetime.now().strftime("%H:%M:%S"),
+            "title": "News service temporarily unavailable",
+            "time": "",
             "sentiment": "neutral"
-        }
-    ]
+        }]
+
 
 @router.get("/{symbol}")
-async def get_stock_news(symbol: str):
+async def get_stock_news(symbol: str, limit: int = Query(20, ge=1, le=100)):
     """
     Get news for a specific stock.
+
+    Note: This endpoint delegates to news_aggregator service.
+    For more options, use /news-aggregator/symbol/{symbol} instead.
     """
-    # We can use yfinance via MarketRouter if we implement it there
-    # For now, return mock data
-    return [
-        {
-            "headline": f"{symbol} 发布季度财报，营收超出预期",
-            "source": "Financial Times",
+    try:
+        news = await news_aggregator.get_news_by_symbol(symbol.upper())
+        news = news[:limit]
+
+        # Transform to legacy format for backward compatibility
+        result = []
+        for item in news:
+            result.append({
+                "headline": item.title,
+                "source": item.source,
+                "url": item.url or "#",
+                "time": item.published_at.strftime("%Y-%m-%d %H:%M") if item.published_at else "N/A",
+                "sentiment": item.sentiment.value if item.sentiment else "neutral",
+                "summary": item.summary,
+            })
+        return result
+
+    except Exception as e:
+        logger.error("Failed to get stock news", symbol=symbol, error=str(e))
+        # Fallback to minimal mock if service fails
+        return [{
+            "headline": f"Unable to fetch news for {symbol}",
+            "source": "System",
             "url": "#",
-            "time": "2 hours ago",
-            "sentiment": "positive"
-        },
-        {
-            "headline": f"分析师上调 {symbol} 评级至‘买入’",
-            "source": "Reuters",
-            "url": "#",
-            "time": "5 hours ago",
-            "sentiment": "positive"
-        }
-    ]
+            "time": "N/A",
+            "sentiment": "neutral"
+        }]

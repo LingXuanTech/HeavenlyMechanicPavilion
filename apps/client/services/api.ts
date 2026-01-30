@@ -46,7 +46,7 @@ import {
 
 // ============ 基础配置 ============
 
-const API_BASE = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000/api';
+export const API_BASE = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000/api';
 
 /**
  * API 错误类
@@ -132,17 +132,33 @@ export interface SSEAnalysisController {
 }
 
 /**
+ * 分析选项
+ */
+export interface AnalysisOptions {
+  /** 分析级别：L1 快速扫描, L2 完整分析（默认 L2） */
+  analysisLevel?: 'L1' | 'L2';
+  /** 是否使用 Planner 动态选择分析师 */
+  usePlanner?: boolean;
+  /** 自定义分析师列表（覆盖默认） */
+  overrideAnalysts?: string[];
+  /** 排除的分析师 */
+  excludeAnalysts?: string[];
+}
+
+/**
  * 触发股票分析（SSE 流式，带重连机制）
  *
  * @param symbol 股票代码
  * @param callbacks 回调函数
  * @param retryConfig 重连配置
+ * @param options 分析选项
  * @returns 控制器，可用于取消分析
  */
 export const analyzeStockWithAgent = async (
   symbol: string,
   callbacks: SSEAnalysisCallbacks | ((event: string, data: SSEEventData) => void),
-  retryConfig: SSERetryConfig = {}
+  retryConfig: SSERetryConfig = {},
+  options: AnalysisOptions = {}
 ): Promise<SSEAnalysisController> => {
   // 兼容旧的函数签名
   const { onEvent, onConnectionState } =
@@ -181,8 +197,25 @@ export const analyzeStockWithAgent = async (
   // 触发分析任务
   onConnectionState?.('connecting');
 
+  // 构建请求体（仅包含非默认值的选项）
+  const requestBody: Record<string, unknown> = {};
+  if (options.analysisLevel) {
+    requestBody.analysis_level = options.analysisLevel;
+  }
+  if (options.usePlanner !== undefined) {
+    requestBody.use_planner = options.usePlanner;
+  }
+  if (options.overrideAnalysts?.length) {
+    requestBody.override_analysts = options.overrideAnalysts;
+  }
+  if (options.excludeAnalysts?.length) {
+    requestBody.exclude_analysts = options.excludeAnalysts;
+  }
+
   const response = await fetch(`${API_BASE}/analyze/${symbol}`, {
     method: 'POST',
+    headers: Object.keys(requestBody).length > 0 ? { 'Content-Type': 'application/json' } : undefined,
+    body: Object.keys(requestBody).length > 0 ? JSON.stringify(requestBody) : undefined,
   });
 
   if (!response.ok) {
@@ -297,6 +330,21 @@ export const getLatestAnalysis = (symbol: string) =>
   request<any>(`/analyze/latest/${symbol}`);
 
 /**
+ * 快速扫描（L1 模式）
+ *
+ * 仅运行 Market + News + Macro 三个分析师，跳过辩论和风险评估。
+ */
+export const quickScanStock = (symbol: string) =>
+  request<{
+    task_id: string;
+    symbol: string;
+    status: string;
+    analysis_level: string;
+    analysts: string[];
+    estimated_time_seconds: number;
+  }>(`/analyze/quick/${symbol}`, { method: 'POST' });
+
+/**
  * 获取分析历史
  */
 export const getAnalysisHistory = (symbol: string, limit: number = 10) =>
@@ -325,6 +373,9 @@ export const getMarketPrice = (symbol: string) =>
 
 export const getMarketHistory = (symbol: string, period: string = '1mo') =>
   request<any[]>(`/market/history/${symbol}?period=${period}`);
+
+export const getMarketKline = (symbol: string, days: number = 90) =>
+  request<any>(`/market/kline/${encodeURIComponent(symbol)}?days=${days}`);
 
 export const getGlobalMarket = () => request<any>('/market/global');
 

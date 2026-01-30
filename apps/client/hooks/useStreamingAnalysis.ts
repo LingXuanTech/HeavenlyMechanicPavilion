@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useStreamTypewriter } from './useTypewriter';
 import type { AgentAnalysis } from '../types';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+import { API_BASE } from '../services/api';
 
 /**
  * SSE 流式事件类型
@@ -151,7 +150,7 @@ export function useStreamingAnalysis(options: UseStreamingAnalysisOptions = {}) 
     try {
       // 1. 发起分析请求，获取 task_id
       const tradeDate = date || new Date().toISOString().split('T')[0];
-      const response = await fetch(`${API_URL}/analyze/${symbol}?trade_date=${tradeDate}`, {
+      const response = await fetch(`${API_BASE}/analyze/${symbol}?trade_date=${tradeDate}`, {
         method: 'POST',
       });
 
@@ -164,7 +163,7 @@ export function useStreamingAnalysis(options: UseStreamingAnalysisOptions = {}) 
       taskIdRef.current = taskId;
 
       // 2. 连接 SSE 流
-      const eventSource = new EventSource(`${API_URL}/analyze/stream/${taskId}`);
+      const eventSource = new EventSource(`${API_BASE}/analyze/stream/${taskId}`);
       eventSourceRef.current = eventSource;
       setIsConnected(true);
 

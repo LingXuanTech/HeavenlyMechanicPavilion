@@ -58,7 +58,7 @@ class WatchlistScheduler:
 
         try:
             # 延迟导入避免循环依赖
-            from services.synthesizer import synthesizer
+            from services.synthesizer import synthesizer, SynthesisContext
             from tradingagents.graph.trading_graph import TradingAgentsGraph
             from tradingagents.default_config import DEFAULT_CONFIG
 
@@ -105,8 +105,18 @@ class WatchlistScheduler:
                             if "portfolio_report" in node_data:
                                 agent_reports["portfolio"] = node_data["portfolio_report"]
 
+                    # 构建合成上下文
+                    elapsed_seconds = round(time.time() - start_time, 2)
+                    synthesis_context = SynthesisContext(
+                        analysis_level="L2",
+                        task_id=task_id,
+                        elapsed_seconds=elapsed_seconds,
+                        analysts_used=["market", "news", "fundamentals", "macro"],
+                        market=MarketRouter.get_market(item.symbol),
+                    )
+
                     # 合成结果
-                    final_json = await synthesizer.synthesize(item.symbol, agent_reports)
+                    final_json = await synthesizer.synthesize(item.symbol, agent_reports, synthesis_context)
                     elapsed_seconds = round(time.time() - start_time, 2)
 
                     # 保存到数据库
@@ -160,7 +170,7 @@ class WatchlistScheduler:
 
     async def trigger_single_analysis(self, symbol: str):
         """手动触发单个股票的分析（供管理 API 调用）"""
-        from services.synthesizer import synthesizer
+        from services.synthesizer import synthesizer, SynthesisContext
         from tradingagents.graph.trading_graph import TradingAgentsGraph
         from tradingagents.default_config import DEFAULT_CONFIG
 
@@ -170,9 +180,10 @@ class WatchlistScheduler:
 
         try:
             config = DEFAULT_CONFIG.copy()
-            ta = TradingAgentsGraph(debug=False, config=config)
+            market = MarketRouter.get_market(symbol)
+            ta = TradingAgentsGraph(debug=False, config=config, market=market)
 
-            init_state = ta.propagator.create_initial_state(symbol, trade_date)
+            init_state = ta.propagator.create_initial_state(symbol, trade_date, market=market)
             args = ta.propagator.get_graph_args()
 
             agent_reports = {}
@@ -190,7 +201,17 @@ class WatchlistScheduler:
                     if "portfolio_report" in node_data:
                         agent_reports["portfolio"] = node_data["portfolio_report"]
 
-            final_json = await synthesizer.synthesize(symbol, agent_reports)
+            # 构建合成上下文
+            elapsed_seconds = round(time.time() - start_time, 2)
+            synthesis_context = SynthesisContext(
+                analysis_level="L2",
+                task_id=task_id,
+                elapsed_seconds=elapsed_seconds,
+                analysts_used=["market", "news", "fundamentals", "macro"],
+                market=market,
+            )
+
+            final_json = await synthesizer.synthesize(symbol, agent_reports, synthesis_context)
             elapsed_seconds = round(time.time() - start_time, 2)
 
             with Session(engine) as session:

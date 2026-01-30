@@ -62,6 +62,27 @@ class NorthMoneyHistory(BaseModel):
     sz_connect: float
 
 
+class NorthMoneySectorFlow(BaseModel):
+    """北向资金板块流向"""
+    sector: str = Field(description="板块名称")
+    sector_code: str = Field(default="", description="板块代码")
+    net_buy: float = Field(description="净买入金额（亿元）")
+    stock_count: int = Field(description="涉及股票数量")
+    top_stocks: List[str] = Field(default_factory=list, description="TOP 净买入个股")
+    flow_direction: str = Field(description="资金方向: inflow / outflow / neutral")
+    change_ratio: float = Field(default=0, description="较昨日变化比例（%）")
+
+
+class SectorRotationSignal(BaseModel):
+    """板块轮动信号"""
+    date: DateType = Field(description="信号日期")
+    inflow_sectors: List[str] = Field(description="资金流入板块（按流入强度排序）")
+    outflow_sectors: List[str] = Field(description="资金流出板块（按流出强度排序）")
+    rotation_pattern: str = Field(description="轮动模式: defensive / aggressive / mixed / unclear")
+    signal_strength: int = Field(description="信号强度 0-100")
+    interpretation: str = Field(description="信号解读")
+
+
 class NorthMoneySummary(BaseModel):
     """北向资金概览"""
     today: NorthMoneyFlow
@@ -354,6 +375,212 @@ class NorthMoneyService:
             trend=trend,
             week_total=week_total,
         )
+
+    # ============ 板块轮动分析 ============
+
+    # 申万一级行业与关键词映射
+    SECTOR_KEYWORDS = {
+        "银行": ["银行", "农商", "城商"],
+        "非银金融": ["证券", "券商", "保险", "信托", "期货"],
+        "房地产": ["地产", "房产", "物业", "置业"],
+        "食品饮料": ["酒", "乳业", "饮料", "食品", "调味"],
+        "医药生物": ["医药", "生物", "制药", "医疗", "疫苗"],
+        "电子": ["电子", "半导体", "芯片", "面板", "元器件"],
+        "计算机": ["软件", "信息", "科技", "数据", "云计算"],
+        "电气设备": ["电气", "新能源", "光伏", "风电", "电池", "储能"],
+        "汽车": ["汽车", "整车", "汽配"],
+        "机械设备": ["机械", "设备", "工程", "自动化"],
+        "有色金属": ["有色", "铜", "铝", "锂", "稀土", "黄金"],
+        "化工": ["化工", "化学", "材料"],
+        "建筑材料": ["水泥", "玻璃", "建材"],
+        "公用事业": ["电力", "水务", "燃气", "环保"],
+        "交通运输": ["航运", "物流", "铁路", "航空", "港口"],
+        "传媒": ["传媒", "游戏", "影视", "广告"],
+        "通信": ["通信", "电信", "5G", "运营商"],
+        "家用电器": ["家电", "电器", "空调"],
+        "纺织服装": ["服装", "纺织", "鞋帽"],
+        "国防军工": ["军工", "航天", "国防", "航空"],
+    }
+
+    # 板块特性分类
+    DEFENSIVE_SECTORS = ["银行", "食品饮料", "公用事业", "医药生物", "交通运输"]
+    AGGRESSIVE_SECTORS = ["电子", "计算机", "电气设备", "有色金属", "国防军工"]
+
+    async def get_sector_flow(self) -> List[NorthMoneySectorFlow]:
+        """获取北向资金板块流向
+
+        基于个股北向持仓变化，聚合到板块级别。
+        """
+        cache_key = "sector_flow"
+        cached = self._get_cache(cache_key)
+        if cached:
+            return cached
+
+        try:
+            # 获取北向持股数据
+            df = await asyncio.to_thread(
+                ak.stock_hsgt_hold_stock_em,
+                market="北向",
+                indicator="今日排行"
+            )
+
+            if df.empty:
+                return []
+
+            # 聚合到板块
+            sector_data: Dict[str, Dict] = {}
+
+            for _, row in df.iterrows():
+                stock_name = str(row.get('名称', ''))
+                net_buy = float(row.get('净买额', 0) or row.get('今日增持市值', 0) or 0) / 1e8
+
+                # 识别板块
+                matched_sector = self._match_sector(stock_name)
+                if matched_sector not in sector_data:
+                    sector_data[matched_sector] = {
+                        "net_buy": 0,
+                        "stock_count": 0,
+                        "top_stocks": [],
+                    }
+
+                sector_data[matched_sector]["net_buy"] += net_buy
+                sector_data[matched_sector]["stock_count"] += 1
+
+                # 记录 TOP 个股
+                if abs(net_buy) > 0.1:  # 净买入/卖出超过 1000 万
+                    sector_data[matched_sector]["top_stocks"].append(
+                        f"{stock_name}({net_buy:+.2f}亿)"
+                    )
+
+            # 转换为模型
+            result = []
+            for sector, data in sector_data.items():
+                net_buy = data["net_buy"]
+                if net_buy > 0.5:
+                    direction = "inflow"
+                elif net_buy < -0.5:
+                    direction = "outflow"
+                else:
+                    direction = "neutral"
+
+                result.append(NorthMoneySectorFlow(
+                    sector=sector,
+                    net_buy=round(net_buy, 2),
+                    stock_count=data["stock_count"],
+                    top_stocks=data["top_stocks"][:5],
+                    flow_direction=direction,
+                ))
+
+            # 按净买入排序
+            result.sort(key=lambda x: x.net_buy, reverse=True)
+
+            self._set_cache(cache_key, result)
+            logger.info("Calculated sector flow", sectors=len(result))
+            return result
+
+        except Exception as e:
+            logger.error("Failed to calculate sector flow", error=str(e))
+            return []
+
+    def _match_sector(self, stock_name: str) -> str:
+        """根据股票名称匹配板块"""
+        for sector, keywords in self.SECTOR_KEYWORDS.items():
+            for keyword in keywords:
+                if keyword in stock_name:
+                    return sector
+        return "其他"
+
+    async def get_sector_rotation_signal(self) -> SectorRotationSignal:
+        """获取板块轮动信号
+
+        分析北向资金在不同板块间的流动，判断轮动模式。
+        """
+        sector_flows = await self.get_sector_flow()
+
+        if not sector_flows:
+            return SectorRotationSignal(
+                date=datetime.now().date(),
+                inflow_sectors=[],
+                outflow_sectors=[],
+                rotation_pattern="unclear",
+                signal_strength=0,
+                interpretation="数据不足，无法判断板块轮动",
+            )
+
+        # 分类流入/流出板块
+        inflow_sectors = [
+            s.sector for s in sector_flows
+            if s.flow_direction == "inflow"
+        ]
+        outflow_sectors = [
+            s.sector for s in sector_flows
+            if s.flow_direction == "outflow"
+        ]
+
+        # 计算防御/进攻板块的净流入
+        defensive_net = sum(
+            s.net_buy for s in sector_flows
+            if s.sector in self.DEFENSIVE_SECTORS
+        )
+        aggressive_net = sum(
+            s.net_buy for s in sector_flows
+            if s.sector in self.AGGRESSIVE_SECTORS
+        )
+
+        # 判断轮动模式
+        total_inflow = sum(s.net_buy for s in sector_flows if s.net_buy > 0)
+        total_outflow = abs(sum(s.net_buy for s in sector_flows if s.net_buy < 0))
+
+        if defensive_net > aggressive_net * 1.5:
+            pattern = "defensive"
+            interpretation = "北向资金流向防御性板块（银行、食品饮料、公用事业等），市场风险偏好下降，建议谨慎操作。"
+        elif aggressive_net > defensive_net * 1.5:
+            pattern = "aggressive"
+            interpretation = "北向资金流向进攻性板块（电子、计算机、新能源等），市场风险偏好上升，可适当加仓成长股。"
+        elif total_inflow > total_outflow * 2:
+            pattern = "broad_inflow"
+            interpretation = "北向资金全面流入，市场情绪积极，可维持多头思维。"
+        elif total_outflow > total_inflow * 2:
+            pattern = "broad_outflow"
+            interpretation = "北向资金全面流出，市场情绪谨慎，建议控制仓位。"
+        else:
+            pattern = "mixed"
+            interpretation = "北向资金板块分化，无明显轮动方向，建议观望或个股操作。"
+
+        # 计算信号强度
+        total_flow = total_inflow + total_outflow
+        if total_flow > 100:
+            strength = 90
+        elif total_flow > 50:
+            strength = 70
+        elif total_flow > 20:
+            strength = 50
+        else:
+            strength = 30
+
+        # 调整：如果模式清晰，强度加成
+        if pattern in ["defensive", "aggressive"]:
+            strength = min(100, strength + 15)
+
+        return SectorRotationSignal(
+            date=datetime.now().date(),
+            inflow_sectors=inflow_sectors[:5],
+            outflow_sectors=outflow_sectors[:5],
+            rotation_pattern=pattern,
+            signal_strength=strength,
+            interpretation=interpretation,
+        )
+
+    async def get_sector_flow_history(self, days: int = 5) -> Dict[str, List[float]]:
+        """获取板块资金流向历史（简化版，用于趋势分析）
+
+        注意：由于 AkShare 不提供历史板块流向，此方法返回模拟数据或需要自行存储。
+        实际生产中应接入专业数据源或自建历史数据库。
+        """
+        # TODO: 实现历史数据存储和查询
+        # 当前返回空数据，后续迭代可接入数据库
+        logger.debug("Sector flow history not implemented, returning empty")
+        return {}
 
 
 # 单例实例

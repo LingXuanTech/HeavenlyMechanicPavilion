@@ -66,6 +66,46 @@ class HotMoneySeat(BaseModel):
     win_rate: Optional[float] = Field(default=None, description="历史胜率")
 
 
+class HotMoneyProfile(BaseModel):
+    """游资席位完整画像"""
+    seat_name: str = Field(description="营业部名称")
+    alias: str = Field(description="游资别名/江湖名号")
+    tier: str = Field(description="游资层级: 一线/二线/新锐")
+    style: str = Field(description="操作风格")
+    style_tags: List[str] = Field(default_factory=list, description="风格标签")
+
+    # 历史统计
+    total_appearances: int = Field(default=0, description="历史上榜次数")
+    total_buy_amount: float = Field(default=0, description="历史总买入金额（亿元）")
+    total_sell_amount: float = Field(default=0, description="历史总卖出金额（亿元）")
+    avg_net_buy: float = Field(default=0, description="平均单次净买入（万元）")
+    win_rate: Optional[float] = Field(default=None, description="历史胜率（次日上涨%）")
+    avg_holding_days: Optional[float] = Field(default=None, description="平均持有天数")
+
+    # 操作偏好
+    preferred_sectors: List[str] = Field(default_factory=list, description="偏好板块")
+    preferred_market_cap: str = Field(default="中小盘", description="偏好市值: 大盘/中盘/小盘/中小盘")
+    active_time_pattern: str = Field(default="全天活跃", description="活跃时间特征")
+
+    # 近期操作
+    recent_operations: List[dict] = Field(default_factory=list, description="近期操作记录")
+    last_active_date: Optional[date] = Field(default=None, description="最近活跃日期")
+
+    # 关联分析
+    correlated_seats: List[str] = Field(default_factory=list, description="常一起出现的席位")
+    success_stocks: List[str] = Field(default_factory=list, description="成功案例股票")
+
+
+class HotMoneyMovementSignal(BaseModel):
+    """游资动向信号"""
+    date: date = Field(description="信号日期")
+    signal_type: str = Field(description="信号类型: consensus_buy/consensus_sell/divergence/new_entry")
+    signal_strength: int = Field(description="信号强度 0-100")
+    involved_seats: List[str] = Field(description="涉及的游资席位")
+    target_stocks: List[dict] = Field(description="目标股票列表")
+    interpretation: str = Field(description="信号解读")
+
+
 class LHBSummary(BaseModel):
     """龙虎榜概览"""
     date: date
@@ -82,22 +122,130 @@ class LHBSummary(BaseModel):
 # 知名游资席位映射（实际应用中应该从数据库加载）
 HOT_MONEY_SEATS = {
     # 一线游资
-    "华鑫证券上海分公司": {"alias": "溧阳路", "style": "打板/接力"},
-    "中国银河证券绍兴证券营业部": {"alias": "赵老哥", "style": "打板/龙头"},
-    "国泰君安上海江苏路": {"alias": "章盟主", "style": "趋势/波段"},
-    "东方财富证券拉萨团结路第二": {"alias": "拉萨天团", "style": "打板/接力"},
-    "东方财富证券拉萨东环路第二": {"alias": "拉萨天团", "style": "打板/接力"},
-    "华泰证券深圳益田路荣超商务中心": {"alias": "深圳帮", "style": "趋势/题材"},
-    "中信证券上海溧阳路": {"alias": "顶级游资", "style": "大资金/趋势"},
+    "华鑫证券上海分公司": {
+        "alias": "溧阳路",
+        "tier": "一线",
+        "style": "打板/接力",
+        "style_tags": ["打板", "接力", "题材"],
+        "preferred_sectors": ["科技", "新能源", "军工"],
+        "preferred_market_cap": "中小盘",
+    },
+    "中国银河证券绍兴证券营业部": {
+        "alias": "赵老哥",
+        "tier": "一线",
+        "style": "打板/龙头",
+        "style_tags": ["打板", "龙头战法", "趋势"],
+        "preferred_sectors": ["题材龙头", "次新股"],
+        "preferred_market_cap": "中盘",
+    },
+    "国泰君安上海江苏路": {
+        "alias": "章盟主",
+        "tier": "一线",
+        "style": "趋势/波段",
+        "style_tags": ["趋势", "波段", "大资金"],
+        "preferred_sectors": ["白马股", "行业龙头"],
+        "preferred_market_cap": "大盘",
+    },
+    "东方财富证券拉萨团结路第二": {
+        "alias": "拉萨天团",
+        "tier": "一线",
+        "style": "打板/接力",
+        "style_tags": ["打板", "接力", "激进"],
+        "preferred_sectors": ["题材", "概念"],
+        "preferred_market_cap": "小盘",
+    },
+    "东方财富证券拉萨东环路第二": {
+        "alias": "拉萨天团",
+        "tier": "一线",
+        "style": "打板/接力",
+        "style_tags": ["打板", "接力", "激进"],
+        "preferred_sectors": ["题材", "概念"],
+        "preferred_market_cap": "小盘",
+    },
+    "华泰证券深圳益田路荣超商务中心": {
+        "alias": "深圳帮",
+        "tier": "一线",
+        "style": "趋势/题材",
+        "style_tags": ["趋势", "题材", "中线"],
+        "preferred_sectors": ["科技", "消费"],
+        "preferred_market_cap": "中盘",
+    },
+    "中信证券上海溧阳路": {
+        "alias": "顶级游资",
+        "tier": "一线",
+        "style": "大资金/趋势",
+        "style_tags": ["大资金", "趋势", "稳健"],
+        "preferred_sectors": ["行业龙头", "白马股"],
+        "preferred_market_cap": "大盘",
+    },
 
     # 二线游资
-    "财通证券杭州上塘路": {"alias": "杭州帮", "style": "题材/接力"},
-    "国盛证券宁波桑田路": {"alias": "宁波桑田路", "style": "打板/短线"},
-    "华泰证券成都蜀金路": {"alias": "成都帮", "style": "题材/波段"},
-    "西藏东方财富证券拉萨团结路第一": {"alias": "拉萨天团", "style": "打板/接力"},
+    "财通证券杭州上塘路": {
+        "alias": "杭州帮",
+        "tier": "二线",
+        "style": "题材/接力",
+        "style_tags": ["题材", "接力", "短线"],
+        "preferred_sectors": ["互联网", "新零售"],
+        "preferred_market_cap": "中小盘",
+    },
+    "国盛证券宁波桑田路": {
+        "alias": "宁波桑田路",
+        "tier": "二线",
+        "style": "打板/短线",
+        "style_tags": ["打板", "短线", "激进"],
+        "preferred_sectors": ["题材", "次新"],
+        "preferred_market_cap": "小盘",
+    },
+    "华泰证券成都蜀金路": {
+        "alias": "成都帮",
+        "tier": "二线",
+        "style": "题材/波段",
+        "style_tags": ["题材", "波段", "区域股"],
+        "preferred_sectors": ["西部概念", "基建"],
+        "preferred_market_cap": "中盘",
+    },
+    "西藏东方财富证券拉萨团结路第一": {
+        "alias": "拉萨天团",
+        "tier": "一线",
+        "style": "打板/接力",
+        "style_tags": ["打板", "接力", "激进"],
+        "preferred_sectors": ["题材", "概念"],
+        "preferred_market_cap": "小盘",
+    },
+    "申万宏源西部证券上海分公司": {
+        "alias": "上海帮",
+        "tier": "二线",
+        "style": "趋势/题材",
+        "style_tags": ["趋势", "题材"],
+        "preferred_sectors": ["科技", "新能源"],
+        "preferred_market_cap": "中盘",
+    },
+    "中泰证券深圳欢乐海岸": {
+        "alias": "欢乐海岸",
+        "tier": "二线",
+        "style": "接力/题材",
+        "style_tags": ["接力", "题材", "短线"],
+        "preferred_sectors": ["热点题材"],
+        "preferred_market_cap": "中小盘",
+    },
+    "国信证券深圳泰然九路": {
+        "alias": "泰然九路",
+        "tier": "二线",
+        "style": "趋势/波段",
+        "style_tags": ["趋势", "波段"],
+        "preferred_sectors": ["科技", "医药"],
+        "preferred_market_cap": "中盘",
+    },
 
     # 机构专用席位标识
-    "机构专用": {"alias": "机构", "style": "机构"},
+    "机构专用": {
+        "alias": "机构",
+        "tier": "机构",
+        "style": "机构",
+        "style_tags": ["机构"],
+        "preferred_sectors": [],
+        "preferred_market_cap": "大盘",
+    },
 }
 
 
@@ -127,19 +275,23 @@ class LHBService:
         return None
 
     def _identify_seat_type(self, seat_name: str) -> tuple:
-        """识别席位类型和游资信息"""
+        """识别席位类型和游资信息
+
+        Returns:
+            (seat_type, style, hot_money_alias, tier)
+        """
         if "机构专用" in seat_name:
-            return "机构", "机构", None
+            return "机构", "机构", "机构", "机构"
 
         for pattern, info in HOT_MONEY_SEATS.items():
             if pattern in seat_name:
-                return "游资", info["style"], info["alias"]
+                return "游资", info["style"], info["alias"], info.get("tier", "未知")
 
-        return "普通", "未知", None
+        return "普通", "未知", None, None
 
     def _parse_seat_data(self, seat_name: str, buy: float, sell: float) -> LHBSeat:
         """解析席位数据"""
-        seat_type, style, hot_money = self._identify_seat_type(seat_name)
+        seat_type, style, hot_money, _ = self._identify_seat_type(seat_name)
         return LHBSeat(
             seat_name=seat_name,
             buy_amount=buy,
@@ -352,6 +504,303 @@ class LHBService:
             top_sells=top_sells,
             hot_money_active=hot_money,
         )
+
+    # ============ 游资席位画像功能 ============
+
+    async def get_hot_money_profile(self, alias: str) -> Optional[HotMoneyProfile]:
+        """获取单个游资席位的完整画像
+
+        Args:
+            alias: 游资别名（如 "溧阳路"、"赵老哥"）
+
+        Returns:
+            游资完整画像，包含历史统计和操作特征
+        """
+        cache_key = f"hot_money_profile_{alias}"
+        cached = self._get_cache(cache_key)
+        if cached:
+            return cached
+
+        try:
+            # 查找席位信息
+            seat_name = None
+            seat_info = None
+            for name, info in HOT_MONEY_SEATS.items():
+                if info.get("alias") == alias:
+                    seat_name = name
+                    seat_info = info
+                    break
+
+            if not seat_info:
+                logger.warning("Hot money alias not found", alias=alias)
+                return None
+
+            # 获取近期活动数据
+            daily_lhb = await self.get_daily_lhb()
+
+            # 统计该游资的操作
+            operations = []
+            total_buy = 0.0
+            total_sell = 0.0
+            appearance_count = 0
+
+            for stock in daily_lhb:
+                for seat in stock.buy_seats + stock.sell_seats:
+                    if seat.hot_money_name == alias:
+                        appearance_count += 1
+                        total_buy += seat.buy_amount
+                        total_sell += seat.sell_amount
+                        operations.append({
+                            "date": datetime.now().date().isoformat(),
+                            "symbol": stock.symbol,
+                            "name": stock.name,
+                            "action": "买入" if seat.net_amount > 0 else "卖出",
+                            "amount": abs(seat.net_amount),
+                            "change_percent": stock.change_percent,
+                        })
+
+            # 构建画像
+            profile = HotMoneyProfile(
+                seat_name=seat_name,
+                alias=alias,
+                tier=seat_info.get("tier", "未知"),
+                style=seat_info.get("style", "未知"),
+                style_tags=seat_info.get("style_tags", []),
+                total_appearances=appearance_count,
+                total_buy_amount=total_buy / 10000,  # 转为亿元
+                total_sell_amount=total_sell / 10000,
+                avg_net_buy=(total_buy - total_sell) / max(appearance_count, 1),
+                preferred_sectors=seat_info.get("preferred_sectors", []),
+                preferred_market_cap=seat_info.get("preferred_market_cap", "中小盘"),
+                recent_operations=operations[:20],
+                last_active_date=datetime.now().date() if operations else None,
+                # 以下字段需要历史数据计算，暂时使用预设值
+                win_rate=None,
+                avg_holding_days=None,
+                correlated_seats=[],
+                success_stocks=[],
+            )
+
+            self._set_cache(cache_key, profile)
+            return profile
+
+        except Exception as e:
+            logger.error("Failed to get hot money profile", alias=alias, error=str(e))
+            return None
+
+    async def get_all_hot_money_profiles(self, tier: Optional[str] = None) -> List[HotMoneyProfile]:
+        """获取所有知名游资画像列表
+
+        Args:
+            tier: 可选过滤条件，按层级筛选（一线/二线）
+
+        Returns:
+            游资画像列表
+        """
+        cache_key = f"all_hot_money_profiles_{tier or 'all'}"
+        cached = self._get_cache(cache_key)
+        if cached:
+            return cached
+
+        try:
+            # 获取所有唯一的游资别名
+            unique_aliases = set()
+            for info in HOT_MONEY_SEATS.values():
+                if info.get("alias") and info.get("alias") != "机构":
+                    if tier is None or info.get("tier") == tier:
+                        unique_aliases.add(info["alias"])
+
+            # 并行获取所有画像
+            profiles = await asyncio.gather(
+                *[self.get_hot_money_profile(alias) for alias in unique_aliases]
+            )
+
+            result = [p for p in profiles if p is not None]
+
+            # 按层级和活跃度排序
+            tier_order = {"一线": 0, "二线": 1, "新锐": 2, "未知": 3}
+            result.sort(key=lambda x: (tier_order.get(x.tier, 99), -x.total_appearances))
+
+            self._set_cache(cache_key, result)
+            return result
+
+        except Exception as e:
+            logger.error("Failed to get all hot money profiles", error=str(e))
+            return []
+
+    async def get_hot_money_movement_signal(self) -> HotMoneyMovementSignal:
+        """获取游资动向信号
+
+        分析多个知名游资的同向操作，生成跟踪信号。
+        """
+        try:
+            daily_lhb = await self.get_daily_lhb()
+
+            # 统计游资操作
+            buy_consensus: Dict[str, List[str]] = {}  # 股票 -> 买入的游资列表
+            sell_consensus: Dict[str, List[str]] = {}  # 股票 -> 卖出的游资列表
+
+            involved_seats = set()
+            target_stocks = []
+
+            for stock in daily_lhb:
+                stock_buys = []
+                stock_sells = []
+
+                for seat in stock.buy_seats:
+                    if seat.hot_money_name:
+                        stock_buys.append(seat.hot_money_name)
+                        involved_seats.add(seat.hot_money_name)
+
+                for seat in stock.sell_seats:
+                    if seat.hot_money_name:
+                        stock_sells.append(seat.hot_money_name)
+                        involved_seats.add(seat.hot_money_name)
+
+                if stock_buys:
+                    buy_consensus[stock.symbol] = stock_buys
+                if stock_sells:
+                    sell_consensus[stock.symbol] = stock_sells
+
+            # 分析信号类型
+            # 找出多个游资同时买入的股票
+            multi_buy_stocks = {
+                k: v for k, v in buy_consensus.items() if len(v) >= 2
+            }
+            multi_sell_stocks = {
+                k: v for k, v in sell_consensus.items() if len(v) >= 2
+            }
+
+            # 确定信号类型和强度
+            if multi_buy_stocks:
+                signal_type = "consensus_buy"
+                signal_strength = min(100, 50 + len(multi_buy_stocks) * 20)
+                for symbol, seats in multi_buy_stocks.items():
+                    stock_info = next((s for s in daily_lhb if s.symbol == symbol), None)
+                    if stock_info:
+                        target_stocks.append({
+                            "symbol": symbol,
+                            "name": stock_info.name,
+                            "change_percent": stock_info.change_percent,
+                            "involved_seats": seats,
+                            "action": "买入",
+                        })
+                interpretation = (
+                    f"多路知名游资（{', '.join(list(involved_seats)[:3])}等）同时买入 "
+                    f"{len(multi_buy_stocks)} 只股票，形成共识看多信号。"
+                )
+
+            elif multi_sell_stocks:
+                signal_type = "consensus_sell"
+                signal_strength = min(100, 50 + len(multi_sell_stocks) * 20)
+                for symbol, seats in multi_sell_stocks.items():
+                    stock_info = next((s for s in daily_lhb if s.symbol == symbol), None)
+                    if stock_info:
+                        target_stocks.append({
+                            "symbol": symbol,
+                            "name": stock_info.name,
+                            "change_percent": stock_info.change_percent,
+                            "involved_seats": seats,
+                            "action": "卖出",
+                        })
+                interpretation = (
+                    f"多路知名游资同时卖出 {len(multi_sell_stocks)} 只股票，"
+                    f"注意规避风险。"
+                )
+
+            elif buy_consensus and sell_consensus:
+                signal_type = "divergence"
+                signal_strength = 40
+                # 合并目标股票
+                for symbol, seats in list(buy_consensus.items())[:5]:
+                    stock_info = next((s for s in daily_lhb if s.symbol == symbol), None)
+                    if stock_info:
+                        target_stocks.append({
+                            "symbol": symbol,
+                            "name": stock_info.name,
+                            "change_percent": stock_info.change_percent,
+                            "involved_seats": seats,
+                            "action": "买入",
+                        })
+                interpretation = "游资操作分化，无明显共识方向，建议观望或轻仓试探。"
+
+            elif involved_seats:
+                signal_type = "new_entry"
+                signal_strength = 30
+                for symbol, seats in list(buy_consensus.items())[:5]:
+                    stock_info = next((s for s in daily_lhb if s.symbol == symbol), None)
+                    if stock_info:
+                        target_stocks.append({
+                            "symbol": symbol,
+                            "name": stock_info.name,
+                            "change_percent": stock_info.change_percent,
+                            "involved_seats": seats,
+                            "action": "买入",
+                        })
+                interpretation = "知名游资有新动作，但未形成共识，可关注后续动向。"
+
+            else:
+                signal_type = "no_activity"
+                signal_strength = 0
+                interpretation = "今日无知名游资活动记录。"
+
+            return HotMoneyMovementSignal(
+                date=datetime.now().date(),
+                signal_type=signal_type,
+                signal_strength=signal_strength,
+                involved_seats=list(involved_seats)[:10],
+                target_stocks=target_stocks[:10],
+                interpretation=interpretation,
+            )
+
+        except Exception as e:
+            logger.error("Failed to get hot money movement signal", error=str(e))
+            return HotMoneyMovementSignal(
+                date=datetime.now().date(),
+                signal_type="error",
+                signal_strength=0,
+                involved_seats=[],
+                target_stocks=[],
+                interpretation=f"获取游资动向信号失败: {str(e)}",
+            )
+
+    async def get_seat_correlation(self, alias: str) -> List[Dict[str, Any]]:
+        """获取与指定游资经常一起出现的席位
+
+        Args:
+            alias: 游资别名
+
+        Returns:
+            关联席位列表，按共现次数排序
+        """
+        try:
+            daily_lhb = await self.get_daily_lhb()
+
+            # 统计共现
+            co_occurrence: Dict[str, int] = {}
+
+            for stock in daily_lhb:
+                all_seats = stock.buy_seats + stock.sell_seats
+                target_present = any(s.hot_money_name == alias for s in all_seats)
+
+                if target_present:
+                    for seat in all_seats:
+                        if seat.hot_money_name and seat.hot_money_name != alias:
+                            co_occurrence[seat.hot_money_name] = (
+                                co_occurrence.get(seat.hot_money_name, 0) + 1
+                            )
+
+            # 排序并返回
+            result = [
+                {"alias": k, "co_occurrence_count": v}
+                for k, v in sorted(co_occurrence.items(), key=lambda x: -x[1])
+            ]
+
+            return result[:10]
+
+        except Exception as e:
+            logger.error("Failed to get seat correlation", alias=alias, error=str(e))
+            return []
 
 
 # 单例实例

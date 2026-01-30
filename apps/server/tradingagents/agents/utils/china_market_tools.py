@@ -301,6 +301,279 @@ def get_china_flow_analysis(symbol: str) -> str:
         return f"分析 {symbol} 资金流向失败: {str(e)}"
 
 
+@tool
+def get_sector_rotation_analysis() -> str:
+    """获取北向资金板块轮动分析
+
+    分析北向资金在不同板块间的流动，识别轮动模式和投资机会。
+
+    Returns:
+        板块轮动分析报告，包括：
+        - 各板块资金流向
+        - 流入/流出 TOP 板块
+        - 轮动模式判断（防御/进攻/混合）
+        - 投资建议
+    """
+    try:
+        from services.north_money_service import north_money_service
+
+        # 获取板块流向和轮动信号
+        sector_flows = _run_async(north_money_service.get_sector_flow())
+        rotation_signal = _run_async(north_money_service.get_sector_rotation_signal())
+
+        output_lines = ["## 北向资金板块轮动分析\n"]
+
+        # 轮动信号
+        output_lines.append("### 轮动信号")
+        output_lines.append(f"- **轮动模式**: {rotation_signal.rotation_pattern}")
+        output_lines.append(f"- **信号强度**: {rotation_signal.signal_strength}/100")
+        output_lines.append(f"- **解读**: {rotation_signal.interpretation}\n")
+
+        # 资金流入板块
+        if rotation_signal.inflow_sectors:
+            output_lines.append("### 资金流入板块 TOP 5")
+            inflow_flows = [s for s in sector_flows if s.flow_direction == "inflow"][:5]
+            for s in inflow_flows:
+                output_lines.append(
+                    f"- **{s.sector}**: 净流入 {s.net_buy:.2f} 亿元，{s.stock_count} 只股票"
+                )
+                if s.top_stocks:
+                    output_lines.append(f"  主力标的: {', '.join(s.top_stocks[:3])}")
+            output_lines.append("")
+
+        # 资金流出板块
+        if rotation_signal.outflow_sectors:
+            output_lines.append("### 资金流出板块 TOP 5")
+            outflow_flows = [s for s in sector_flows if s.flow_direction == "outflow"][:5]
+            for s in outflow_flows:
+                output_lines.append(
+                    f"- **{s.sector}**: 净流出 {abs(s.net_buy):.2f} 亿元，{s.stock_count} 只股票"
+                )
+            output_lines.append("")
+
+        # 投资建议
+        output_lines.append("### 投资建议")
+        if rotation_signal.rotation_pattern == "defensive":
+            output_lines.append("- 🛡️ 市场偏好防御，可关注银行、食品饮料、公用事业等低估值板块")
+            output_lines.append("- 🔻 减持高估值成长股，控制整体仓位")
+        elif rotation_signal.rotation_pattern == "aggressive":
+            output_lines.append("- 🚀 市场风险偏好上升，可适当加仓电子、计算机、新能源等成长板块")
+            output_lines.append("- ⚡ 关注北向重仓的行业龙头")
+        elif rotation_signal.rotation_pattern == "broad_inflow":
+            output_lines.append("- ✅ 资金全面流入，市场做多情绪浓厚")
+            output_lines.append("- 📈 可维持或增加多头敞口")
+        elif rotation_signal.rotation_pattern == "broad_outflow":
+            output_lines.append("- ⚠️ 资金全面流出，建议降低仓位")
+            output_lines.append("- 💰 保留现金等待市场企稳")
+        else:
+            output_lines.append("- 🔄 板块分化明显，建议精选个股")
+            output_lines.append("- 🎯 关注北向持续加仓的细分龙头")
+
+        return "\n".join(output_lines)
+
+    except Exception as e:
+        logger.warning("Failed to get sector rotation analysis", error=str(e))
+        return f"获取板块轮动分析失败: {str(e)}"
+
+
+@tool
+def get_hot_money_profiles() -> str:
+    """获取知名游资席位画像列表
+
+    Returns:
+        所有知名游资的画像信息，包括层级、操作风格、偏好板块和近期操作
+    """
+    try:
+        from services.lhb_service import lhb_service
+        profiles = _run_async(lhb_service.get_all_hot_money_profiles())
+
+        if not profiles:
+            return "暂无知名游资画像数据"
+
+        output_lines = ["## 知名游资席位画像\n"]
+
+        for p in profiles:
+            output_lines.append(f"### {p.alias}（{p.tier}）")
+            output_lines.append(f"- **席位**: {p.seat_name}")
+            output_lines.append(f"- **风格**: {p.style}")
+            output_lines.append(f"- **风格标签**: {', '.join(p.style_tags)}")
+            output_lines.append(f"- **偏好板块**: {', '.join(p.preferred_sectors)}")
+            output_lines.append(f"- **偏好市值**: {p.preferred_market_cap}")
+
+            if p.total_appearances > 0:
+                output_lines.append(f"- **近期上榜**: {p.total_appearances} 次")
+                output_lines.append(f"- **买入总额**: {p.total_buy_amount:.2f} 亿元")
+                output_lines.append(f"- **卖出总额**: {p.total_sell_amount:.2f} 亿元")
+
+            if p.recent_operations:
+                output_lines.append("- **近期操作**:")
+                for op in p.recent_operations[:3]:
+                    output_lines.append(
+                        f"  - {op['name']}({op['symbol']}): "
+                        f"{op['action']} {op['amount']:.0f}万元"
+                    )
+            output_lines.append("")
+
+        return "\n".join(output_lines)
+
+    except Exception as e:
+        logger.warning("Failed to get hot money profiles", error=str(e))
+        return f"获取游资画像失败: {str(e)}"
+
+
+@tool
+def get_hot_money_movement() -> str:
+    """获取游资动向信号
+
+    分析多个知名游资的同向操作，识别共识买入/卖出信号。
+
+    Returns:
+        游资动向信号报告，包括信号类型、涉及席位和目标股票
+    """
+    try:
+        from services.lhb_service import lhb_service
+        signal = _run_async(lhb_service.get_hot_money_movement_signal())
+
+        output_lines = [f"## 游资动向信号 ({signal.date})\n"]
+
+        # 信号概览
+        signal_emoji = {
+            "consensus_buy": "🟢",
+            "consensus_sell": "🔴",
+            "divergence": "🟡",
+            "new_entry": "🔵",
+            "no_activity": "⚪",
+        }
+        emoji = signal_emoji.get(signal.signal_type, "⚪")
+
+        output_lines.append(f"### {emoji} 信号类型: {signal.signal_type}")
+        output_lines.append(f"- **信号强度**: {signal.signal_strength}/100")
+        output_lines.append(f"- **解读**: {signal.interpretation}\n")
+
+        # 涉及席位
+        if signal.involved_seats:
+            output_lines.append("### 涉及游资")
+            output_lines.append(f"- {', '.join(signal.involved_seats)}\n")
+
+        # 目标股票
+        if signal.target_stocks:
+            output_lines.append("### 目标股票")
+            for stock in signal.target_stocks:
+                seats_str = ", ".join(stock.get("involved_seats", []))
+                output_lines.append(
+                    f"- **{stock['name']}** ({stock['symbol']}): "
+                    f"{stock['action']}，涨跌幅 {stock.get('change_percent', 0):+.2f}%"
+                    f"（{seats_str}）"
+                )
+
+        return "\n".join(output_lines)
+
+    except Exception as e:
+        logger.warning("Failed to get hot money movement", error=str(e))
+        return f"获取游资动向信号失败: {str(e)}"
+
+
+@tool
+def get_unlock_overview() -> str:
+    """获取市场解禁概览
+
+    Returns:
+        市场解禁概览，包括本周/本月解禁市值、高压力股票、趋势判断
+    """
+    try:
+        from services.unlock_service import unlock_service
+        overview = _run_async(unlock_service.get_market_unlock_overview())
+
+        output_lines = [f"## 市场解禁概览 ({overview.date})\n"]
+
+        # 解禁市值统计
+        output_lines.append("### 解禁市值统计")
+        output_lines.append(f"- **本周解禁**: {overview.this_week_value:.1f} 亿元")
+        output_lines.append(f"- **下周解禁**: {overview.next_week_value:.1f} 亿元")
+        output_lines.append(f"- **本月解禁**: {overview.this_month_value:.1f} 亿元")
+        output_lines.append(f"- **趋势**: {overview.trend}\n")
+
+        # 市场影响
+        output_lines.append("### 市场影响评估")
+        output_lines.append(f"{overview.market_impact}\n")
+
+        # 高压力股票
+        if overview.high_pressure_stocks:
+            output_lines.append("### 高压力解禁股 TOP 10")
+            for stock in overview.high_pressure_stocks[:10]:
+                output_lines.append(
+                    f"- **{stock.name}** ({stock.symbol}): "
+                    f"解禁 {stock.unlock_value:.1f} 亿元，"
+                    f"占总股本 {stock.unlock_ratio:.1f}%，"
+                    f"解禁日 {stock.unlock_date}"
+                )
+
+        return "\n".join(output_lines)
+
+    except Exception as e:
+        logger.warning("Failed to get unlock overview", error=str(e))
+        return f"获取解禁概览失败: {str(e)}"
+
+
+@tool
+def get_stock_unlock_pressure(symbol: str) -> str:
+    """获取个股解禁压力评估
+
+    Args:
+        symbol: 股票代码（如 600519.SH、000001.SZ）
+
+    Returns:
+        该股票的解禁压力评估报告
+    """
+    try:
+        from services.unlock_service import unlock_service
+        pressure = _run_async(unlock_service.get_unlock_pressure(symbol))
+
+        # 压力等级图标
+        level_emoji = {
+            "低": "🟢",
+            "中": "🟡",
+            "高": "🟠",
+            "极高": "🔴",
+        }
+        emoji = level_emoji.get(pressure.pressure_level, "⚪")
+
+        output_lines = [f"## {pressure.name} ({symbol}) 解禁压力评估\n"]
+
+        # 压力评分
+        output_lines.append(f"### {emoji} 压力等级: {pressure.pressure_level}")
+        output_lines.append(f"- **压力评分**: {pressure.pressure_score}/100")
+        output_lines.append(f"- **未来30日解禁市值**: {pressure.total_unlock_value:.2f} 亿元")
+        output_lines.append(f"- **解禁占流通比**: {pressure.total_unlock_ratio:.2f}%\n")
+
+        # 风险因素
+        if pressure.risk_factors:
+            output_lines.append("### 风险因素")
+            for factor in pressure.risk_factors:
+                output_lines.append(f"- ⚠️ {factor}")
+            output_lines.append("")
+
+        # 解禁计划
+        if pressure.upcoming_unlocks:
+            output_lines.append("### 未来30日解禁计划")
+            for u in pressure.upcoming_unlocks[:5]:
+                output_lines.append(
+                    f"- **{u.unlock_date}**: {u.unlock_shares:.0f}万股，"
+                    f"市值约 {u.unlock_value:.2f} 亿元 ({u.unlock_type})"
+                )
+            output_lines.append("")
+
+        # 操作建议
+        output_lines.append("### 操作建议")
+        output_lines.append(pressure.suggestion)
+
+        return "\n".join(output_lines)
+
+    except Exception as e:
+        logger.warning("Failed to get stock unlock pressure", symbol=symbol, error=str(e))
+        return f"获取 {symbol} 解禁压力评估失败: {str(e)}"
+
+
 # 导出所有工具
 CHINA_MARKET_TOOLS = [
     get_north_money_summary,
@@ -308,4 +581,9 @@ CHINA_MARKET_TOOLS = [
     get_lhb_summary,
     get_stock_lhb_history,
     get_china_flow_analysis,
+    get_sector_rotation_analysis,
+    get_hot_money_profiles,
+    get_hot_money_movement,
+    get_unlock_overview,
+    get_stock_unlock_pressure,
 ]

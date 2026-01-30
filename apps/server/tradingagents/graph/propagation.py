@@ -5,6 +5,7 @@ from tradingagents.agents.utils.agent_states import (
     AgentState,
     InvestDebateState,
     RiskDebateState,
+    AnalystType,
 )
 
 
@@ -48,6 +49,9 @@ class Propagator:
                     "count": 0,
                 }
             ),
+            # 动态分析师报告存储（新）
+            "analyst_reports": {},
+            # 向后兼容的静态字段
             # Standard analyst reports
             "market_report": "",
             "fundamentals_report": "",
@@ -56,6 +60,13 @@ class Propagator:
             # A-share focused reports (populated only for CN/HK markets)
             "retail_sentiment_report": "",
             "policy_report": "",
+            "china_flow_data": "",
+            # Planner 相关字段（新增）
+            "macro_report": "",
+            "portfolio_report": "",
+            "scout_report": "",
+            "opportunities": [],
+            "recommended_analysts": [],
         }
 
     def get_graph_args(self) -> Dict[str, Any]:

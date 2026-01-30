@@ -1,6 +1,12 @@
 """Scout Agent - 股票发现专家
 
 基于实时搜索发现潜在投资标的的 Agent。
+
+注意：Scout Agent 已增强为 Planner 功能。
+- create_scout_agent: 原始 Scout 功能（股票发现）
+- create_planner_agent: 新增 Planner 功能（分析师选择）
+
+推荐在图中使用 create_planner_agent 进行自适应分析师选择。
 """
 
 import json
@@ -9,6 +15,13 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage, AIMessage
 from services.prompt_manager import prompt_manager
 import structlog
+
+# 导入 Planner Agent（向后兼容 + 新功能）
+from tradingagents.agents.analysts.planner_agent import (
+    create_planner_agent,
+    _get_stock_characteristics,
+    _get_available_analysts,
+)
 
 # 导入 Scout 工具
 from tradingagents.agents.utils.scout_tools import (
