@@ -14,6 +14,8 @@ import akshare as ak
 import pandas as pd
 import asyncio
 
+from utils import TTLCache
+
 logger = structlog.get_logger(__name__)
 
 
@@ -68,24 +70,7 @@ class JiejinService:
     """限售解禁预警服务"""
 
     def __init__(self):
-        self._cache: Dict[str, Any] = {}
-        self._cache_time: Dict[str, datetime] = {}
-        self._cache_ttl = 3600  # 1 小时缓存（解禁数据变化不频繁）
-
-    def _is_cache_valid(self, key: str) -> bool:
-        if key not in self._cache_time:
-            return False
-        elapsed = (datetime.now() - self._cache_time[key]).total_seconds()
-        return elapsed < self._cache_ttl
-
-    def _set_cache(self, key: str, value: Any):
-        self._cache[key] = value
-        self._cache_time[key] = datetime.now()
-
-    def _get_cache(self, key: str) -> Optional[Any]:
-        if self._is_cache_valid(key):
-            return self._cache.get(key)
-        return None
+        self._cache = TTLCache(default_ttl=3600)  # 1 小时缓存（解禁数据变化不频繁）
 
     def _evaluate_pressure(self, jiejin_ratio: float, jiejin_market_value: float) -> str:
         """评估解禁压力等级
@@ -107,7 +92,7 @@ class JiejinService:
             days: 查询未来天数，默认 30 天
         """
         cache_key = f"upcoming_jiejin_{days}"
-        cached = self._get_cache(cache_key)
+        cached = self._cache.get(cache_key)
         if cached:
             return cached
 
@@ -169,7 +154,7 @@ class JiejinService:
             # 按日期排序
             result.sort(key=lambda x: x.jiejin_date)
 
-            self._set_cache(cache_key, result)
+            self._cache.set(cache_key, result)
             logger.info("Upcoming jiejin fetched", count=len(result), days=days)
             return result
 
@@ -216,7 +201,7 @@ class JiejinService:
             symbol: 股票代码
         """
         cache_key = f"stock_jiejin_{symbol}"
-        cached = self._get_cache(cache_key)
+        cached = self._cache.get(cache_key)
         if cached:
             return cached
 
@@ -279,7 +264,7 @@ class JiejinService:
                 total_locked_ratio=total_locked_ratio,
             )
 
-            self._set_cache(cache_key, result)
+            self._cache.set(cache_key, result)
             return result
 
         except Exception as e:

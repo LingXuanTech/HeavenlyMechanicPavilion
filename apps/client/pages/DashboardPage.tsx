@@ -5,8 +5,9 @@
  */
 import React, { useState, useCallback, useMemo } from 'react';
 import { Stock, MarketStatus } from '../types';
+import { logger } from '../utils/logger';
 import Header from '../components/Header';
-import StockCard from '../components/StockCard';
+import LazyStockCard from '../components/LazyStockCard';
 import StockDetailModal from '../components/StockDetailModal';
 import FlashNewsTicker from '../components/FlashNewsTicker';
 import NewsHighlightsPanel from '../components/NewsHighlightsPanel';
@@ -84,7 +85,7 @@ const DashboardPage: React.FC = () => {
         setFreshAnalyses(prev => new Set(prev).add(symbol));
         await runAnalysis(symbol, options);
       } catch (error) {
-        console.error(`Analysis failed for ${symbol}`, error);
+        logger.error(`Analysis failed for ${symbol}`, error);
         // 失败时移除新鲜标记
         setFreshAnalyses(prev => {
           const next = new Set(prev);
@@ -109,7 +110,7 @@ const DashboardPage: React.FC = () => {
           setSelectedStock(null);
         }
       } catch (e) {
-        console.error('Failed to delete stock', e);
+        logger.error('Failed to delete stock', e);
       }
     },
     [removeStockMutation, selectedStock]
@@ -146,7 +147,7 @@ const DashboardPage: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
             {filteredStocks.map((stock) => (
-              <StockCard
+              <LazyStockCard
                 key={stock.symbol}
                 stock={stock}
                 priceData={prices[stock.symbol]}

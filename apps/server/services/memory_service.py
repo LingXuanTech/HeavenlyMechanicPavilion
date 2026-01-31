@@ -1,9 +1,16 @@
-"""记忆与反思服务 - ChromaDB 集成"""
+"""记忆与反思服务 - ChromaDB 集成
+
+增强功能：
+- 时间衰减：旧记忆权重降低（指数衰减，半衰期可配置）
+- 相似度阈值：过滤低相关性结果
+- 组合评分：综合相似度和时效性排序
+"""
+import math
 import structlog
 import json
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import hashlib
 
 try:
@@ -17,6 +24,16 @@ except ImportError:
 from config.settings import settings
 
 logger = structlog.get_logger()
+
+# ============ 向量检索优化配置 ============
+# 相似度阈值（0-1），低于此值的结果将被过滤
+SIMILARITY_THRESHOLD: float = 0.3
+
+# 时间衰减半衰期（天），经过此天数后时间权重减半
+TIME_DECAY_HALF_LIFE_DAYS: int = 90
+
+# 时间权重的最小值（防止极旧记忆权重为0）
+MIN_TIME_WEIGHT: float = 0.1
 
 
 class AnalysisMemory(BaseModel):
@@ -54,10 +71,12 @@ class AnalysisOutcome(BaseModel):
 
 
 class MemoryRetrievalResult(BaseModel):
-    """记忆检索结果"""
+    """记忆检索结果（增强版：含时间衰减和组合评分）"""
     memory: AnalysisMemory
-    similarity: float
+    similarity: float  # 原始相似度 (0-1)
     days_ago: int
+    time_weight: float = Field(default=1.0, ge=0.0, le=1.0, description="时间衰减权重")
+    combined_score: float = Field(default=0.0, ge=0.0, le=1.0, description="组合评分 = similarity * time_weight")
 
 
 class ReflectionReport(BaseModel):
@@ -185,32 +204,38 @@ class MemoryService:
         symbol: str,
         query_text: str = "",
         n_results: int = 5,
-        max_days: int = 365
+        max_days: int = 365,
+        similarity_threshold: Optional[float] = None,
+        time_decay_enabled: bool = True,
     ) -> List[MemoryRetrievalResult]:
         """
-        检索相似的历史分析
+        检索相似的历史分析（增强版：支持时间衰减和相似度阈值）
 
         Args:
             symbol: 股票代码
             query_text: 查询文本（可选）
             n_results: 返回结果数量
             max_days: 最大历史天数
+            similarity_threshold: 相似度阈值（默认使用全局配置 SIMILARITY_THRESHOLD）
+            time_decay_enabled: 是否启用时间衰减（默认 True）
 
         Returns:
-            相似记忆列表
+            相似记忆列表（按 combined_score 降序排列）
         """
         if not self.is_available():
             return []
+
+        threshold = similarity_threshold if similarity_threshold is not None else SIMILARITY_THRESHOLD
 
         try:
             # 构建查询
             if not query_text:
                 query_text = f"Stock analysis for {symbol}"
 
-            # 查询 ChromaDB
+            # 查询 ChromaDB（获取更多结果以便过滤）
             results = self._collection.query(
                 query_texts=[query_text],
-                n_results=n_results * 2,  # 获取更多以便过滤
+                n_results=n_results * 3,  # 获取更多以便过滤
                 where={"symbol": symbol}
             )
 
@@ -220,6 +245,13 @@ class MemoryService:
             for i, doc_id in enumerate(results.get("ids", [[]])[0]):
                 metadata = results["metadatas"][0][i]
                 distance = results["distances"][0][i] if "distances" in results else 0
+
+                # 计算相似度（ChromaDB 返回的是距离，需要转换）
+                similarity = max(0.0, 1.0 - distance) if distance else 0.5
+
+                # 相似度阈值过滤
+                if similarity < threshold:
+                    continue
 
                 # 计算天数
                 try:
@@ -232,6 +264,15 @@ class MemoryService:
                 # 过滤超出时间范围的
                 if days_ago > max_days:
                     continue
+
+                # 计算时间衰减权重
+                if time_decay_enabled:
+                    time_weight = self._calculate_time_weight(days_ago)
+                else:
+                    time_weight = 1.0
+
+                # 计算组合评分
+                combined_score = similarity * time_weight
 
                 memory = AnalysisMemory(
                     symbol=metadata["symbol"],
@@ -248,18 +289,51 @@ class MemoryService:
 
                 memories.append(MemoryRetrievalResult(
                     memory=memory,
-                    similarity=1 - distance if distance else 0.5,  # 转换距离为相似度
-                    days_ago=days_ago
+                    similarity=round(similarity, 4),
+                    days_ago=days_ago,
+                    time_weight=round(time_weight, 4),
+                    combined_score=round(combined_score, 4),
                 ))
 
-            # 按日期排序（最近优先）
-            memories.sort(key=lambda x: x.days_ago)
+            # 按组合评分降序排序（相似度 * 时间权重）
+            memories.sort(key=lambda x: x.combined_score, reverse=True)
+
+            logger.debug(
+                "Memory retrieval completed",
+                symbol=symbol,
+                candidates=len(results.get("ids", [[]])[0]),
+                after_threshold=len(memories),
+                returned=min(len(memories), n_results),
+                threshold=threshold,
+                time_decay=time_decay_enabled,
+            )
 
             return memories[:n_results]
 
         except Exception as e:
             logger.error("Failed to retrieve memories", error=str(e))
             return []
+
+    def _calculate_time_weight(self, days_ago: int) -> float:
+        """
+        计算时间衰减权重（指数衰减）
+
+        使用公式: weight = max(MIN_TIME_WEIGHT, 0.5 ^ (days_ago / half_life))
+
+        Args:
+            days_ago: 距今天数
+
+        Returns:
+            时间权重 (0.1 ~ 1.0)
+        """
+        if days_ago <= 0:
+            return 1.0
+
+        # 指数衰减：每过 half_life 天，权重减半
+        decay_factor = math.pow(0.5, days_ago / TIME_DECAY_HALF_LIFE_DAYS)
+
+        # 确保不低于最小权重
+        return max(MIN_TIME_WEIGHT, decay_factor)
 
     async def generate_reflection(self, symbol: str) -> Optional[ReflectionReport]:
         """
@@ -375,7 +449,7 @@ class MemoryService:
             return None
 
     def get_stats(self) -> Dict[str, Any]:
-        """获取记忆服务统计信息"""
+        """获取记忆服务统计信息（含检索配置）"""
         if not self.is_available():
             return {"status": "unavailable", "reason": "ChromaDB not initialized"}
 
@@ -384,7 +458,12 @@ class MemoryService:
             return {
                 "status": "available",
                 "total_memories": count,
-                "chroma_path": settings.CHROMA_DB_PATH
+                "chroma_path": settings.CHROMA_DB_PATH,
+                "retrieval_config": {
+                    "similarity_threshold": SIMILARITY_THRESHOLD,
+                    "time_decay_half_life_days": TIME_DECAY_HALF_LIFE_DAYS,
+                    "min_time_weight": MIN_TIME_WEIGHT,
+                }
             }
         except Exception as e:
             return {"status": "error", "reason": str(e)}
@@ -861,12 +940,16 @@ class LayeredMemoryService(MemoryService):
         self,
         macro_cycle: str,
         n_results: int = 10,
+        similarity_threshold: Optional[float] = None,
+        time_decay_enabled: bool = True,
     ) -> List[MemoryRetrievalResult]:
-        """按宏观周期检索相似案例
+        """按宏观周期检索相似案例（支持时间衰减和相似度阈值）
 
         Args:
             macro_cycle: 宏观周期（rate_cut, bull_market 等）
             n_results: 返回结果数量
+            similarity_threshold: 相似度阈值（默认使用全局配置）
+            time_decay_enabled: 是否启用时间衰减
 
         Returns:
             相似记忆列表
@@ -875,17 +958,41 @@ class LayeredMemoryService(MemoryService):
             logger.warning("Macro collection not available")
             return []
 
+        threshold = similarity_threshold if similarity_threshold is not None else SIMILARITY_THRESHOLD
+
         try:
             results = self._macro_collection.query(
                 query_texts=[f"Stock analysis during {macro_cycle}"],
-                n_results=n_results,
+                n_results=n_results * 3,
                 where={"macro_cycle": macro_cycle}
             )
 
             memories = []
+            today = datetime.now().date()
+
             for i, doc_id in enumerate(results.get("ids", [[]])[0]):
                 metadata = results["metadatas"][0][i]
                 distance = results["distances"][0][i] if "distances" in results else 0
+
+                similarity = max(0.0, 1.0 - distance) if distance else 0.5
+
+                if similarity < threshold:
+                    continue
+
+                # 计算天数
+                try:
+                    analysis_date = datetime.strptime(metadata["date"], "%Y-%m-%d").date()
+                    days_ago = (today - analysis_date).days
+                except ValueError:
+                    days_ago = 0
+
+                # 时间衰减
+                if time_decay_enabled:
+                    time_weight = self._calculate_time_weight(days_ago)
+                else:
+                    time_weight = 1.0
+
+                combined_score = similarity * time_weight
 
                 memory = AnalysisMemory(
                     symbol=metadata["symbol"],
@@ -898,11 +1005,14 @@ class LayeredMemoryService(MemoryService):
 
                 memories.append(MemoryRetrievalResult(
                     memory=memory,
-                    similarity=1 - distance if distance else 0.5,
-                    days_ago=0  # 跨时间检索，不计算天数
+                    similarity=round(similarity, 4),
+                    days_ago=days_ago,
+                    time_weight=round(time_weight, 4),
+                    combined_score=round(combined_score, 4),
                 ))
 
-            return memories
+            memories.sort(key=lambda x: x.combined_score, reverse=True)
+            return memories[:n_results]
 
         except Exception as e:
             logger.error("Failed to retrieve by macro cycle", error=str(e))
@@ -913,13 +1023,17 @@ class LayeredMemoryService(MemoryService):
         pattern_type: str,
         sector: Optional[str] = None,
         n_results: int = 10,
+        similarity_threshold: Optional[float] = None,
+        time_decay_enabled: bool = True,
     ) -> List[MemoryRetrievalResult]:
-        """按技术形态检索相似案例
+        """按技术形态检索相似案例（支持时间衰减和相似度阈值）
 
         Args:
             pattern_type: 技术形态
             sector: 行业筛选（可选）
             n_results: 返回结果数量
+            similarity_threshold: 相似度阈值（默认使用全局配置）
+            time_decay_enabled: 是否启用时间衰减
 
         Returns:
             相似记忆列表
@@ -928,6 +1042,8 @@ class LayeredMemoryService(MemoryService):
             logger.warning("Pattern collection not available")
             return []
 
+        threshold = similarity_threshold if similarity_threshold is not None else SIMILARITY_THRESHOLD
+
         try:
             where_filter = {"pattern_type": pattern_type}
             if sector:
@@ -935,14 +1051,36 @@ class LayeredMemoryService(MemoryService):
 
             results = self._pattern_collection.query(
                 query_texts=[f"Stock with {pattern_type} pattern"],
-                n_results=n_results,
+                n_results=n_results * 3,
                 where=where_filter
             )
 
             memories = []
+            today = datetime.now().date()
+
             for i, doc_id in enumerate(results.get("ids", [[]])[0]):
                 metadata = results["metadatas"][0][i]
                 distance = results["distances"][0][i] if "distances" in results else 0
+
+                similarity = max(0.0, 1.0 - distance) if distance else 0.5
+
+                if similarity < threshold:
+                    continue
+
+                # 计算天数
+                try:
+                    analysis_date = datetime.strptime(metadata["date"], "%Y-%m-%d").date()
+                    days_ago = (today - analysis_date).days
+                except ValueError:
+                    days_ago = 0
+
+                # 时间衰减
+                if time_decay_enabled:
+                    time_weight = self._calculate_time_weight(days_ago)
+                else:
+                    time_weight = 1.0
+
+                combined_score = similarity * time_weight
 
                 memory = AnalysisMemory(
                     symbol=metadata["symbol"],
@@ -955,11 +1093,14 @@ class LayeredMemoryService(MemoryService):
 
                 memories.append(MemoryRetrievalResult(
                     memory=memory,
-                    similarity=1 - distance if distance else 0.5,
-                    days_ago=0
+                    similarity=round(similarity, 4),
+                    days_ago=days_ago,
+                    time_weight=round(time_weight, 4),
+                    combined_score=round(combined_score, 4),
                 ))
 
-            return memories
+            memories.sort(key=lambda x: x.combined_score, reverse=True)
+            return memories[:n_results]
 
         except Exception as e:
             logger.error("Failed to retrieve by pattern", error=str(e))

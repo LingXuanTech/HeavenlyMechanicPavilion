@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
+import { logger } from '../utils/logger';
 import {
   Volume2,
   VolumeX,
@@ -119,7 +120,7 @@ export const AudioBriefing: React.FC<AudioBriefingProps> = memo(({
           setVoices(voiceList);
         }
       } catch (err) {
-        console.error('Failed to fetch TTS status', err);
+        logger.error('Failed to fetch TTS status', err);
       }
     };
 

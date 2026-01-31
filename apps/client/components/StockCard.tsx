@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, memo } from 'react';
 import { AgentAnalysis, SignalType, Stock, StockPrice } from '../types';
 import StockChart from './StockChart';
+import { AnalysisProgressBar } from './AnalysisProgressBar';
 import { ArrowUp, ArrowDown, RefreshCw, Target, TrendingUp, TrendingDown, Minus, Maximize2, Calendar, Scale, Zap, BrainCircuit, ChevronDown } from 'lucide-react';
 import type { AnalysisOptions } from '../services/api';
 
@@ -31,32 +32,36 @@ const getTrendIcon = (trend: string) => {
   return <Minus className="w-4 h-4 text-yellow-400" />;
 };
 
-const StockCard: React.FC<StockCardProps> = ({ stock, priceData, analysis, onRefresh, isAnalyzing, currentStage, onDelete, onClick }) => {
+const StockCardComponent: React.FC<StockCardProps> = ({ stock, priceData, analysis, onRefresh, isAnalyzing, currentStage, onDelete, onClick }) => {
   const isUp = priceData && priceData.change >= 0;
   const chartColor = isUp ? '#10B981' : '#EF4444';
 
   // Analysis level state
   const [showLevelMenu, setShowLevelMenu] = useState(false);
 
-  const handleRefresh = (e: React.MouseEvent, level: 'L1' | 'L2' = 'L2') => {
+  const handleRefresh = useCallback((e: React.MouseEvent, level: 'L1' | 'L2' = 'L2') => {
     e.stopPropagation();
     setShowLevelMenu(false);
     onRefresh(stock.symbol, stock.name, { analysisLevel: level });
-  };
+  }, [stock.symbol, stock.name, onRefresh]);
 
-  const handleDelete = (e: React.MouseEvent) => {
+  const handleDelete = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     onDelete(stock.symbol);
-  };
+  }, [stock.symbol, onDelete]);
 
-  const handleToggleLevelMenu = (e: React.MouseEvent) => {
+  const handleToggleLevelMenu = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowLevelMenu(!showLevelMenu);
-  };
+    setShowLevelMenu(prev => !prev);
+  }, []);
+
+  const handleCardClick = useCallback(() => {
+    onClick(stock);
+  }, [stock, onClick]);
 
   return (
-    <div 
-      onClick={() => onClick(stock)}
+    <div
+      onClick={handleCardClick}
       className="bg-gray-900 border border-gray-800 rounded-lg p-4 flex flex-col gap-4 hover:border-blue-500/50 hover:bg-gray-900/80 transition-all shadow-lg relative group cursor-pointer"
     >
       {/* Hover Expand Icon */}
@@ -106,15 +111,14 @@ const StockCard: React.FC<StockCardProps> = ({ stock, priceData, analysis, onRef
         </div>
 
         {isAnalyzing && !analysis ? (
-          <div className="flex flex-col items-center justify-center py-4 gap-2 text-sm text-blue-400 animate-pulse">
-            <div className="flex items-center gap-2">
-              <RefreshCw className="w-4 h-4 animate-spin" /> Analyzing...
-            </div>
-            {currentStage && (
-              <span className="text-[10px] text-blue-300/70 uppercase font-bold tracking-widest mt-1">
-                {currentStage.replace('stage_', '')}
+          <div className="flex flex-col gap-2 py-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-blue-400 font-medium flex items-center gap-1.5">
+                <RefreshCw className="w-3 h-3 animate-spin" />
+                分析中
               </span>
-            )}
+            </div>
+            <AnalysisProgressBar currentStage={currentStage || 'starting'} compact />
           </div>
         ) : analysis ? (
           <>
@@ -244,5 +248,18 @@ const StockCard: React.FC<StockCardProps> = ({ stock, priceData, analysis, onRef
     </div>
   );
 };
+
+// 使用 React.memo 优化，仅在关键 props 变化时重渲染
+const StockCard = memo(StockCardComponent, (prevProps, nextProps) => {
+  // 返回 true 表示不需要重渲染
+  return (
+    prevProps.stock.symbol === nextProps.stock.symbol &&
+    prevProps.isAnalyzing === nextProps.isAnalyzing &&
+    prevProps.currentStage === nextProps.currentStage &&
+    prevProps.analysis?.timestamp === nextProps.analysis?.timestamp &&
+    prevProps.priceData?.price === nextProps.priceData?.price &&
+    prevProps.priceData?.changePercent === nextProps.priceData?.changePercent
+  );
+});
 
 export default StockCard;

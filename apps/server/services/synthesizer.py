@@ -1,10 +1,16 @@
 import json
+import hashlib
 import structlog
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 from config.settings import settings
+from services.models import AgentAnalysis
 
 logger = structlog.get_logger()
+
+# 合成结果缓存 {hash: (result, timestamp)}
+_synthesis_cache: Dict[str, tuple] = {}
+_SYNTHESIS_CACHE_TTL = 60 * 60  # 1 小时缓存
 
 
 class SynthesisContext:
@@ -17,6 +23,9 @@ class SynthesisContext:
         elapsed_seconds: Optional[float] = None,
         analysts_used: Optional[List[str]] = None,
         planner_decision: Optional[str] = None,
+        planner_reasoning: Optional[str] = None,
+        planner_skip_reasons: Optional[Dict[str, str]] = None,
+        planner_historical_insight: Optional[str] = None,
         data_quality_issues: Optional[List[str]] = None,
         historical_cases_count: Optional[int] = None,
         market: str = "US",
@@ -26,9 +35,34 @@ class SynthesisContext:
         self.elapsed_seconds = elapsed_seconds
         self.analysts_used = analysts_used or []
         self.planner_decision = planner_decision
+        self.planner_reasoning = planner_reasoning
+        self.planner_skip_reasons = planner_skip_reasons or {}
+        self.planner_historical_insight = planner_historical_insight
         self.data_quality_issues = data_quality_issues or []
         self.historical_cases_count = historical_cases_count
         self.market = market
+
+    def get_planner_insight(self) -> Optional[str]:
+        """构建完整的 Planner 洞察文本，用于前端展示"""
+        if not self.planner_decision and not self.planner_reasoning:
+            return None
+
+        parts = []
+
+        if self.planner_reasoning:
+            parts.append(f"**决策理由**: {self.planner_reasoning}")
+
+        if self.planner_skip_reasons:
+            skip_lines = [f"- {analyst}: {reason}" for analyst, reason in self.planner_skip_reasons.items()]
+            parts.append(f"**跳过的分析师**:\n" + "\n".join(skip_lines))
+
+        if self.planner_historical_insight:
+            parts.append(f"**历史洞察**: {self.planner_historical_insight}")
+
+        if self.analysts_used:
+            parts.append(f"**最终使用**: {', '.join(self.analysts_used)}")
+
+        return "\n\n".join(parts) if parts else self.planner_decision
 
 
 class ResponseSynthesizer:
@@ -40,6 +74,30 @@ class ResponseSynthesizer:
         """通过 ai_config_service 统一获取 LLM"""
         from services.ai_config_service import ai_config_service
         return ai_config_service.get_llm("synthesis")
+
+    def _generate_cache_key(self, symbol: str, agent_reports: Dict[str, str]) -> str:
+        """生成报告内容的哈希作为缓存键"""
+        # 按键排序确保一致性
+        sorted_reports = json.dumps(agent_reports, sort_keys=True, ensure_ascii=False)
+        content = f"{symbol}:{sorted_reports}"
+        return hashlib.md5(content.encode()).hexdigest()
+
+    def _get_cached_result(self, cache_key: str) -> Optional[Dict[str, Any]]:
+        """获取缓存的合成结果"""
+        cached = _synthesis_cache.get(cache_key)
+        if cached:
+            result, timestamp = cached
+            if (datetime.now() - timestamp).total_seconds() < _SYNTHESIS_CACHE_TTL:
+                logger.info("Synthesis cache hit", cache_key=cache_key[:8])
+                return result
+            # 过期缓存，删除
+            del _synthesis_cache[cache_key]
+        return None
+
+    def _set_cached_result(self, cache_key: str, result: Dict[str, Any]):
+        """设置合成结果缓存"""
+        _synthesis_cache[cache_key] = (result, datetime.now())
+        logger.debug("Synthesis result cached", cache_key=cache_key[:8])
 
     async def synthesize(
         self,
@@ -60,6 +118,18 @@ class ResponseSynthesizer:
         """
         if context is None:
             context = SynthesisContext()
+
+        # 检查缓存（基于报告内容哈希）
+        cache_key = self._generate_cache_key(symbol, agent_reports)
+        cached_result = self._get_cached_result(cache_key)
+        if cached_result:
+            # 更新时间戳和诊断信息
+            cached_result = cached_result.copy()
+            cached_result["timestamp"] = datetime.now().strftime('%H:%M:%S')
+            if "diagnostics" not in cached_result:
+                cached_result["diagnostics"] = {}
+            cached_result["diagnostics"]["from_cache"] = True
+            return cached_result
 
         logger.info(
             "Synthesizing agent reports",
@@ -200,6 +270,19 @@ class ResponseSynthesizer:
             # 后处理：添加 diagnostics 和补充 uiHints 字段
             result = self._post_process(result, context)
 
+            # Pydantic 结构验证（宽松模式：记录告警但不阻塞）
+            try:
+                AgentAnalysis.model_validate(result)
+            except Exception as validation_err:
+                logger.warning(
+                    "AgentAnalysis validation warning (non-blocking)",
+                    symbol=symbol,
+                    error=str(validation_err),
+                )
+
+            # 缓存成功的合成结果
+            self._set_cached_result(cache_key, result)
+
             return result
         except json.JSONDecodeError as e:
             logger.error("Failed to parse synthesized JSON", error=str(e), content=content)
@@ -244,6 +327,10 @@ class ResponseSynthesizer:
             diagnostics["analysts_used"] = context.analysts_used
         if context.planner_decision:
             diagnostics["planner_decision"] = context.planner_decision
+        if context.planner_reasoning:
+            diagnostics["planner_reasoning"] = context.planner_reasoning
+        if context.planner_skip_reasons:
+            diagnostics["planner_skip_reasons"] = context.planner_skip_reasons
 
         if diagnostics:
             result["diagnostics"] = diagnostics
@@ -266,6 +353,12 @@ class ResponseSynthesizer:
             # 确保 analysisLevel 正确
             ui_hints["analysisLevel"] = context.analysis_level
 
+            # Planner 决策透明度 - 使用完整洞察
+            planner_insight = context.get_planner_insight()
+            ui_hints.setdefault("showPlannerReasoning", bool(planner_insight))
+            if planner_insight:
+                ui_hints["plannerInsight"] = planner_insight
+
             # 确保关键字段存在
             ui_hints.setdefault("alertLevel", "none")
             ui_hints.setdefault("highlightSections", ["signal"])
@@ -276,7 +369,6 @@ class ResponseSynthesizer:
                 "emphasisLevel": "default",
                 "expandByDefault": False,
             })
-            ui_hints.setdefault("showPlannerReasoning", bool(context.planner_decision))
             ui_hints.setdefault("actionSuggestions", [])
 
         return result
@@ -332,6 +424,9 @@ class ResponseSynthesizer:
             key_metrics.append(f"Trend={tech['trend']}")
         key_metrics.append(f"Confidence={confidence}")
 
+        # 获取完整 Planner 洞察
+        planner_insight = context.get_planner_insight()
+
         return {
             "alertLevel": alert_level,
             "alertMessage": alert_message,
@@ -344,8 +439,8 @@ class ResponseSynthesizer:
                 "emphasisLevel": debate_emphasis,
                 "expandByDefault": False,
             },
-            "showPlannerReasoning": bool(context.planner_decision),
-            "plannerInsight": context.planner_decision,
+            "showPlannerReasoning": bool(planner_insight),
+            "plannerInsight": planner_insight,
             "actionSuggestions": [],
             "historicalCasesCount": context.historical_cases_count,
             "analysisLevel": context.analysis_level,

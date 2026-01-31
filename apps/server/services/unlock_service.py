@@ -15,6 +15,8 @@ import akshare as ak
 import pandas as pd
 import asyncio
 
+from utils import TTLCache
+
 logger = structlog.get_logger(__name__)
 
 
@@ -37,7 +39,7 @@ class UnlockStock(BaseModel):
 
 class UnlockCalendar(BaseModel):
     """解禁日历"""
-    date: date = Field(description="日期")
+    calendar_date: date = Field(description="日期")
     total_stocks: int = Field(description="解禁股票数量")
     total_value: float = Field(description="解禁市值合计（亿元）")
     stocks: List[UnlockStock] = Field(description="解禁股票列表")
@@ -58,7 +60,7 @@ class UnlockPressure(BaseModel):
 
 class MarketUnlockOverview(BaseModel):
     """市场解禁概览"""
-    date: date = Field(description="数据日期")
+    data_date: date = Field(description="数据日期")
     this_week_value: float = Field(description="本周解禁市值（亿元）")
     next_week_value: float = Field(description="下周解禁市值（亿元）")
     this_month_value: float = Field(description="本月解禁市值（亿元）")
@@ -73,24 +75,7 @@ class UnlockService:
     """限售解禁监控服务"""
 
     def __init__(self):
-        self._cache: Dict[str, Any] = {}
-        self._cache_time: Dict[str, datetime] = {}
-        self._cache_ttl = 3600  # 1 小时缓存
-
-    def _is_cache_valid(self, key: str) -> bool:
-        if key not in self._cache_time:
-            return False
-        elapsed = (datetime.now() - self._cache_time[key]).total_seconds()
-        return elapsed < self._cache_ttl
-
-    def _set_cache(self, key: str, value: Any):
-        self._cache[key] = value
-        self._cache_time[key] = datetime.now()
-
-    def _get_cache(self, key: str) -> Optional[Any]:
-        if self._is_cache_valid(key):
-            return self._cache.get(key)
-        return None
+        self._cache = TTLCache(default_ttl=3600)  # 1 小时缓存
 
     async def get_unlock_calendar(self, start_date: date = None, end_date: date = None) -> List[UnlockCalendar]:
         """获取解禁日历
@@ -105,7 +90,7 @@ class UnlockService:
             end_date = start_date + timedelta(days=30)
 
         cache_key = f"unlock_calendar_{start_date}_{end_date}"
-        cached = self._get_cache(cache_key)
+        cached = self._cache.get(cache_key)
         if cached:
             return cached
 
@@ -167,13 +152,13 @@ class UnlockService:
                 stocks = calendar_data[dt]
                 total_value = sum(s.unlock_value for s in stocks)
                 result.append(UnlockCalendar(
-                    date=dt,
+                    calendar_date=dt,
                     total_stocks=len(stocks),
                     total_value=total_value,
                     stocks=sorted(stocks, key=lambda x: x.unlock_value, reverse=True),
                 ))
 
-            self._set_cache(cache_key, result)
+            self._cache.set(cache_key, result)
             logger.info("Fetched unlock calendar", days=len(result), total_stocks=sum(c.total_stocks for c in result))
             return result
 
@@ -353,7 +338,7 @@ class UnlockService:
     async def get_market_unlock_overview(self) -> MarketUnlockOverview:
         """获取市场解禁概览"""
         cache_key = "market_unlock_overview"
-        cached = self._get_cache(cache_key)
+        cached = self._cache.get(cache_key)
         if cached:
             return cached
 
@@ -406,7 +391,7 @@ class UnlockService:
                 market_impact = "本周解禁压力较小，对市场影响较弱"
 
             overview = MarketUnlockOverview(
-                date=today,
+                data_date=today,
                 this_week_value=this_week_value,
                 next_week_value=next_week_value,
                 this_month_value=this_month_value,
@@ -415,7 +400,7 @@ class UnlockService:
                 market_impact=market_impact,
             )
 
-            self._set_cache(cache_key, overview)
+            self._cache.set(cache_key, overview)
             logger.info(
                 "Market unlock overview fetched",
                 this_week=f"{this_week_value:.1f}亿",
@@ -426,7 +411,7 @@ class UnlockService:
         except Exception as e:
             logger.error("Failed to get market unlock overview", error=str(e))
             return MarketUnlockOverview(
-                date=datetime.now().date(),
+                data_date=datetime.now().date(),
                 this_week_value=0,
                 next_week_value=0,
                 this_month_value=0,

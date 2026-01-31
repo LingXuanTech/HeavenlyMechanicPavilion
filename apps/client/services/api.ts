@@ -7,6 +7,8 @@
  * 3. 类型安全
  */
 
+import { logger } from '../utils/logger';
+
 import {
   MarketOpportunity,
   FlashNews,
@@ -36,12 +38,28 @@ import {
   NorthMoneyHistory,
   NorthMoneyHolding,
   NorthMoneyTopStock,
+  IntradayFlowSummary,
+  NorthMoneyAnomaly,
+  NorthMoneyRealtime,
+  NorthMoneySectorFlow,
+  SectorRotationSignal,
   LHBStock,
   LHBSummary,
   HotMoneySeat,
   JiejinStock,
   JiejinCalendar,
   JiejinSummary,
+  // 新增类型
+  Stock,
+  AgentAnalysis,
+  ChatMessage,
+  AnalysisHistoryItem,
+  AnalysisTaskStatus,
+  CorrelationMatrix,
+  PortfolioAnalysisResult,
+  QuickPortfolioCheck,
+  MacroOverview,
+  MacroImpactAnalysis,
 } from '../types';
 
 // ============ 基础配置 ============
@@ -111,6 +129,8 @@ export interface SSERetryConfig {
   maxDelay?: number;
   /** 延迟倍数，默认 2 */
   backoffMultiplier?: number;
+  /** 心跳超时（毫秒），超过此时间未收到任何事件则视为静默断连，默认 90000 (90秒) */
+  heartbeatTimeout?: number;
 }
 
 /**
@@ -169,14 +189,24 @@ export const analyzeStockWithAgent = async (
     initialDelay = 1000,
     maxDelay = 8000,
     backoffMultiplier = 2,
+    heartbeatTimeout = 90_000,
   } = retryConfig;
 
   let aborted = false;
   let currentEventSource: EventSource | null = null;
+  let heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const clearHeartbeat = () => {
+    if (heartbeatTimer) {
+      clearTimeout(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  };
 
   const controller: SSEAnalysisController = {
     abort: () => {
       aborted = true;
+      clearHeartbeat();
       if (currentEventSource) {
         currentEventSource.close();
         currentEventSource = null;
@@ -184,10 +214,13 @@ export const analyzeStockWithAgent = async (
     },
   };
 
-  // 计算退避延迟
+  // 计算退避延迟（含随机抖动，防止惊群效应）
   const getBackoffDelay = (retryCount: number): number => {
-    const delay = initialDelay * Math.pow(backoffMultiplier, retryCount);
-    return Math.min(delay, maxDelay);
+    const base = initialDelay * Math.pow(backoffMultiplier, retryCount);
+    const capped = Math.min(base, maxDelay);
+    // 添加 ±25% 的随机抖动
+    const jitter = capped * (0.75 + Math.random() * 0.5);
+    return Math.round(jitter);
   };
 
   // 等待指定时间
@@ -225,7 +258,7 @@ export const analyzeStockWithAgent = async (
 
   const { task_id } = await response.json();
 
-  // SSE 连接函数（支持重试）
+  // SSE 连接函数（支持重试 + 心跳超时检测）
   const connectSSE = async (retryCount: number = 0): Promise<void> => {
     if (aborted) {
       onConnectionState?.('closed');
@@ -236,22 +269,36 @@ export const analyzeStockWithAgent = async (
       const eventSource = new EventSource(`${API_BASE}/analyze/stream/${task_id}`);
       currentEventSource = eventSource;
 
-      let hasReceivedData = false;
       let isCompleted = false;
 
       const stages = ['stage_analyst', 'stage_debate', 'stage_risk', 'stage_final', 'error', 'progress'];
 
+      // 心跳超时：若超过 heartbeatTimeout 未收到任何事件，视为静默断连
+      const resetHeartbeat = () => {
+        clearHeartbeat();
+        if (isCompleted || aborted) return;
+        heartbeatTimer = setTimeout(() => {
+          if (isCompleted || aborted) return;
+          logger.warn(`SSE heartbeat timeout (${heartbeatTimeout}ms), triggering reconnect`);
+          eventSource.close();
+          currentEventSource = null;
+          handleReconnect(retryCount, resolve, reject);
+        }, heartbeatTimeout);
+      };
+
       // 连接成功时触发
       eventSource.onopen = () => {
         if (retryCount > 0) {
-          console.info(`SSE reconnected after ${retryCount} retries`);
+          logger.info(`SSE reconnected after ${retryCount} retries`);
         }
         onConnectionState?.('connected');
+        resetHeartbeat();
       };
 
       stages.forEach((stage) => {
         eventSource.addEventListener(stage, (event: MessageEvent) => {
-          hasReceivedData = true;
+          // 收到事件，重置心跳计时
+          resetHeartbeat();
 
           try {
             const data = JSON.parse(event.data);
@@ -259,18 +306,20 @@ export const analyzeStockWithAgent = async (
 
             if (stage === 'stage_final' || stage === 'error') {
               isCompleted = true;
+              clearHeartbeat();
               eventSource.close();
               currentEventSource = null;
               onConnectionState?.('closed');
               resolve();
             }
           } catch (parseError) {
-            console.error('Failed to parse SSE data:', parseError);
+            logger.error('Failed to parse SSE data:', parseError);
           }
         });
       });
 
-      eventSource.onerror = async (err) => {
+      eventSource.onerror = async () => {
+        clearHeartbeat();
         eventSource.close();
         currentEventSource = null;
 
@@ -281,43 +330,53 @@ export const analyzeStockWithAgent = async (
           return;
         }
 
-        // 检查是否可以重试
-        if (retryCount < maxRetries) {
-          const delay = getBackoffDelay(retryCount);
-          console.warn(`SSE connection error, retrying in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`, err);
-
-          onConnectionState?.('reconnecting', retryCount + 1);
-
-          await sleep(delay);
-
-          if (!aborted) {
-            try {
-              await connectSSE(retryCount + 1);
-              resolve();
-            } catch (retryError) {
-              reject(retryError);
-            }
-          } else {
-            onConnectionState?.('closed');
-            resolve();
-          }
-        } else {
-          // 达到最大重试次数
-          console.error(`SSE connection failed after ${maxRetries} retries`);
-          onConnectionState?.('error');
-          onEvent('error', {
-            message: `连接失败，已重试 ${maxRetries} 次`,
-            code: 'SSE_MAX_RETRIES_EXCEEDED',
-          });
-          reject(new Error(`SSE connection failed after ${maxRetries} retries`));
-        }
+        handleReconnect(retryCount, resolve, reject);
       };
     });
   };
 
+  // 统一的重连处理（onerror 和心跳超时共用）
+  const handleReconnect = async (
+    retryCount: number,
+    resolve: () => void,
+    reject: (reason: Error) => void,
+  ) => {
+    if (retryCount < maxRetries) {
+      const delay = getBackoffDelay(retryCount);
+      logger.warn(
+        `SSE reconnecting in ${delay}ms (attempt ${retryCount + 1}/${maxRetries})`
+      );
+
+      onConnectionState?.('reconnecting', retryCount + 1);
+
+      await sleep(delay);
+
+      if (!aborted) {
+        try {
+          await connectSSE(retryCount + 1);
+          resolve();
+        } catch (retryError) {
+          reject(retryError as Error);
+        }
+      } else {
+        onConnectionState?.('closed');
+        resolve();
+      }
+    } else {
+      // 达到最大重试次数
+      logger.error(`SSE connection failed after ${maxRetries} retries`);
+      onConnectionState?.('error');
+      onEvent('error', {
+        message: `连接失败，已重试 ${maxRetries} 次`,
+        code: 'SSE_MAX_RETRIES_EXCEEDED',
+      });
+      reject(new Error(`SSE connection failed after ${maxRetries} retries`));
+    }
+  };
+
   // 启动 SSE 连接（异步，不阻塞返回控制器）
   connectSSE().catch((error) => {
-    console.error('SSE connection failed:', error);
+    logger.error('SSE connection failed:', error);
   });
 
   return controller;
@@ -327,7 +386,7 @@ export const analyzeStockWithAgent = async (
  * 获取最新分析结果
  */
 export const getLatestAnalysis = (symbol: string) =>
-  request<any>(`/analyze/latest/${symbol}`);
+  request<AgentAnalysis>(`/analyze/latest/${symbol}`);
 
 /**
  * 快速扫描（L1 模式）
@@ -348,36 +407,53 @@ export const quickScanStock = (symbol: string) =>
  * 获取分析历史
  */
 export const getAnalysisHistory = (symbol: string, limit: number = 10) =>
-  request<any[]>(`/analyze/history/${symbol}?limit=${limit}`);
+  request<{ items: AnalysisHistoryItem[]; total: number; offset: number; limit: number }>(`/analyze/history/${symbol}?limit=${limit}&status=completed`);
+
+/**
+ * 获取指定 ID 的完整分析报告
+ */
+export const getAnalysisDetail = (analysisId: number) =>
+  request<{
+    id: number;
+    symbol: string;
+    date: string;
+    signal: string;
+    confidence: number;
+    full_report: AgentAnalysis;
+    anchor_script: string;
+    created_at: string;
+    task_id: string;
+    elapsed_seconds: number;
+  }>(`/analyze/detail/${analysisId}`);
 
 /**
  * 获取分析任务状态
  */
 export const getAnalysisStatus = (taskId: string) =>
-  request<any>(`/analyze/status/${taskId}`);
+  request<AnalysisTaskStatus>(`/analyze/status/${taskId}`);
 
 // ============ 监听列表 API ============
 
-export const getWatchlist = () => request<any[]>('/watchlist/');
+export const getWatchlist = () => request<Stock[]>('/watchlist/');
 
 export const addToWatchlist = (symbol: string) =>
-  request<any>(`/watchlist/${symbol}`, { method: 'POST' });
+  request<Stock>(`/watchlist/${symbol}`, { method: 'POST' });
 
 export const removeFromWatchlist = (symbol: string) =>
-  request<any>(`/watchlist/${symbol}`, { method: 'DELETE' });
+  request<{ deleted: boolean }>(`/watchlist/${symbol}`, { method: 'DELETE' });
 
 // ============ 市场数据 API ============
 
 export const getMarketPrice = (symbol: string) =>
-  request<any>(`/market/price/${symbol}`);
+  request<StockPriceResponse>(`/market/price/${symbol}`);
 
 export const getMarketHistory = (symbol: string, period: string = '1mo') =>
-  request<any[]>(`/market/history/${symbol}?period=${period}`);
+  request<KlineDataResponse[]>(`/market/history/${symbol}?period=${period}`);
 
 export const getMarketKline = (symbol: string, days: number = 90) =>
-  request<any>(`/market/kline/${encodeURIComponent(symbol)}?days=${days}`);
+  request<{ data: KlineDataResponse[]; symbol: string }>(`/market/kline/${encodeURIComponent(symbol)}?days=${days}`);
 
-export const getGlobalMarket = () => request<any>('/market/global');
+export const getGlobalMarket = () => request<GlobalMarketResponse>('/market/global');
 
 // ============ 发现 API ============
 
@@ -393,17 +469,17 @@ export const discoverStocks = async (query: string): Promise<MarketOpportunity[]
 export const getFlashNews = () => request<FlashNews[]>('/news/flash');
 
 export const getStockNews = (symbol: string) =>
-  request<any[]>(`/news/${symbol}`);
+  request<FlashNews[]>(`/news/${symbol}`);
 
 // ============ 聊天 API ============
 
 export const getChatResponse = (threadId: string, message: string) =>
-  request<any>(`/chat/${threadId}?message=${encodeURIComponent(message)}`, {
+  request<ChatMessage>(`/chat/${threadId}?message=${encodeURIComponent(message)}`, {
     method: 'POST',
   });
 
 export const getChatHistory = (threadId: string) =>
-  request<any[]>(`/chat/${threadId}`);
+  request<ChatMessage[]>(`/chat/${threadId}`);
 
 // ============ Prompt 管理 API ============
 
@@ -418,53 +494,53 @@ export const getPromptByRole = (role: string) =>
   request<PromptConfig>(`/settings/prompts/${role}`);
 
 export const updatePromptByRole = (role: string, config: PromptConfig, apiKey?: string) =>
-  request<any>(`/settings/prompts/${role}`, {
+  request<{ updated: boolean }>(`/settings/prompts/${role}`, {
     method: 'PUT',
     headers: apiKey ? { 'X-API-Key': apiKey } : undefined,
     body: JSON.stringify(config),
   });
 
 export const updateAllPrompts = (prompts: Record<string, PromptConfig>, apiKey?: string) =>
-  request<any>('/settings/prompts', {
+  request<{ updated: boolean }>('/settings/prompts', {
     method: 'PUT',
     headers: apiKey ? { 'X-API-Key': apiKey } : undefined,
     body: JSON.stringify({ prompts }),
   });
 
 export const reloadPrompts = () =>
-  request<any>('/settings/prompts/reload', { method: 'POST' });
+  request<{ reloaded: boolean }>('/settings/prompts/reload', { method: 'POST' });
 
 // ============ Portfolio 分析 API ============
 
 export const getPortfolioCorrelation = (symbols: string[], period: string = '1mo') =>
-  request<any>('/portfolio/correlation', {
+  request<CorrelationMatrix>('/portfolio/correlation', {
     method: 'POST',
     body: JSON.stringify({ symbols, period }),
   });
 
 export const getPortfolioAnalysis = (symbols: string[], period: string = '1mo') =>
-  request<any>('/portfolio/analyze', {
+  request<PortfolioAnalysisResult>('/portfolio/analyze', {
     method: 'POST',
     body: JSON.stringify({ symbols, period }),
   });
 
 export const getQuickPortfolioCheck = (symbols: string[]) =>
-  request<any>(`/portfolio/quick-check?symbols=${symbols.join(',')}`);
+  request<QuickPortfolioCheck>(`/portfolio/quick-check?symbols=${symbols.join(',')}`);
 
 // ============ 宏观经济 API ============
 
-export const getMacroOverview = () => request<any>('/macro/overview');
+export const getMacroOverview = () => request<MacroOverview>('/macro/overview');
 
 export const getMacroIndicator = (name: string) =>
-  request<any>(`/macro/indicator/${name}`);
+  request<Record<string, unknown>>(`/macro/indicator/${name}`);
 
 export const getMacroImpactAnalysis = (market?: string) => {
   const query = market ? `?market=${market}` : '';
-  return request<any>(`/macro/impact-analysis${query}`);
+  return request<MacroImpactAnalysis>(`/macro/impact-analysis${query}`);
 };
 
 export const refreshMacro = () =>
-  request<any>('/macro/refresh', { method: 'POST' });
+  request<ServiceStatusResponse>('/macro/refresh', { method: 'POST' });
 
 // ============ 记忆服务 API ============
 
@@ -480,7 +556,7 @@ export const getReflection = (symbol: string) =>
   request<ReflectionReport | null>(`/memory/reflection/${symbol}`);
 
 export const storeMemory = (memory: AnalysisMemory) =>
-  request<any>('/memory/store', {
+  request<ServiceStatusResponse>('/memory/store', {
     method: 'POST',
     body: JSON.stringify(memory),
   });
@@ -745,6 +821,21 @@ export const getNorthMoneyTopBuys = (limit: number = 20) =>
 export const getNorthMoneyTopSells = (limit: number = 20) =>
   request<NorthMoneyTopStock[]>(`/north-money/top-sells?limit=${limit}`);
 
+export const getNorthMoneyIntraday = () =>
+  request<IntradayFlowSummary>('/north-money/intraday');
+
+export const getNorthMoneyAnomalies = () =>
+  request<NorthMoneyAnomaly[]>('/north-money/anomalies');
+
+export const getNorthMoneyRealtime = () =>
+  request<NorthMoneyRealtime>('/north-money/realtime');
+
+export const getNorthMoneySectorFlow = () =>
+  request<NorthMoneySectorFlow[]>('/north-money/sector-flow');
+
+export const getNorthMoneyRotationSignal = () =>
+  request<SectorRotationSignal>('/north-money/rotation-signal');
+
 // ============ 龙虎榜 API (A股特有) ============
 
 export const getLHBDaily = (tradeDate?: string) => {
@@ -756,7 +847,7 @@ export const getLHBSummary = () =>
   request<LHBSummary>('/lhb/summary');
 
 export const getLHBStockHistory = (symbol: string, days: number = 30) =>
-  request<any[]>(`/lhb/stock/${symbol}?days=${days}`);
+  request<LHBStock[]>(`/lhb/stock/${symbol}?days=${days}`);
 
 export const getLHBHotMoneyActivity = (days: number = 5) =>
   request<HotMoneySeat[]>(`/lhb/hot-money?days=${days}`);
@@ -785,13 +876,13 @@ export const getJiejinSummary = (days: number = 30) =>
   request<JiejinSummary>(`/jiejin/summary?days=${days}`);
 
 export const getJiejinStockPlan = (symbol: string) =>
-  request<any>(`/jiejin/stock/${symbol}`);
+  request<JiejinStock>(`/jiejin/stock/${symbol}`);
 
 export const getJiejinHighPressure = (days: number = 7) =>
   request<JiejinStock[]>(`/jiejin/high-pressure?days=${days}`);
 
 export const getJiejinWarning = (symbol: string, days: number = 30) =>
-  request<any>(`/jiejin/warning/${symbol}?days=${days}`);
+  request<{ symbol: string; warning: boolean; message: string; upcoming: JiejinStock[] }>(`/jiejin/warning/${symbol}?days=${days}`);
 
 export const getJiejinToday = () =>
   request<JiejinStock[]>('/jiejin/today');

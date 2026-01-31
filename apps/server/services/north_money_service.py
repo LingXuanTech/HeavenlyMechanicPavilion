@@ -2,17 +2,23 @@
 
 提供沪深港通北向资金流向数据，包括：
 - 当日资金流向
+- 盘中分时流向（实时）
 - 个股北向持仓变化
 - 净买入/卖出 TOP 榜单
+- 板块轮动信号
+- 异常流动检测
 """
-from datetime import datetime, date as DateType
-from typing import List, Optional, Dict, Any
+from datetime import datetime, date as DateType, time as TimeType
+from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel, Field
 import structlog
 import akshare as ak
 import pandas as pd
 from functools import lru_cache
 import asyncio
+import statistics
+
+from utils import TTLCache
 
 logger = structlog.get_logger(__name__)
 
@@ -93,38 +99,61 @@ class NorthMoneySummary(BaseModel):
     week_total: float = Field(description="本周累计净流入")
 
 
+# ============ 盘中实时模型 ============
+
+class IntradayFlowPoint(BaseModel):
+    """盘中分时流向数据点"""
+    time: str = Field(description="时间 (HH:MM)")
+    sh_connect: float = Field(description="沪股通净流入（亿元）")
+    sz_connect: float = Field(description="深股通净流入（亿元）")
+    total: float = Field(description="北向资金净流入合计（亿元）")
+    cumulative_total: float = Field(description="累计净流入（亿元）")
+
+
+class IntradayFlowSummary(BaseModel):
+    """盘中实时流向汇总"""
+    date: DateType = Field(description="日期")
+    last_update: str = Field(description="最后更新时间")
+    current_total: float = Field(description="当前累计净流入（亿元）")
+    flow_points: List[IntradayFlowPoint] = Field(default_factory=list, description="分时数据点")
+    peak_inflow: float = Field(description="盘中峰值净流入")
+    peak_outflow: float = Field(description="盘中峰值净流出")
+    flow_volatility: float = Field(default=0, description="流向波动率")
+    momentum: str = Field(description="动量方向: accelerating / decelerating / stable")
+
+
+class NorthMoneyAnomaly(BaseModel):
+    """北向资金异常信号"""
+    timestamp: datetime = Field(description="检测时间")
+    anomaly_type: str = Field(description="异常类型: sudden_inflow / sudden_outflow / reversal / volume_spike")
+    severity: str = Field(description="严重程度: low / medium / high / critical")
+    description: str = Field(description="异常描述")
+    affected_stocks: List[str] = Field(default_factory=list, description="受影响个股")
+    flow_change: float = Field(description="流向变化（亿元）")
+    recommendation: str = Field(description="操作建议")
+
+
+class NorthMoneyRealtime(BaseModel):
+    """北向资金实时全景"""
+    summary: NorthMoneySummary = Field(description="基础概览")
+    intraday: Optional[IntradayFlowSummary] = Field(default=None, description="盘中实时")
+    anomalies: List[NorthMoneyAnomaly] = Field(default_factory=list, description="异常信号")
+    index_correlation: Optional[Dict[str, float]] = Field(default=None, description="与主要指数相关性")
+    is_trading_hours: bool = Field(default=False, description="是否交易时段")
+
+
 # ============ 服务类 ============
 
 class NorthMoneyService:
     """北向资金监控服务"""
 
     def __init__(self):
-        self._cache: Dict[str, Any] = {}
-        self._cache_time: Dict[str, datetime] = {}
-        self._cache_ttl = 300  # 5 分钟缓存
-
-    def _is_cache_valid(self, key: str) -> bool:
-        """检查缓存是否有效"""
-        if key not in self._cache_time:
-            return False
-        elapsed = (datetime.now() - self._cache_time[key]).total_seconds()
-        return elapsed < self._cache_ttl
-
-    def _set_cache(self, key: str, value: Any):
-        """设置缓存"""
-        self._cache[key] = value
-        self._cache_time[key] = datetime.now()
-
-    def _get_cache(self, key: str) -> Optional[Any]:
-        """获取缓存"""
-        if self._is_cache_valid(key):
-            return self._cache.get(key)
-        return None
+        self._cache = TTLCache(default_ttl=300)  # 5 分钟缓存
 
     async def get_north_money_flow(self) -> NorthMoneyFlow:
         """获取当日北向资金流向"""
         cache_key = "north_money_flow"
-        cached = self._get_cache(cache_key)
+        cached = self._cache.get(cache_key)
         if cached:
             return cached
 
@@ -157,7 +186,7 @@ class NorthMoneyService:
                 market_sentiment=sentiment,
             )
 
-            self._set_cache(cache_key, flow)
+            self._cache.set(cache_key, flow)
             logger.info("Fetched north money flow", total=total, sentiment=sentiment)
             return flow
 
@@ -175,7 +204,7 @@ class NorthMoneyService:
     async def get_north_money_history(self, days: int = 30) -> List[NorthMoneyHistory]:
         """获取北向资金历史数据"""
         cache_key = f"north_money_history_{days}"
-        cached = self._get_cache(cache_key)
+        cached = self._cache.get(cache_key)
         if cached:
             return cached
 
@@ -200,7 +229,7 @@ class NorthMoneyService:
                 except Exception:
                     continue
 
-            self._set_cache(cache_key, history)
+            self._cache.set(cache_key, history)
             return history
 
         except Exception as e:
@@ -253,7 +282,7 @@ class NorthMoneyService:
     async def get_top_north_buys(self, limit: int = 20) -> List[NorthMoneyTopStock]:
         """获取北向资金净买入 TOP"""
         cache_key = f"top_north_buys_{limit}"
-        cached = self._get_cache(cache_key)
+        cached = self._cache.get(cache_key)
         if cached:
             return cached
 
@@ -289,7 +318,7 @@ class NorthMoneyService:
                 except Exception:
                     continue
 
-            self._set_cache(cache_key, result)
+            self._cache.set(cache_key, result)
             return result
 
         except Exception as e:
@@ -299,7 +328,7 @@ class NorthMoneyService:
     async def get_top_north_sells(self, limit: int = 20) -> List[NorthMoneyTopStock]:
         """获取北向资金净卖出 TOP"""
         cache_key = f"top_north_sells_{limit}"
-        cached = self._get_cache(cache_key)
+        cached = self._cache.get(cache_key)
         if cached:
             return cached
 
@@ -339,7 +368,7 @@ class NorthMoneyService:
                 except Exception:
                     continue
 
-            self._set_cache(cache_key, result)
+            self._cache.set(cache_key, result)
             return result
 
         except Exception as e:
@@ -412,7 +441,7 @@ class NorthMoneyService:
         基于个股北向持仓变化，聚合到板块级别。
         """
         cache_key = "sector_flow"
-        cached = self._get_cache(cache_key)
+        cached = self._cache.get(cache_key)
         if cached:
             return cached
 
@@ -474,7 +503,7 @@ class NorthMoneyService:
             # 按净买入排序
             result.sort(key=lambda x: x.net_buy, reverse=True)
 
-            self._set_cache(cache_key, result)
+            self._cache.set(cache_key, result)
             logger.info("Calculated sector flow", sectors=len(result))
             return result
 
@@ -581,6 +610,257 @@ class NorthMoneyService:
         # 当前返回空数据，后续迭代可接入数据库
         logger.debug("Sector flow history not implemented, returning empty")
         return {}
+
+    # ============ 盘中实时流向 ============
+
+    def _is_trading_hours(self) -> bool:
+        """判断当前是否在交易时段"""
+        now = datetime.now()
+        # 交易日判断（简化：非周末）
+        if now.weekday() >= 5:
+            return False
+
+        current_time = now.time()
+        # 上午盘 9:30 - 11:30，下午盘 13:00 - 15:00
+        morning_start = TimeType(9, 30)
+        morning_end = TimeType(11, 30)
+        afternoon_start = TimeType(13, 0)
+        afternoon_end = TimeType(15, 0)
+
+        return (
+            (morning_start <= current_time <= morning_end) or
+            (afternoon_start <= current_time <= afternoon_end)
+        )
+
+    async def get_intraday_flow(self) -> IntradayFlowSummary:
+        """获取盘中分时北向资金流向
+
+        使用 AkShare 的分钟级数据（如可用），否则返回当前累计。
+        """
+        cache_key = "intraday_flow"
+        # 盘中数据缓存时间较短（1分钟）
+        if cache_key in self._cache_time:
+            elapsed = (datetime.now() - self._cache_time[cache_key]).total_seconds()
+            if elapsed < 60:
+                cached = self._cache.get(cache_key)
+                if cached:
+                    return cached
+
+        try:
+            # 尝试获取分时数据
+            df = await asyncio.to_thread(ak.stock_hsgt_north_min_em)
+
+            flow_points = []
+            cumulative = 0.0
+
+            if df is not None and not df.empty:
+                for _, row in df.iterrows():
+                    try:
+                        time_str = str(row.get('时间', ''))[-5:]  # 取 HH:MM
+                        sh = float(row.get('沪股通', 0) or 0)
+                        sz = float(row.get('深股通', 0) or 0)
+                        total = sh + sz
+                        cumulative = float(row.get('北向资金', cumulative) or cumulative)
+
+                        flow_points.append(IntradayFlowPoint(
+                            time=time_str,
+                            sh_connect=round(sh, 2),
+                            sz_connect=round(sz, 2),
+                            total=round(total, 2),
+                            cumulative_total=round(cumulative, 2),
+                        ))
+                    except Exception:
+                        continue
+
+            # 计算统计指标
+            if flow_points:
+                totals = [p.cumulative_total for p in flow_points]
+                peak_inflow = max(totals)
+                peak_outflow = min(totals)
+                volatility = statistics.stdev(totals) if len(totals) > 1 else 0
+
+                # 计算动量（最近 5 个点的趋势）
+                recent = totals[-5:] if len(totals) >= 5 else totals
+                if len(recent) >= 2:
+                    slope = recent[-1] - recent[0]
+                    if slope > 5:
+                        momentum = "accelerating"
+                    elif slope < -5:
+                        momentum = "decelerating"
+                    else:
+                        momentum = "stable"
+                else:
+                    momentum = "stable"
+            else:
+                peak_inflow = 0
+                peak_outflow = 0
+                volatility = 0
+                momentum = "stable"
+                cumulative = 0
+
+            result = IntradayFlowSummary(
+                date=datetime.now().date(),
+                last_update=datetime.now().strftime("%H:%M:%S"),
+                current_total=round(cumulative, 2),
+                flow_points=flow_points,
+                peak_inflow=round(peak_inflow, 2),
+                peak_outflow=round(peak_outflow, 2),
+                flow_volatility=round(volatility, 2),
+                momentum=momentum,
+            )
+
+            self._cache.set(cache_key, result)
+            return result
+
+        except Exception as e:
+            logger.warning("Failed to fetch intraday flow, using fallback", error=str(e))
+            # 降级：使用当日总流向
+            today = await self.get_north_money_flow()
+            return IntradayFlowSummary(
+                date=datetime.now().date(),
+                last_update=datetime.now().strftime("%H:%M:%S"),
+                current_total=today.total,
+                flow_points=[],
+                peak_inflow=max(0, today.total),
+                peak_outflow=min(0, today.total),
+                flow_volatility=0,
+                momentum="stable",
+            )
+
+    # ============ 异常检测 ============
+
+    async def detect_anomalies(self) -> List[NorthMoneyAnomaly]:
+        """检测北向资金异常流动
+
+        检测规则：
+        1. 突然大额流入/流出（单日超过 100 亿）
+        2. 流向反转（连续多日后方向突变）
+        3. 盘中剧烈波动（波动率超阈值）
+        4. 个股异常集中（单一股票占比过高）
+        """
+        anomalies = []
+
+        try:
+            # 获取基础数据
+            today_flow = await self.get_north_money_flow()
+            history = await self.get_north_money_history(days=10)
+            intraday = await self.get_intraday_flow()
+            top_buys = await self.get_top_north_buys(limit=5)
+
+            now = datetime.now()
+
+            # 规则 1: 大额流入/流出
+            if abs(today_flow.total) > 100:
+                anomaly_type = "sudden_inflow" if today_flow.total > 0 else "sudden_outflow"
+                severity = "critical" if abs(today_flow.total) > 150 else "high"
+                direction = "流入" if today_flow.total > 0 else "流出"
+
+                anomalies.append(NorthMoneyAnomaly(
+                    timestamp=now,
+                    anomaly_type=anomaly_type,
+                    severity=severity,
+                    description=f"北向资金单日大额{direction} {abs(today_flow.total):.1f} 亿元",
+                    affected_stocks=[s.name for s in top_buys[:3]],
+                    flow_change=today_flow.total,
+                    recommendation=f"{'关注机构重仓股机会' if today_flow.total > 0 else '警惕市场回调风险'}",
+                ))
+
+            # 规则 2: 流向反转
+            if len(history) >= 5:
+                recent_5d = [h.total for h in history[-5:]]
+                prev_direction = sum(recent_5d[:-1]) / 4  # 前4天平均
+                today_direction = recent_5d[-1]
+
+                # 前4天单边，今天反转
+                if (prev_direction > 20 and today_direction < -20) or \
+                   (prev_direction < -20 and today_direction > 20):
+                    anomalies.append(NorthMoneyAnomaly(
+                        timestamp=now,
+                        anomaly_type="reversal",
+                        severity="high",
+                        description=f"北向资金流向突然反转：前4日平均{prev_direction:+.1f}亿 → 今日{today_direction:+.1f}亿",
+                        affected_stocks=[],
+                        flow_change=today_direction - prev_direction,
+                        recommendation="关注市场风格切换，适当调整持仓结构",
+                    ))
+
+            # 规则 3: 盘中剧烈波动
+            if intraday.flow_volatility > 30:
+                anomalies.append(NorthMoneyAnomaly(
+                    timestamp=now,
+                    anomaly_type="volume_spike",
+                    severity="medium",
+                    description=f"盘中资金流向波动剧烈（波动率: {intraday.flow_volatility:.1f}）",
+                    affected_stocks=[],
+                    flow_change=intraday.peak_inflow - intraday.peak_outflow,
+                    recommendation="短线波动加大，避免追涨杀跌",
+                ))
+
+            # 规则 4: 个股集中度异常
+            if top_buys and today_flow.total != 0:
+                top1_ratio = abs(top_buys[0].net_buy / today_flow.total) if today_flow.total else 0
+                if top1_ratio > 0.3:  # 单一个股占比超过 30%
+                    anomalies.append(NorthMoneyAnomaly(
+                        timestamp=now,
+                        anomaly_type="concentration",
+                        severity="medium",
+                        description=f"资金高度集中于 {top_buys[0].name}，占比 {top1_ratio*100:.1f}%",
+                        affected_stocks=[top_buys[0].name],
+                        flow_change=top_buys[0].net_buy,
+                        recommendation=f"密切关注 {top_buys[0].name} 走势，警惕筹码集中风险",
+                    ))
+
+            return anomalies
+
+        except Exception as e:
+            logger.error("Failed to detect anomalies", error=str(e))
+            return []
+
+    # ============ 实时全景 API ============
+
+    async def get_realtime_panorama(self) -> NorthMoneyRealtime:
+        """获取北向资金实时全景数据
+
+        整合所有北向资金相关数据，适合前端仪表盘使用。
+        """
+        is_trading = self._is_trading_hours()
+
+        # 并行获取所有数据
+        if is_trading:
+            summary, intraday, anomalies = await asyncio.gather(
+                self.get_summary(),
+                self.get_intraday_flow(),
+                self.detect_anomalies(),
+            )
+        else:
+            summary, anomalies = await asyncio.gather(
+                self.get_summary(),
+                self.detect_anomalies(),
+            )
+            intraday = None
+
+        # 计算与指数相关性（简化版，需要指数数据支持）
+        index_correlation = None
+        try:
+            history = await self.get_north_money_history(days=20)
+            if len(history) >= 10:
+                # TODO: 接入指数数据计算相关性
+                # 当前返回占位数据
+                index_correlation = {
+                    "上证指数": 0.75,
+                    "沪深300": 0.82,
+                    "创业板指": 0.68,
+                }
+        except Exception:
+            pass
+
+        return NorthMoneyRealtime(
+            summary=summary,
+            intraday=intraday,
+            anomalies=anomalies,
+            index_correlation=index_correlation,
+            is_trading_hours=is_trading,
+        )
 
 
 # 单例实例

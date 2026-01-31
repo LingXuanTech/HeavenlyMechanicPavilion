@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { logger } from '../utils/logger';
 import {
   X,
   TrendingUp,
@@ -86,7 +87,7 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
       const result = await portfolioMutation.mutateAsync(symbols);
       setAnalysis(result);
     } catch (error) {
-      console.error('Portfolio analysis failed', error);
+      logger.error('Portfolio analysis failed', error);
     }
   };
 

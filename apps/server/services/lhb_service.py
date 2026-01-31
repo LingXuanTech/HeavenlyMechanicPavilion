@@ -15,6 +15,8 @@ import akshare as ak
 import pandas as pd
 import asyncio
 
+from utils import TTLCache
+
 logger = structlog.get_logger(__name__)
 
 
@@ -98,7 +100,7 @@ class HotMoneyProfile(BaseModel):
 
 class HotMoneyMovementSignal(BaseModel):
     """游资动向信号"""
-    date: date = Field(description="信号日期")
+    signal_date: date = Field(description="信号日期")
     signal_type: str = Field(description="信号类型: consensus_buy/consensus_sell/divergence/new_entry")
     signal_strength: int = Field(description="信号强度 0-100")
     involved_seats: List[str] = Field(description="涉及的游资席位")
@@ -108,7 +110,7 @@ class HotMoneyMovementSignal(BaseModel):
 
 class LHBSummary(BaseModel):
     """龙虎榜概览"""
-    date: date
+    data_date: date
     total_stocks: int = Field(description="上榜股票数")
     total_net_buy: float = Field(description="全市场龙虎榜净买入（亿元）")
     institution_net_buy: float = Field(description="机构净买入（亿元）")
@@ -255,24 +257,7 @@ class LHBService:
     """龙虎榜解析服务"""
 
     def __init__(self):
-        self._cache: Dict[str, Any] = {}
-        self._cache_time: Dict[str, datetime] = {}
-        self._cache_ttl = 600  # 10 分钟缓存
-
-    def _is_cache_valid(self, key: str) -> bool:
-        if key not in self._cache_time:
-            return False
-        elapsed = (datetime.now() - self._cache_time[key]).total_seconds()
-        return elapsed < self._cache_ttl
-
-    def _set_cache(self, key: str, value: Any):
-        self._cache[key] = value
-        self._cache_time[key] = datetime.now()
-
-    def _get_cache(self, key: str) -> Optional[Any]:
-        if self._is_cache_valid(key):
-            return self._cache.get(key)
-        return None
+        self._cache = TTLCache(default_ttl=600)  # 10 分钟缓存
 
     def _identify_seat_type(self, seat_name: str) -> tuple:
         """识别席位类型和游资信息
@@ -308,7 +293,7 @@ class LHBService:
             trade_date: 交易日期，格式 YYYYMMDD，默认最近交易日
         """
         cache_key = f"daily_lhb_{trade_date or 'latest'}"
-        cached = self._get_cache(cache_key)
+        cached = self._cache.get(cache_key)
         if cached:
             return cached
 
@@ -385,7 +370,7 @@ class LHBService:
             # 按净买入排序
             result.sort(key=lambda x: x.lhb_net_buy, reverse=True)
 
-            self._set_cache(cache_key, result)
+            self._cache.set(cache_key, result)
             logger.info("Fetched daily LHB", count=len(result), date=trade_date)
             return result
 
@@ -396,7 +381,7 @@ class LHBService:
     async def get_stock_lhb_history(self, symbol: str, days: int = 30) -> List[LHBRecord]:
         """获取个股龙虎榜历史"""
         cache_key = f"stock_lhb_{symbol}_{days}"
-        cached = self._get_cache(cache_key)
+        cached = self._cache.get(cache_key)
         if cached:
             return cached
 
@@ -421,7 +406,7 @@ class LHBService:
                 except Exception:
                     continue
 
-            self._set_cache(cache_key, result)
+            self._cache.set(cache_key, result)
             return result
 
         except Exception as e:
@@ -431,7 +416,7 @@ class LHBService:
     async def get_hot_money_activity(self, days: int = 5) -> List[HotMoneySeat]:
         """获取知名游资近期活动"""
         cache_key = f"hot_money_{days}"
-        cached = self._get_cache(cache_key)
+        cached = self._cache.get(cache_key)
         if cached:
             return cached
 
@@ -474,7 +459,7 @@ class LHBService:
                     win_rate=None,  # 需要历史数据计算
                 ))
 
-            self._set_cache(cache_key, result)
+            self._cache.set(cache_key, result)
             return result
 
         except Exception as e:
@@ -496,7 +481,7 @@ class LHBService:
         top_sells = sorted(daily_lhb, key=lambda x: x.lhb_net_buy)[:10]
 
         return LHBSummary(
-            date=datetime.now().date(),
+            data_date=datetime.now().date(),
             total_stocks=len(daily_lhb),
             total_net_buy=total_net,
             institution_net_buy=inst_net,
@@ -517,7 +502,7 @@ class LHBService:
             游资完整画像，包含历史统计和操作特征
         """
         cache_key = f"hot_money_profile_{alias}"
-        cached = self._get_cache(cache_key)
+        cached = self._cache.get(cache_key)
         if cached:
             return cached
 
@@ -581,7 +566,7 @@ class LHBService:
                 success_stocks=[],
             )
 
-            self._set_cache(cache_key, profile)
+            self._cache.set(cache_key, profile)
             return profile
 
         except Exception as e:
@@ -598,7 +583,7 @@ class LHBService:
             游资画像列表
         """
         cache_key = f"all_hot_money_profiles_{tier or 'all'}"
-        cached = self._get_cache(cache_key)
+        cached = self._cache.get(cache_key)
         if cached:
             return cached
 
@@ -621,7 +606,7 @@ class LHBService:
             tier_order = {"一线": 0, "二线": 1, "新锐": 2, "未知": 3}
             result.sort(key=lambda x: (tier_order.get(x.tier, 99), -x.total_appearances))
 
-            self._set_cache(cache_key, result)
+            self._cache.set(cache_key, result)
             return result
 
         except Exception as e:
@@ -745,7 +730,7 @@ class LHBService:
                 interpretation = "今日无知名游资活动记录。"
 
             return HotMoneyMovementSignal(
-                date=datetime.now().date(),
+                signal_date=datetime.now().date(),
                 signal_type=signal_type,
                 signal_strength=signal_strength,
                 involved_seats=list(involved_seats)[:10],
@@ -756,7 +741,7 @@ class LHBService:
         except Exception as e:
             logger.error("Failed to get hot money movement signal", error=str(e))
             return HotMoneyMovementSignal(
-                date=datetime.now().date(),
+                signal_date=datetime.now().date(),
                 signal_type="error",
                 signal_strength=0,
                 involved_seats=[],

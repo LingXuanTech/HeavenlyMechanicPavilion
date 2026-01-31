@@ -27,9 +27,9 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // 全局默认配置
-      staleTime: 60 * 1000, // 1分钟内认为数据新鲜
-      gcTime: 10 * 60 * 1000, // 10分钟后清理未使用的缓存
+      // 全局默认配置 - 优化后的缓存策略
+      staleTime: 5 * 60 * 1000, // 5分钟内认为数据新鲜（减少不必要的重复请求）
+      gcTime: 30 * 60 * 1000, // 30分钟后清理未使用的缓存
       retry: 2, // 失败后重试2次
       refetchOnWindowFocus: false, // 窗口聚焦时不自动刷新
     },

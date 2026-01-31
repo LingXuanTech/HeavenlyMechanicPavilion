@@ -1,10 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, Path
+from fastapi import APIRouter, Depends, Path
 from sqlmodel import Session, select
 from typing import List
 import re
 from db.models import Watchlist, get_session
-from services.data_router import MarketRouter, DataSourceError
-from api.exceptions import ResourceNotFoundError
+from services.data_router import MarketRouter
+from api.exceptions import (
+    ValidationError,
+    InvalidSymbolError,
+    ResourceNotFoundError,
+    DataSourceError as AppDataSourceError,
+)
 import structlog
 
 router = APIRouter(prefix="/watchlist", tags=["Watchlist"])
@@ -34,28 +39,18 @@ def validate_symbol(symbol: str) -> str:
         Normalized uppercase symbol
 
     Raises:
-        HTTPException: If symbol format is invalid
+        ValidationError / InvalidSymbolError: If symbol format is invalid
     """
     symbol = symbol.strip().upper()
 
     if not symbol:
-        raise HTTPException(
-            status_code=400,
-            detail="Symbol cannot be empty"
-        )
+        raise ValidationError("Symbol cannot be empty", field="symbol")
 
     if len(symbol) > 12:
-        raise HTTPException(
-            status_code=400,
-            detail="Symbol too long (max 12 characters)"
-        )
+        raise ValidationError("Symbol too long (max 12 characters)", field="symbol")
 
     if not SYMBOL_PATTERN.match(symbol):
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid symbol format: {symbol}. Expected formats: "
-                   f"US (e.g., AAPL), A-share (e.g., 600519.SH), HK (e.g., 00700.HK)"
-        )
+        raise InvalidSymbolError(symbol)
 
     return symbol
 
@@ -91,10 +86,8 @@ async def add_to_watchlist(
         try:
             fund = await MarketRouter.get_fundamentals(symbol)
             name = fund.name
-        except DataSourceError as e:
-            logger.debug("Could not fetch fundamentals, using symbol as name", symbol=symbol, error=str(e))
         except Exception as e:
-            logger.debug("Unexpected error fetching fundamentals", symbol=symbol, error=str(e))
+            logger.debug("Could not fetch fundamentals, using symbol as name", symbol=symbol, error=str(e))
 
         new_item = Watchlist(symbol=symbol, name=name, market=market)
         session.add(new_item)
@@ -103,12 +96,11 @@ async def add_to_watchlist(
 
         logger.info("Added symbol to watchlist", symbol=symbol, name=name, market=market)
         return new_item
-    except DataSourceError as e:
-        logger.error("Data source error adding to watchlist", symbol=symbol, source=e.source, error=str(e))
-        raise HTTPException(status_code=502, detail=f"Data source error: {str(e)}")
+    except AppDataSourceError:
+        raise  # 已是 AppException 子类，交给全局 handler
     except Exception as e:
         logger.error("Failed to add to watchlist", symbol=symbol, error=str(e))
-        raise HTTPException(status_code=400, detail=f"Could not add symbol: {str(e)}")
+        raise AppDataSourceError("watchlist", f"Could not add symbol {symbol}: {str(e)}")
 
 @router.delete("/{symbol}")
 async def remove_from_watchlist(
@@ -121,7 +113,7 @@ async def remove_from_watchlist(
     statement = select(Watchlist).where(Watchlist.symbol == symbol)
     item = session.exec(statement).first()
     if not item:
-        raise HTTPException(status_code=404, detail="Symbol not found in watchlist")
+        raise ResourceNotFoundError("Watchlist", symbol)
 
     session.delete(item)
     session.commit()

@@ -4,7 +4,7 @@
 """
 
 from fastapi import APIRouter, HTTPException, Query
-from typing import Optional
+from typing import Optional, List
 import structlog
 
 from services.north_money_service import (
@@ -16,6 +16,9 @@ from services.north_money_service import (
     NorthMoneyTopStock,
     NorthMoneySectorFlow,
     SectorRotationSignal,
+    IntradayFlowSummary,
+    NorthMoneyAnomaly,
+    NorthMoneyRealtime,
 )
 
 logger = structlog.get_logger(__name__)
@@ -165,4 +168,73 @@ async def get_rotation_signal():
         return await north_money_service.get_sector_rotation_signal()
     except Exception as e:
         logger.error("Failed to get rotation signal", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============ 实时增强接口 ============
+
+@router.get("/intraday", response_model=IntradayFlowSummary)
+async def get_intraday_flow():
+    """
+    获取盘中分时北向资金流向
+
+    返回：
+    - 当前累计净流入
+    - 分时数据点列表（分钟级）
+    - 盘中峰值净流入/流出
+    - 流向波动率
+    - 动量方向（accelerating/decelerating/stable）
+
+    注意：仅在交易时段（9:30-11:30, 13:00-15:00）返回分时数据
+    """
+    try:
+        return await north_money_service.get_intraday_flow()
+    except Exception as e:
+        logger.error("Failed to get intraday flow", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/anomalies", response_model=List[NorthMoneyAnomaly])
+async def get_anomalies():
+    """
+    检测北向资金异常流动
+
+    检测规则：
+    - 突然大额流入/流出（单日超过 100 亿）
+    - 流向反转（连续多日后方向突变）
+    - 盘中剧烈波动（波动率超阈值）
+    - 个股异常集中（单一股票占比过高）
+
+    返回异常列表，每条包含：
+    - 异常类型和严重程度
+    - 描述和受影响个股
+    - 操作建议
+    """
+    try:
+        return await north_money_service.detect_anomalies()
+    except Exception as e:
+        logger.error("Failed to detect anomalies", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/realtime", response_model=NorthMoneyRealtime)
+async def get_realtime_panorama():
+    """
+    获取北向资金实时全景数据
+
+    整合所有北向资金相关数据，适合前端仪表盘使用。
+
+    包含：
+    - 基础概览（summary）
+    - 盘中实时（intraday，仅交易时段）
+    - 异常信号（anomalies）
+    - 与主要指数相关性（index_correlation）
+    - 是否交易时段标识
+
+    建议前端轮询间隔：交易时段 1 分钟，非交易时段 5 分钟
+    """
+    try:
+        return await north_money_service.get_realtime_panorama()
+    except Exception as e:
+        logger.error("Failed to get realtime panorama", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))

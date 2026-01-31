@@ -8,6 +8,7 @@ from functools import lru_cache
 import asyncio
 
 from config.settings import settings
+from utils import TTLCache
 
 logger = structlog.get_logger()
 
@@ -57,9 +58,8 @@ class MacroAnalysisResult(BaseModel):
     opportunities: List[str]
 
 
-# 内存缓存
-_macro_cache: Dict[str, tuple] = {}  # {key: (data, timestamp)}
-_CACHE_TTL = 3600  # 1小时缓存
+# 模块级缓存实例
+_macro_cache = TTLCache(default_ttl=3600)  # 1小时缓存
 
 
 class MacroDataService:
@@ -81,20 +81,6 @@ class MacroDataService:
         "treasury_10y": "DGS10",  # 10年期国债收益率
         "pmi": "MANEMP",  # 制造业就业 (PMI proxy)
     }
-
-    @staticmethod
-    def _get_cache(key: str) -> Optional[Any]:
-        """获取缓存"""
-        if key in _macro_cache:
-            data, ts = _macro_cache[key]
-            if (datetime.now() - ts).total_seconds() < _CACHE_TTL:
-                return data
-        return None
-
-    @staticmethod
-    def _set_cache(key: str, data: Any):
-        """设置缓存"""
-        _macro_cache[key] = (data, datetime.now())
 
     @classmethod
     async def _fetch_fred_data(cls, series_id: str) -> Optional[Dict]:
@@ -195,7 +181,7 @@ class MacroDataService:
         """获取宏观经济概览"""
 
         # 检查缓存
-        cached = cls._get_cache("macro_overview")
+        cached = _macro_cache.get("macro_overview")
         if cached:
             logger.debug("Using cached macro overview")
             return cached
@@ -232,7 +218,7 @@ class MacroDataService:
         overview.summary = cls._generate_summary(overview)
 
         # 缓存结果
-        cls._set_cache("macro_overview", overview)
+        _macro_cache.set("macro_overview", overview)
 
         return overview
 

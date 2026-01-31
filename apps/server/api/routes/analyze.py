@@ -198,8 +198,22 @@ async def run_analysis_task(
                 # 收集 Planner 决策信息（如有）
                 if "recommended_analysts" in node_data:
                     planner_decision = f"Planner 推荐使用: {', '.join(node_data['recommended_analysts'])}"
+                    # 尝试解析 scout_report 获取完整决策详情
+                    if "scout_report" in node_data:
+                        try:
+                            scout_data = json.loads(node_data["scout_report"])
+                            planner_reasoning = scout_data.get("reasoning")
+                            planner_skip_reasons = scout_data.get("skip_reasons", {})
+                            planner_historical_insight = scout_data.get("historical_insight")
+                        except (json.JSONDecodeError, TypeError):
+                            planner_reasoning = None
+                            planner_skip_reasons = {}
+                            planner_historical_insight = None
                 elif "planner_decision" not in locals():
                     planner_decision = None
+                    planner_reasoning = None
+                    planner_skip_reasons = {}
+                    planner_historical_insight = None
 
         # 计算耗时
         elapsed_seconds = round(time.time() - start_time, 2)
@@ -215,6 +229,9 @@ async def run_analysis_task(
             elapsed_seconds=elapsed_seconds,
             analysts_used=selected_analysts,
             planner_decision=planner_decision if 'planner_decision' in locals() else None,
+            planner_reasoning=planner_reasoning if 'planner_reasoning' in locals() else None,
+            planner_skip_reasons=planner_skip_reasons if 'planner_skip_reasons' in locals() else {},
+            planner_historical_insight=planner_historical_insight if 'planner_historical_insight' in locals() else None,
             data_quality_issues=None,  # 未来可集成 DataValidator
             historical_cases_count=historical_cases_count,
             market=market,
@@ -522,6 +539,29 @@ async def get_analysis_history(
         "total": total,
         "offset": offset,
         "limit": limit,
+    }
+
+
+@router.get("/detail/{analysis_id}")
+async def get_analysis_detail(analysis_id: int, session: Session = Depends(get_session)):
+    """获取指定 ID 的完整分析报告（用于历史对比）"""
+    statement = select(AnalysisResult).where(AnalysisResult.id == analysis_id)
+    result = session.exec(statement).first()
+
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Analysis not found: {analysis_id}")
+
+    return {
+        "id": result.id,
+        "symbol": result.symbol,
+        "date": result.date,
+        "signal": result.signal,
+        "confidence": result.confidence,
+        "full_report": json.loads(result.full_report_json) if result.full_report_json else {},
+        "anchor_script": result.anchor_script,
+        "created_at": result.created_at.isoformat(),
+        "task_id": result.task_id,
+        "elapsed_seconds": result.elapsed_seconds,
     }
 
 

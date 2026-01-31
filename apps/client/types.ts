@@ -516,6 +516,68 @@ export interface NorthMoneySummary {
   top_sells: NorthMoneyTopStock[];
 }
 
+/** 盘中分时流向数据点 */
+export interface IntradayFlowPoint {
+  time: string;                // 时间 (HH:MM)
+  sh_connect: number;          // 沪股通净流入（亿元）
+  sz_connect: number;          // 深股通净流入（亿元）
+  total: number;               // 北向资金净流入合计（亿元）
+  cumulative_total: number;    // 累计净流入（亿元）
+}
+
+/** 盘中实时流向汇总 */
+export interface IntradayFlowSummary {
+  date: string;
+  last_update: string;         // 最后更新时间
+  current_total: number;       // 当前累计净流入（亿元）
+  flow_points: IntradayFlowPoint[];
+  peak_inflow: number;         // 盘中峰值净流入
+  peak_outflow: number;        // 盘中峰值净流出
+  flow_volatility: number;     // 流向波动率
+  momentum: 'accelerating' | 'decelerating' | 'stable';
+}
+
+/** 北向资金异常信号 */
+export interface NorthMoneyAnomaly {
+  timestamp: string;
+  anomaly_type: 'sudden_inflow' | 'sudden_outflow' | 'reversal' | 'volume_spike' | 'concentration';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  affected_stocks: string[];
+  flow_change: number;         // 流向变化（亿元）
+  recommendation: string;      // 操作建议
+}
+
+/** 北向资金实时全景 */
+export interface NorthMoneyRealtime {
+  summary: NorthMoneySummary;
+  intraday: IntradayFlowSummary | null;
+  anomalies: NorthMoneyAnomaly[];
+  index_correlation: Record<string, number> | null;
+  is_trading_hours: boolean;
+}
+
+/** 北向资金板块流向 */
+export interface NorthMoneySectorFlow {
+  sector: string;              // 板块名称
+  sector_code: string;         // 板块代码
+  net_buy: number;             // 净买入金额（亿元）
+  stock_count: number;         // 涉及股票数量
+  top_stocks: string[];        // TOP 净买入个股
+  flow_direction: 'inflow' | 'outflow' | 'neutral';
+  change_ratio: number;        // 较昨日变化比例（%）
+}
+
+/** 板块轮动信号 */
+export interface SectorRotationSignal {
+  date: string;
+  inflow_sectors: string[];    // 资金流入板块
+  outflow_sectors: string[];   // 资金流出板块
+  rotation_pattern: 'defensive' | 'aggressive' | 'mixed' | 'broad_inflow' | 'broad_outflow' | 'unclear';
+  signal_strength: number;     // 信号强度 0-100
+  interpretation: string;      // 信号解读
+}
+
 // ============ 龙虎榜类型 (A股特有) ============
 
 /** 龙虎榜席位 */
@@ -643,4 +705,98 @@ export interface PromptServiceStatus {
   prompts_count: number;
   cached_agents: string[];
   last_refresh: string | null;
+}
+
+// ============ 分析历史类型 ============
+
+/** 分析历史列表项 */
+export interface AnalysisHistoryItem {
+  id: number;
+  symbol: string;
+  date: string;
+  signal: string;
+  confidence: number;
+  created_at: string;
+  task_id: string | null;
+  status: string;
+  elapsed_seconds: number | null;
+}
+
+/** 分析任务状态 */
+export interface AnalysisTaskStatus {
+  task_id: string;
+  symbol: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  progress?: number;
+  current_stage?: string;
+  error_message?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ============ Portfolio 类型 ============
+
+/** 相关性矩阵 */
+export interface CorrelationMatrix {
+  symbols: string[];
+  matrix: number[][];
+  period: string;
+  calculated_at: string;
+}
+
+/** 风险聚类 */
+export interface RiskCluster {
+  cluster_id: number;
+  symbols: string[];
+  avg_correlation: number;
+  risk_level: 'low' | 'medium' | 'high';
+}
+
+/** Portfolio 分析结果 */
+export interface PortfolioAnalysisResult {
+  symbols: string[];
+  correlation: CorrelationMatrix;
+  risk_clusters: RiskCluster[];
+  diversification_score: number;
+  recommendations: string[];
+  analyzed_at: string;
+}
+
+/** 快速检查结果 */
+export interface QuickPortfolioCheck {
+  symbols: string[];
+  high_correlations: Array<{
+    pair: [string, string];
+    correlation: number;
+  }>;
+  risk_warning: boolean;
+  message: string;
+}
+
+// ============ 宏观经济类型 ============
+
+/** 宏观概览 */
+export interface MacroOverview {
+  indicators: Record<string, {
+    value: number;
+    change: number;
+    trend: 'up' | 'down' | 'stable';
+    updated_at: string;
+  }>;
+  market_environment: 'favorable' | 'neutral' | 'unfavorable';
+  summary: string;
+  updated_at: string;
+}
+
+/** 宏观影响分析 */
+export interface MacroImpactAnalysis {
+  market: string;
+  impacts: Array<{
+    factor: string;
+    impact: 'positive' | 'negative' | 'neutral';
+    magnitude: 'high' | 'medium' | 'low';
+    description: string;
+  }>;
+  overall_outlook: string;
+  analyzed_at: string;
 }

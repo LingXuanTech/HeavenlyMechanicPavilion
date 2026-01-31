@@ -126,7 +126,7 @@ class TestAddToWatchlist:
 
     def test_add_stock_fundamentals_unavailable(self, client):
         """基本面数据不可用时仍能添加（使用 symbol 作为名称）"""
-        from services.data_router import DataSourceError
+        from api.exceptions import DataSourceError
 
         with patch("api.routes.watchlist.MarketRouter.get_stock_price") as mock_price:
             with patch("api.routes.watchlist.MarketRouter.get_fundamentals") as mock_fund:

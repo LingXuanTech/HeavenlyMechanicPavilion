@@ -21,6 +21,7 @@ except ImportError:
     yf = None
 
 from config.settings import settings
+from utils import TTLCache
 
 logger = structlog.get_logger()
 
@@ -97,9 +98,7 @@ class MarketWatcherService:
     """
 
     _instance = None
-    _cache: Dict[str, MarketIndex] = {}
-    _cache_time: Optional[datetime] = None
-    _cache_ttl = timedelta(minutes=1)  # 缓存 1 分钟
+    _cache = TTLCache(default_ttl=60)  # 1 分钟缓存
 
     def __new__(cls):
         if cls._instance is None:
@@ -111,12 +110,6 @@ class MarketWatcherService:
         if not self._initialized:
             self._initialized = True
             logger.info("MarketWatcherService initialized")
-
-    def _is_cache_valid(self) -> bool:
-        """检查缓存是否有效"""
-        if not self._cache_time or not self._cache:
-            return False
-        return datetime.now() - self._cache_time < self._cache_ttl
 
     async def _fetch_cn_indices(self) -> List[MarketIndex]:
         """获取 A 股指数（使用 akshare）"""
@@ -234,8 +227,9 @@ class MarketWatcherService:
         Returns:
             市场指数列表
         """
-        if not force_refresh and self._is_cache_valid():
-            return list(self._cache.values())
+        cached_dict = self._cache.get("indices")
+        if not force_refresh and cached_dict:
+            return list(cached_dict.values())
 
         # 并行获取各市场数据
         cn_task = asyncio.create_task(self._fetch_cn_indices())
@@ -246,18 +240,20 @@ class MarketWatcherService:
         all_indices = cn_indices + global_indices
 
         # 更新缓存
-        self._cache = {idx.code: idx for idx in all_indices}
-        self._cache_time = datetime.now()
+        indices_dict = {idx.code: idx for idx in all_indices}
+        self._cache.set("indices", indices_dict)
 
         logger.info("Market indices refreshed", count=len(all_indices))
         return all_indices
 
     async def get_index(self, code: str) -> Optional[MarketIndex]:
         """获取单个指数"""
-        if not self._is_cache_valid():
+        cached_dict = self._cache.get("indices")
+        if not cached_dict:
             await self.get_all_indices()
+            cached_dict = self._cache.get("indices") or {}
 
-        return self._cache.get(code)
+        return cached_dict.get(code)
 
     async def get_indices_by_region(self, region: MarketRegion) -> List[MarketIndex]:
         """按区域获取指数"""
@@ -329,13 +325,13 @@ class MarketWatcherService:
 
     def get_stats(self) -> Dict[str, Any]:
         """获取服务统计"""
+        cached_dict = self._cache.get("indices") or {}
         return {
             "status": "available",
             "akshare_available": AKSHARE_AVAILABLE,
             "yfinance_available": YFINANCE_AVAILABLE,
-            "cached_indices": len(self._cache),
-            "cache_valid": self._is_cache_valid(),
-            "last_update": self._cache_time.isoformat() if self._cache_time else None
+            "cached_indices": len(cached_dict),
+            "cache_valid": self._cache.is_valid("indices"),
         }
 
 

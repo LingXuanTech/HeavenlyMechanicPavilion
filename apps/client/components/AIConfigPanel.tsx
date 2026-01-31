@@ -9,6 +9,7 @@
  */
 
 import { useState } from 'react';
+import { logger } from '../utils/logger';
 import {
   X,
   Plus,
@@ -161,7 +162,7 @@ export function AIConfigPanel({ onClose }: AIConfigPanelProps) {
       }
       handleCancelEdit();
     } catch (error) {
-      console.error('Failed to save provider:', error);
+      logger.error('Failed to save provider:', error);
     }
   };
 
@@ -170,7 +171,7 @@ export function AIConfigPanel({ onClose }: AIConfigPanelProps) {
     try {
       await deleteProvider.mutateAsync(providerId);
     } catch (error) {
-      console.error('Failed to delete provider:', error);
+      logger.error('Failed to delete provider:', error);
     }
   };
 
@@ -203,7 +204,7 @@ export function AIConfigPanel({ onClose }: AIConfigPanelProps) {
     try {
       await updateModelConfig.mutateAsync({ configKey, providerId, modelName });
     } catch (error) {
-      console.error('Failed to update model config:', error);
+      logger.error('Failed to update model config:', error);
     }
   };
 
@@ -211,7 +212,7 @@ export function AIConfigPanel({ onClose }: AIConfigPanelProps) {
     try {
       await refreshConfig.mutateAsync();
     } catch (error) {
-      console.error('Failed to refresh config:', error);
+      logger.error('Failed to refresh config:', error);
     }
   };
 

@@ -20,7 +20,8 @@ export function useStockPrice(symbol: string) {
       };
     },
     staleTime: 30 * 1000, // 30秒
-    refetchInterval: 30 * 1000, // 每30秒自动刷新
+    // 禁用自动轮询，改为用户手动刷新（减少 API 调用）
+    // refetchInterval: 30 * 1000,
     enabled: !!symbol,
   });
 }
@@ -65,7 +66,8 @@ export function useStockPrices(stocks: Stock[]) {
         };
       },
       staleTime: 30 * 1000,
-      refetchInterval: 30 * 1000,
+      // 禁用自动轮询，改为用户手动刷新（减少 API 调用）
+      // refetchInterval: 30 * 1000,
     })),
     combine: (results) => {
       const prices: Record<string, StockPrice> = {};

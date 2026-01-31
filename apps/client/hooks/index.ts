@@ -146,6 +146,11 @@ export {
   useNorthMoneyHolding,
   useNorthMoneyTopBuys,
   useNorthMoneyTopSells,
+  useNorthMoneyIntraday,
+  useNorthMoneyAnomalies,
+  useNorthMoneyRealtime,
+  useNorthMoneySectorFlow,
+  useNorthMoneyRotationSignal,
   NORTH_MONEY_KEY,
   // 龙虎榜
   useLHBDaily,
@@ -170,3 +175,31 @@ export {
 // 图表指标
 export { useChartIndicators } from './useChartIndicators';
 export type { default as UseChartIndicatorsOptions } from './useChartIndicators';
+
+// 历史分析对比
+export {
+  useAnalysisHistory,
+  useAnalysisDetail,
+  useAnalysisComparison,
+  ANALYSIS_HISTORY_KEY,
+  ANALYSIS_DETAIL_KEY,
+} from './useAnalysisHistory';
+export type { AnalysisHistoryItem, AnalysisDetail } from './useAnalysisHistory';
+
+// AI 配置
+export {
+  useAIProviders,
+  useAIProvider,
+  useCreateAIProvider,
+  useUpdateAIProvider,
+  useDeleteAIProvider,
+  useTestAIProvider,
+  useAIModelConfigs,
+  useUpdateAIModelConfig,
+  useRefreshAIConfig,
+  useAIConfigStatus,
+  getProviderTypeLabel,
+  getConfigKeyLabel,
+  getConfigKeyDescription,
+} from './useAIConfig';
+export type { AIProvider, AIProviderType, AIModelConfig, AIConfigStatus, TestProviderResult } from './useAIConfig';

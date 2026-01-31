@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { Stock, MarketOpportunity } from '../types';
+import { logger } from '../utils/logger';
 import {
   Plus,
   LayoutDashboard,
@@ -47,7 +48,7 @@ const Sidebar: React.FC = () => {
         setNewSymbol('');
         setIsAdding(false);
       } catch (error) {
-        console.error('Failed to add stock', error);
+        logger.error('Failed to add stock', error);
       }
     }
   };
@@ -61,7 +62,7 @@ const Sidebar: React.FC = () => {
     try {
       await addStockMutation.mutateAsync(stock.symbol);
     } catch (error) {
-      console.error('Failed to add stock', error);
+      logger.error('Failed to add stock', error);
     }
   };
 

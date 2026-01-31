@@ -3,6 +3,7 @@ import { useState, useCallback, useRef } from 'react';
 import * as api from '../services/api';
 import type { SSEConnectionState, SSEAnalysisController, AnalysisOptions } from '../services/api';
 import { AgentAnalysis } from '../types';
+import { logger } from '../utils/logger';
 
 export const ANALYSIS_KEY = (symbol: string) => ['analysis', symbol];
 export const LATEST_ANALYSIS_KEY = (symbol: string) => ['analysis', 'latest', symbol];
@@ -83,7 +84,7 @@ export function useStockAnalysis() {
     async (symbol: string, options: AnalysisOptions = {}): Promise<void> => {
       // 如果已在分析中，不重复触发
       if (analysisStates[symbol]?.isAnalyzing) {
-        console.warn(`Analysis already in progress for ${symbol}`);
+        logger.warn(`Analysis already in progress for ${symbol}`);
         return;
       }
 
@@ -147,7 +148,7 @@ export function useStockAnalysis() {
         // 保存控制器
         controllersRef.current[symbol] = controller;
       } catch (error) {
-        console.error(`Analysis failed for ${symbol}`, error);
+        logger.error(`Analysis failed for ${symbol}`, error);
         updateState(symbol, {
           isAnalyzing: false,
           connectionState: 'error',

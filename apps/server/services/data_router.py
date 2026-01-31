@@ -1,4 +1,5 @@
 import re
+import asyncio
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
@@ -10,13 +11,24 @@ import time
 import random
 from services.models import StockPrice, KlineData, CompanyFundamentals, NewsItem
 from config.settings import settings
+from api.exceptions import DataSourceError
 import structlog
 
 logger = structlog.get_logger()
 
 # 简单的内存缓存（生产环境可换成 Redis）
 _price_cache: Dict[str, tuple] = {}  # {symbol: (StockPrice, timestamp)}
-_CACHE_TTL_SECONDS = 60  # 缓存有效期 60 秒
+_history_cache: Dict[str, tuple] = {}  # {symbol: (List[KlineData], timestamp)}
+_fundamentals_cache: Dict[str, tuple] = {}  # {symbol: (CompanyFundamentals, timestamp)}
+
+# 分级缓存 TTL（秒）
+_CACHE_TTL_PRICE = 30          # 价格缓存 30 秒
+_CACHE_TTL_HISTORY = 5 * 60    # 历史数据缓存 5 分钟
+_CACHE_TTL_FUNDAMENTALS = 24 * 60 * 60  # 基本面缓存 1 天
+
+# 请求去重：正在进行中的请求 {key: asyncio.Future}
+_pending_requests: Dict[str, asyncio.Future] = {}
+_pending_lock = asyncio.Lock()
 
 # 复用的 HTTP 客户端（避免每次请求创建新连接）
 _http_client: Optional[httpx.AsyncClient] = None
@@ -43,11 +55,50 @@ async def close_http_client():
         _http_client = None
 
 
-class DataSourceError(Exception):
-    """数据源错误"""
-    def __init__(self, source: str, message: str):
-        self.source = source
-        super().__init__(f"[{source}] {message}")
+async def coalesce_request(key: str, fetch_func, *args, **kwargs):
+    """
+    请求去重：多个并发请求同一数据时，只执行一次实际请求
+
+    Args:
+        key: 请求唯一标识（如 "price:AAPL"）
+        fetch_func: 实际获取数据的协程函数
+        *args, **kwargs: 传递给 fetch_func 的参数
+
+    Returns:
+        获取的数据
+
+    Example:
+        # 多个并发调用只会触发一次实际请求
+        price = await coalesce_request(f"price:{symbol}", _fetch_price_impl, symbol)
+    """
+    global _pending_requests
+
+    async with _pending_lock:
+        # 检查是否有正在进行的相同请求
+        if key in _pending_requests:
+            future = _pending_requests[key]
+            logger.debug("Coalescing request, waiting for pending", key=key)
+        else:
+            # 创建新的 Future 并注册
+            future = asyncio.get_event_loop().create_future()
+            _pending_requests[key] = future
+
+            # 在后台执行实际请求
+            async def execute_and_resolve():
+                try:
+                    result = await fetch_func(*args, **kwargs)
+                    future.set_result(result)
+                except Exception as e:
+                    future.set_exception(e)
+                finally:
+                    # 清理 pending 请求
+                    async with _pending_lock:
+                        _pending_requests.pop(key, None)
+
+            asyncio.create_task(execute_and_resolve())
+
+    # 等待结果
+    return await future
 
 
 def _is_provider_available(provider: str) -> bool:
@@ -212,7 +263,7 @@ class MarketRouter:
         cached = _price_cache.get(symbol)
         if cached:
             price, timestamp = cached
-            if (datetime.now() - timestamp).total_seconds() < _CACHE_TTL_SECONDS:
+            if (datetime.now() - timestamp).total_seconds() < _CACHE_TTL_PRICE:
                 logger.debug("Using cached price", symbol=symbol)
                 return price
         return None
@@ -307,16 +358,32 @@ class MarketRouter:
     @classmethod
     async def get_stock_price(cls, symbol: str) -> StockPrice:
         """
-        获取股票价格（带降级和熔断机制）
+        获取股票价格（带请求去重、降级和熔断机制）
 
         优先级：
         - CN: akshare -> yfinance
         - HK/US: yfinance -> alpha_vantage
 
         特性：
+        - 请求去重：多个并发请求同一股票只发起一次实际请求
         - 熔断保护：连续失败 5 次后跳过该数据源 60 秒
         - 失败时尝试使用缓存数据
         """
+        # 1. 先检查缓存
+        cached = cls._get_cached_price(symbol)
+        if cached:
+            return cached
+
+        # 2. 使用请求去重获取数据
+        return await coalesce_request(
+            f"price:{symbol}",
+            cls._fetch_stock_price_impl,
+            symbol
+        )
+
+    @classmethod
+    async def _fetch_stock_price_impl(cls, symbol: str) -> StockPrice:
+        """实际获取股票价格的实现（内部方法）"""
         market = cls.get_market(symbol)
         providers = cls._get_providers_for_market(market)
 
@@ -463,10 +530,12 @@ class MarketRouter:
 
     @classmethod
     def clear_cache(cls):
-        """清除价格缓存"""
-        global _price_cache
+        """清除所有数据缓存"""
+        global _price_cache, _history_cache, _fundamentals_cache
         _price_cache.clear()
-        logger.info("Price cache cleared")
+        _history_cache.clear()
+        _fundamentals_cache.clear()
+        logger.info("All data caches cleared")
 
     @staticmethod
     def get_provider_status() -> Dict[str, Any]:

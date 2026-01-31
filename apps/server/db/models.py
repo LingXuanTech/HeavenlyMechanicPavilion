@@ -410,12 +410,16 @@ def get_engine():
             poolclass=StaticPool,
         )
     else:
-        # PostgreSQL 配置：启用连接池预检
+        # PostgreSQL 配置：增大连接池以支持更高并发
+        import os
+        cpu_count = os.cpu_count() or 4
+        pool_size = max(10, cpu_count * 2)  # 至少 10，推荐 2 倍 CPU 核数
         return create_engine(
             db_url,
             pool_pre_ping=True,
-            pool_size=5,
-            max_overflow=10,
+            pool_size=pool_size,
+            max_overflow=pool_size // 2,
+            pool_recycle=3600,  # 1 小时回收连接，避免连接泄漏
         )
 
 

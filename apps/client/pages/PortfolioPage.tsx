@@ -4,6 +4,7 @@
  * 展示投资组合相关性分析和分散化建议
  */
 import React, { useState, useMemo, useEffect } from 'react';
+import { logger } from '../utils/logger';
 import {
   TrendingUp,
   TrendingDown,
@@ -84,7 +85,7 @@ const PortfolioPage: React.FC = () => {
       const result = await portfolioMutation.mutateAsync(symbols);
       setAnalysis(result);
     } catch (error) {
-      console.error('Portfolio analysis failed', error);
+      logger.error('Portfolio analysis failed', error);
     }
   };
 

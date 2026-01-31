@@ -12,7 +12,8 @@ from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 import pandas as pd
 
-from services.data_router import MarketRouter, DataSourceError, _price_cache
+from services.data_router import MarketRouter, _price_cache
+from api.exceptions import DataSourceError
 
 
 class TestMarketIdentification:

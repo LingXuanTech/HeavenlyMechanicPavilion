@@ -39,7 +39,7 @@ class PolicyKeyword(BaseModel):
 class CentralBankStatement(BaseModel):
     """央行声明分析"""
     source: str = Field(description="来源: PBOC/FED/ECB/BOJ")
-    date: date = Field(description="发布日期")
+    publish_date: date = Field(description="发布日期")
     title: str = Field(description="标题")
     sentiment: PolicySentiment = Field(description="情绪分析")
     key_phrases: List[str] = Field(description="关键表述")
@@ -356,7 +356,7 @@ class CentralBankNLPService:
 
         return CentralBankStatement(
             source=source,
-            date=statement_date or datetime.now().date(),
+            publish_date=statement_date or datetime.now().date(),
             title=title or "央行政策声明",
             sentiment=sentiment,
             key_phrases=key_phrases,

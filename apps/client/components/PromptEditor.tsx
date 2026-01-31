@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../utils/logger';
 import {
   X,
   Save,
@@ -93,7 +94,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ onClose }) => {
     try {
       await reloadPromptsMutation.mutateAsync();
     } catch (err) {
-      console.error('Failed to reload prompts', err);
+      logger.error('Failed to reload prompts', err);
     }
   };
 

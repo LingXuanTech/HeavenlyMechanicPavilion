@@ -12,6 +12,11 @@ import {
   getNorthMoneyHolding,
   getNorthMoneyTopBuys,
   getNorthMoneyTopSells,
+  getNorthMoneyIntraday,
+  getNorthMoneyAnomalies,
+  getNorthMoneyRealtime,
+  getNorthMoneySectorFlow,
+  getNorthMoneyRotationSignal,
   getLHBDaily,
   getLHBSummary,
   getLHBHotMoneyActivity,
@@ -100,6 +105,61 @@ export function useNorthMoneyTopSells(limit: number = 20) {
     queryKey: [NORTH_MONEY_KEY, 'top-sells', limit],
     queryFn: () => getNorthMoneyTopSells(limit),
     staleTime: 60 * 1000,
+  });
+}
+
+/**
+ * 获取盘中分时北向资金流向
+ */
+export function useNorthMoneyIntraday() {
+  return useQuery({
+    queryKey: [NORTH_MONEY_KEY, 'intraday'],
+    queryFn: getNorthMoneyIntraday,
+    staleTime: 60 * 1000, // 1 分钟（盘中数据实时性要求高）
+  });
+}
+
+/**
+ * 获取北向资金异常信号
+ */
+export function useNorthMoneyAnomalies() {
+  return useQuery({
+    queryKey: [NORTH_MONEY_KEY, 'anomalies'],
+    queryFn: getNorthMoneyAnomalies,
+    staleTime: 60 * 1000,
+  });
+}
+
+/**
+ * 获取北向资金实时全景数据
+ */
+export function useNorthMoneyRealtime() {
+  return useQuery({
+    queryKey: [NORTH_MONEY_KEY, 'realtime'],
+    queryFn: getNorthMoneyRealtime,
+    staleTime: 60 * 1000, // 盘中 1 分钟刷新
+  });
+}
+
+/**
+ * 获取北向资金板块流向
+ */
+export function useNorthMoneySectorFlow() {
+  return useQuery({
+    queryKey: [NORTH_MONEY_KEY, 'sector-flow'],
+    queryFn: getNorthMoneySectorFlow,
+    staleTime: 5 * 60 * 1000, // 5 分钟
+  });
+}
+
+/**
+ * 获取板块轮动信号
+ */
+export function useNorthMoneyRotationSignal() {
+  return useQuery({
+    queryKey: [NORTH_MONEY_KEY, 'rotation-signal'],
+    queryFn: getNorthMoneyRotationSignal,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

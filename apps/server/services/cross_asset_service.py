@@ -40,7 +40,7 @@ class AssetCorrelation(BaseModel):
 
 class RiskAppetiteSignal(BaseModel):
     """风险偏好信号"""
-    date: date = Field(description="信号日期")
+    signal_date: date = Field(description="信号日期")
     regime: str = Field(description="市场模式: risk_on/risk_off/neutral")
     score: float = Field(description="风险偏好评分 -100(极度避险) 到 100(极度冒险)")
     confidence: float = Field(description="置信度 0-1")
@@ -332,7 +332,7 @@ class CrossAssetService:
             confidence = min(0.9, 0.5 + (dominant / total_signals) * 0.4)
 
         signal = RiskAppetiteSignal(
-            date=datetime.now().date(),
+            signal_date=datetime.now().date(),
             regime=regime,
             score=max(-100, min(100, score)),
             confidence=round(confidence, 2),
