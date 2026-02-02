@@ -117,12 +117,12 @@ class TestAddToWatchlist:
         assert data["id"] == existing.id
 
     def test_add_invalid_symbol(self, client):
-        """无效股票代码格式返回 400"""
+        """无效股票代码格式返回 422"""
         # 混合数字字母不匹配任何格式
         response = client.post("/api/watchlist/ABC123")
 
-        assert response.status_code == 400
-        assert "Invalid symbol format" in response.json()["detail"]
+        assert response.status_code == 422
+        assert "Invalid" in response.json()["error"]["message"]
 
     def test_add_stock_fundamentals_unavailable(self, client):
         """基本面数据不可用时仍能添加（使用 symbol 作为名称）"""
@@ -173,7 +173,7 @@ class TestRemoveFromWatchlist:
         response = client.delete("/api/watchlist/XXXXX")
 
         assert response.status_code == 404
-        assert "not found" in response.json()["detail"].lower()
+        assert "not found" in response.json()["error"]["message"].lower()
 
 
 class TestWatchlistEdgeCases:

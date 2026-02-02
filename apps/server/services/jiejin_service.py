@@ -105,7 +105,7 @@ class JiejinService:
                 return []
 
             result = []
-            today = date.today()
+            today = DateType.today()
             end_date = today + timedelta(days=days)
 
             for _, row in df.iterrows():
@@ -217,7 +217,7 @@ class JiejinService:
             if df.empty:
                 return None
 
-            today = date.today()
+            today = DateType.today()
             upcoming = []
             past = []
 
@@ -291,7 +291,7 @@ class JiejinService:
         # 按解禁市值排序高压力股票
         high_pressure.sort(key=lambda x: x.jiejin_market_value, reverse=True)
 
-        today = date.today()
+        today = DateType.today()
         end_date = today + timedelta(days=days)
 
         return JiejinSummary(
@@ -318,7 +318,7 @@ class JiejinService:
         if not plan or not plan.upcoming_jiejin:
             return None
 
-        today = date.today()
+        today = DateType.today()
         warning_date = today + timedelta(days=days)
 
         # 筛选预警时间窗口内的解禁

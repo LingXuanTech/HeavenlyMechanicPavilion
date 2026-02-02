@@ -1,7 +1,6 @@
 # Contributing Guide
 
-> 自动生成自 package.json / pyproject.toml / .env.example
-> 最后更新: 2026-01-28
+> 最后更新: 2026-02-02
 
 ## 目录
 
@@ -9,9 +8,11 @@
 2. [项目脚本参考](#项目脚本参考)
 3. [环境变量](#环境变量)
 4. [AI 配置系统](#ai-配置系统)
-5. [开发工作流](#开发工作流)
-6. [测试流程](#测试流程)
-7. [代码规范](#代码规范)
+5. [任务队列系统](#任务队列系统)
+6. [开发工作流](#开发工作流)
+7. [测试流程](#测试流程)
+8. [代码规范](#代码规范)
+9. [目录结构](#目录结构)
 
 ---
 
@@ -37,7 +38,7 @@ cd apps/server
 # 方式1: 使用 uv (推荐)
 uv venv
 source .venv/bin/activate
-uv pip install -r requirements.txt
+uv sync
 
 # 方式2: 使用 pip
 python -m venv .venv
@@ -72,9 +73,12 @@ uvicorn main:app --reload
 |------|------|
 | `python main.py` | 启动 FastAPI 服务 (端口 8000) |
 | `uvicorn main:app --reload` | 热重载开发模式 |
+| `python -m cli.main` | CLI 交互式分析 |
+| `python -m workers.analysis_worker --name worker-1` | 启动分析 Worker |
 | `pytest tests/` | 运行所有测试 |
 | `pytest tests/ -v --cov=.` | 运行测试并生成覆盖率报告 |
 | `ruff check .` | 运行代码风格检查 |
+| `ruff check . --fix` | 自动修复 lint 问题 |
 | `mypy api/ services/` | 运行类型检查 |
 
 ---
@@ -95,7 +99,7 @@ cp .env.example .env
 | `ANTHROPIC_API_KEY` | 可选 | Anthropic API 密钥 (Claude) |
 | `GOOGLE_API_KEY` | 可选 | Google AI API 密钥 (Gemini) |
 
-> 至少配置一个 LLM API 密钥
+> **注意**: 至少配置一个 LLM API 密钥
 
 ### 数据源 API Keys
 
@@ -116,6 +120,14 @@ cp .env.example .env
 | `POSTGRES_USER` | `postgres` | PostgreSQL 用户 |
 | `POSTGRES_PASSWORD` | - | PostgreSQL 密码 |
 | `POSTGRES_DB` | `trading` | PostgreSQL 数据库名 |
+| `CHROMA_DB_PATH` | `./db/chroma` | ChromaDB 向量数据库路径 |
+
+### 缓存与任务队列
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `REDIS_URL` | - | Redis 连接 URL (可选) |
+| `USE_TASK_QUEUE` | `false` | 启用 Redis Stream 任务队列 |
 
 ### 安全配置
 
@@ -125,6 +137,32 @@ cp .env.example .env
 | `API_KEY_ENABLED` | `false` | 是否启用 API Key 认证 |
 | `CORS_ORIGINS` | `http://localhost:3000` | 允许的跨域来源 (逗号分隔) |
 
+### JWT 认证
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `JWT_SECRET_KEY` | - | JWT 签名密钥 |
+| `JWT_ALGORITHM` | `HS256` | JWT 算法 |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | Access Token 过期时间 |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh Token 过期时间 |
+
+### OAuth 2.0
+
+| 变量 | 说明 |
+|------|------|
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth Client Secret |
+| `GITHUB_CLIENT_ID` | GitHub OAuth Client ID |
+| `GITHUB_CLIENT_SECRET` | GitHub OAuth Client Secret |
+
+### WebAuthn/Passkey
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `WEBAUTHN_RP_ID` | `localhost` | Relying Party ID |
+| `WEBAUTHN_RP_NAME` | `Stock Agents Monitor` | Relying Party 名称 |
+| `WEBAUTHN_ORIGIN` | `http://localhost:3000` | 允许的来源 |
+
 ### 调度器配置
 
 | 变量 | 默认值 | 说明 |
@@ -133,13 +171,23 @@ cp .env.example .env
 | `DAILY_ANALYSIS_HOUR` | `9` | 每日分析执行小时 |
 | `DAILY_ANALYSIS_MINUTE` | `30` | 每日分析执行分钟 |
 
-### 其他配置
+### Scout Agent 配置
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| `CHROMA_DB_PATH` | `./db/chroma` | ChromaDB 向量数据库路径 |
-| `PROMPTS_YAML_PATH` | `./config/prompts.yaml` | Prompt 配置文件路径 |
-| `REDIS_URL` | - | Redis 连接 URL (可选) |
+| `DUCKDUCKGO_ENABLED` | `true` | 启用 DuckDuckGo 搜索 |
+| `DUCKDUCKGO_TIMEOUT` | `10` | 搜索超时时间 (秒) |
+| `SCOUT_SEARCH_LIMIT` | `10` | 搜索结果数量限制 |
+| `SCOUT_ENABLE_VALIDATION` | `true` | 启用 Ticker 验证 |
+
+### LangSmith 追踪
+
+| 变量 | 默认值 | 说明 |
+|------|--------|------|
+| `LANGSMITH_ENABLED` | `false` | 启用 LangSmith 追踪 |
+| `LANGSMITH_API_KEY` | - | LangSmith API 密钥 |
+| `LANGSMITH_PROJECT` | `stock-agents` | LangSmith 项目名 |
+| `LANGSMITH_TRACE_SAMPLING_RATE` | `1.0` | 采样率 |
 
 ### AI 配置加密
 
@@ -198,6 +246,57 @@ cp .env.example .env
 - API 密钥使用 Fernet 对称加密存储
 - 前端显示脱敏密钥 (`sk-****...****`)
 - 更新时空密钥保持原值
+
+---
+
+## 任务队列系统
+
+### 概述
+
+系统支持两种任务处理模式：
+
+| 模式 | 技术 | 并发能力 | 适用场景 |
+|------|------|----------|----------|
+| **开发模式** | FastAPI BackgroundTasks | 单进程限制 (~4) | 本地开发 |
+| **生产模式** | Redis Stream + Worker | 水平无限扩展 | 生产部署 |
+
+### 启用任务队列
+
+```bash
+# 1. 启动 Redis
+docker-compose --profile cache up -d
+
+# 2. 配置环境变量
+USE_TASK_QUEUE=true
+REDIS_URL=redis://localhost:6379
+
+# 3. 启动 Worker 进程（可多实例）
+python -m workers.analysis_worker --name worker-1
+python -m workers.analysis_worker --name worker-2
+python -m workers.analysis_worker --name worker-3
+
+# 4. 启动 API 服务
+python main.py
+```
+
+### Worker 管理
+
+```bash
+# 查看运行中的 Worker
+ps aux | grep analysis_worker
+
+# 优雅停止 Worker (SIGTERM)
+kill -TERM <pid>
+
+# 强制停止 Worker (SIGINT)
+kill -INT <pid>
+```
+
+### 任务流程
+
+```
+API 请求 → 入队 Redis Stream → Worker 消费 → 执行分析 → SSE 推送结果
+```
 
 ---
 
@@ -262,10 +361,22 @@ pytest tests/ --cov=. --cov-report=html
 pytest tests/unit/ -v
 ```
 
-**当前测试统计:**
-- 单元测试: 29 个
-- 集成测试: 29 个
-- 总计: 58 个
+**测试目录结构:**
+```
+tests/
+├── unit/
+│   ├── test_data_router.py
+│   ├── test_market_analyst_router.py
+│   ├── test_memory_service.py
+│   └── test_resilience.py
+├── integration/
+│   ├── test_analyze_api.py
+│   └── test_watchlist_api.py
+├── fixtures/
+│   ├── sample_market_data.py
+│   └── mock_llm_responses.py
+└── conftest.py
+```
 
 ### 前端测试
 
@@ -274,9 +385,6 @@ cd apps/client
 
 # TypeScript 类型检查
 npx tsc --noEmit
-
-# ESLint 检查
-npm run lint
 ```
 
 ---
@@ -286,12 +394,14 @@ npm run lint
 ### Python (后端)
 
 - **代码格式**: Ruff (line-length: 120)
+- **Lint 规则**: E, F, W, I, N, UP, B, C4（忽略 E501）
 - **类型检查**: mypy
 - **测试框架**: pytest + pytest-asyncio
 
 运行检查:
 ```bash
 ruff check .
+ruff check . --fix  # 自动修复
 mypy api/ services/ config/ db/
 ```
 
@@ -311,23 +421,44 @@ npx tsc --noEmit
 ## 目录结构
 
 ```
-my-trading/
+HeavenlyMechanicPavilion/
 ├── apps/
-│   ├── client/          # React 19 + Vite 前端
-│   │   ├── components/  # UI 组件
-│   │   ├── hooks/       # TanStack Query Hooks
-│   │   ├── services/    # API 调用层
-│   │   └── types.ts     # TypeScript 类型
+│   ├── client/                 # React 19 + Vite 前端
+│   │   ├── components/         # UI 组件 (33 个)
+│   │   ├── hooks/              # TanStack Query Hooks (20 个)
+│   │   ├── pages/              # 页面组件 (12 个)
+│   │   ├── services/           # API 调用层
+│   │   └── types.ts            # TypeScript 类型 (801 行)
 │   │
-│   └── server/          # FastAPI 后端
-│       ├── api/routes/  # REST API 路由
-│       ├── services/    # 业务服务层
-│       ├── db/          # SQLModel ORM
-│       ├── config/      # 配置管理
-│       ├── tests/       # 测试用例
-│       └── tradingagents/  # Agent 框架
+│   └── server/                 # FastAPI 后端
+│       ├── api/
+│       │   ├── routes/         # REST API 路由 (31 个)
+│       │   ├── dependencies.py # 依赖注入
+│       │   ├── middleware.py   # 中间件
+│       │   └── sse.py          # SSE 封装
+│       ├── services/           # 业务服务层 (34 个)
+│       ├── workers/            # 后台 Worker
+│       │   └── analysis_worker.py
+│       ├── db/                 # SQLModel ORM
+│       ├── config/             # 配置管理
+│       │   ├── settings.py
+│       │   ├── oauth.py
+│       │   └── prompts.yaml
+│       ├── tests/              # 测试用例
+│       └── tradingagents/      # Agent 框架
+│           ├── agents/         # 18 个 Agent
+│           ├── graph/          # LangGraph 编排
+│           │   └── subgraphs/  # SubGraph 模块
+│           └── dataflows/      # 数据源适配器
 │
-├── docs/                # 项目文档
-├── plans/               # 开发计划
-└── .github/workflows/   # CI/CD 配置
+├── docs/                       # 项目文档
+│   ├── ARCH.md                 # 架构设计
+│   ├── PRD.md                  # 产品需求
+│   ├── CONTRIB.md              # 贡献指南（本文件）
+│   └── RUNBOOK.md              # 运维手册
+│
+├── plans/                      # 开发计划
+├── docker-compose.yml          # Docker 编排
+├── CLAUDE.md                   # AI 编码指引
+└── IMPLEMENTATION_SUMMARY.md   # 实施总结
 ```

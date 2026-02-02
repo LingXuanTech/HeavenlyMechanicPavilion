@@ -10,7 +10,7 @@
 
 from datetime import date
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Path, Query
 from pydantic import BaseModel, Field
 import structlog
 
@@ -202,7 +202,7 @@ async def get_high_sensitivity_sectors(
 
 @router.get("/sentiment/{sentiment}", response_model=List[str])
 async def get_sectors_by_sentiment(
-    sentiment: str = Query(..., description="政策情绪：strong_bullish/bullish/neutral/bearish/strong_bearish")
+    sentiment: str = Path(..., description="政策情绪：strong_bullish/bullish/neutral/bearish/strong_bearish")
 ):
     """按政策情绪筛选行业
 
