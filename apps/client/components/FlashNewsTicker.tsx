@@ -1,9 +1,9 @@
 import React from 'react';
-import { FlashNews } from '../types';
-import { Radio, AlertTriangle, Zap, TrendingUp, TrendingDown } from 'lucide-react';
+import type * as T from '../src/types/schema';
+import { Zap, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface FlashNewsTickerProps {
-  news: FlashNews[];
+  news: T.FlashNews[];
   isRefreshing: boolean;
 }
 

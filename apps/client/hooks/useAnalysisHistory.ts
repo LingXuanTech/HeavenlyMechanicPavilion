@@ -9,39 +9,14 @@
 import { useQuery, useQueries } from '@tanstack/react-query';
 import { useState, useCallback, useMemo } from 'react';
 import * as api from '../services/api';
-import type { AgentAnalysis } from '../types';
+import type * as T from '../src/types/schema';
+
+// 导出类型供组件使用
+export type AnalysisDetail = T.AnalysisDetailResponse;
 
 export const ANALYSIS_HISTORY_KEY = (symbol: string) => ['analysis', 'history', symbol];
 export const ANALYSIS_DETAIL_KEY = (id: number) => ['analysis', 'detail', id];
 
-/**
- * 历史分析记录（轻量级）
- */
-export interface AnalysisHistoryItem {
-  id: number;
-  date: string;
-  signal: string;
-  confidence: number;
-  status: string;
-  created_at: string;
-  task_id: string;
-}
-
-/**
- * 完整分析详情（含报告）
- */
-export interface AnalysisDetail {
-  id: number;
-  symbol: string;
-  date: string;
-  signal: string;
-  confidence: number;
-  full_report: AgentAnalysis;
-  anchor_script: string;
-  created_at: string;
-  task_id: string;
-  elapsed_seconds: number;
-}
 
 /**
  * 获取股票分析历史列表
@@ -50,9 +25,12 @@ export function useAnalysisHistory(symbol: string, limit: number = 10) {
   return useQuery({
     queryKey: ANALYSIS_HISTORY_KEY(symbol),
     queryFn: async () => {
-      const data = await api.getAnalysisHistory(symbol, limit);
+      const data = (await api.getAnalysisHistory(symbol, limit)) as {
+        items: T.AnalysisHistoryItem[];
+        total: number;
+      };
       return {
-        items: data.items as AnalysisHistoryItem[],
+        items: data.items,
         total: data.total,
       };
     },
@@ -69,7 +47,7 @@ export function useAnalysisDetail(analysisId: number | null) {
     queryKey: ANALYSIS_DETAIL_KEY(analysisId ?? 0),
     queryFn: async () => {
       if (!analysisId) return null;
-      return (await api.getAnalysisDetail(analysisId)) as AnalysisDetail;
+      return (await api.getAnalysisDetail(analysisId)) as T.AnalysisDetailResponse;
     },
     staleTime: Infinity, // 历史分析不会变
     enabled: !!analysisId,
@@ -92,7 +70,7 @@ export function useAnalysisComparison(symbol: string) {
   const detailQueries = useQueries({
     queries: selectedIds.map((id) => ({
       queryKey: ANALYSIS_DETAIL_KEY(id),
-      queryFn: () => api.getAnalysisDetail(id) as Promise<AnalysisDetail>,
+      queryFn: () => api.getAnalysisDetail(id) as Promise<T.AnalysisDetailResponse>,
       staleTime: Infinity,
       enabled: !!id,
     })),
@@ -121,7 +99,7 @@ export function useAnalysisComparison(symbol: string) {
   const loadedDetails = useMemo(() => {
     return detailQueries
       .filter((q) => q.isSuccess && q.data)
-      .map((q) => q.data as AnalysisDetail);
+      .map((q) => q.data as T.AnalysisDetailResponse);
   }, [detailQueries]);
 
   // 是否有报告在加载中

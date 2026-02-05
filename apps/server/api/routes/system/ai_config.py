@@ -7,47 +7,30 @@ AI 配置 API 路由
 - 连接测试
 - 配置刷新
 """
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import List, Optional, Any
+from fastapi import APIRouter, HTTPException, Query
+from typing import List, Optional, Any, Dict
 import structlog
 
 from services.ai_config_service import ai_config_service
+from api.schemas.ai_config import (
+    AIProvider,
+    AIModelConfig,
+    AIConfigStatus,
+    TestProviderResult,
+    ProviderListResponse,
+    ModelConfigListResponse,
+    ProviderCreateRequest,
+    ProviderUpdateRequest,
+    ModelConfigUpdateRequest
+)
 
 router = APIRouter(prefix="/ai", tags=["AI Configuration"])
 logger = structlog.get_logger()
 
 
-# ============ Pydantic 模型 ============
-
-class ProviderCreate(BaseModel):
-    name: str
-    provider_type: str  # "openai", "openai_compatible", "google", "anthropic", "deepseek"
-    base_url: Optional[str] = None
-    api_key: str = ""
-    models: List[str] = []
-    is_enabled: bool = True
-    priority: int = 99
-
-
-class ProviderUpdate(BaseModel):
-    name: Optional[str] = None
-    provider_type: Optional[str] = None
-    base_url: Optional[str] = None
-    api_key: Optional[str] = None
-    models: Optional[List[str]] = None
-    is_enabled: Optional[bool] = None
-    priority: Optional[int] = None
-
-
-class ModelConfigUpdate(BaseModel):
-    provider_id: int
-    model_name: str
-
-
 # ============ 提供商 API ============
 
-@router.get("/providers")
+@router.get("/providers", response_model=ProviderListResponse)
 async def list_providers():
     """列出所有 AI 提供商"""
     try:
@@ -58,7 +41,7 @@ async def list_providers():
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/providers/{provider_id}")
+@router.get("/providers/{provider_id}", response_model=AIProvider)
 async def get_provider(provider_id: int):
     """获取单个提供商详情"""
     provider = await ai_config_service.get_provider(provider_id)
@@ -68,7 +51,7 @@ async def get_provider(provider_id: int):
 
 
 @router.post("/providers")
-async def create_provider(data: ProviderCreate):
+async def create_provider(data: ProviderCreateRequest):
     """创建新提供商"""
     try:
         result = await ai_config_service.create_provider(data.model_dump())
@@ -79,7 +62,7 @@ async def create_provider(data: ProviderCreate):
 
 
 @router.put("/providers/{provider_id}")
-async def update_provider(provider_id: int, data: ProviderUpdate):
+async def update_provider(provider_id: int, data: ProviderUpdateRequest):
     """更新提供商"""
     # 过滤掉 None 值
     update_data = {k: v for k, v in data.model_dump().items() if v is not None}
@@ -115,8 +98,19 @@ async def get_model_configs():
     return {"configs": configs}
 
 
+@router.get("/models", response_model=ModelConfigListResponse)
+async def list_model_configs():
+    """列出所有模型配置"""
+    try:
+        configs = await ai_config_service.get_model_configs()
+        return {"configs": configs}
+    except Exception as e:
+        logger.error("Failed to list model configs", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.put("/models/{config_key}")
-async def update_model_config(config_key: str, data: ModelConfigUpdate):
+async def update_model_config(config_key: str, data: ModelConfigUpdateRequest):
     """更新模型配置"""
     result = await ai_config_service.update_model_config(
         config_key=config_key,
@@ -124,6 +118,17 @@ async def update_model_config(config_key: str, data: ModelConfigUpdate):
         model_name=data.model_name,
     )
     return result
+
+
+@router.post("/providers/{provider_id}/test", response_model=TestProviderResult)
+async def test_provider(provider_id: int):
+    """测试提供商连接"""
+    try:
+        result = await ai_config_service.test_provider(provider_id)
+        return result
+    except Exception as e:
+        logger.error("Failed to test provider", provider_id=provider_id, error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============ 管理 API ============
@@ -135,7 +140,7 @@ async def refresh_config():
     return {"refreshed": True}
 
 
-@router.get("/status")
+@router.get("/status", response_model=AIConfigStatus)
 async def get_status():
     """获取 AI 配置服务状态"""
     return ai_config_service.get_status()

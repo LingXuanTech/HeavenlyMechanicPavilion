@@ -61,6 +61,26 @@ tasks:
       - '@group(sources)'
       - 'tsconfig.json'
 
+  # 代码检查
+  lint:
+    command: 'pnpm run lint'
+    inputs:
+      - '@group(sources)'
+      - 'eslint.config.js'
+      - '.prettierrc'
+
+  # 代码格式化
+  format:
+    command: 'pnpm run format'
+    local: true
+
+  # 生成 API 类型
+  codegen:
+    command: 'pnpm run gen:types'
+    local: true
+    options:
+      cache: false
+
 # 文件分组
 fileGroups:
   sources:

@@ -4,8 +4,8 @@
  * 负责导航和品牌展示
  */
 import React, { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
-import { Stock, MarketOpportunity } from '../types';
+import { NavLink } from 'react-router-dom';
+import type * as T from '../src/types/schema';
 import { logger } from '../utils/logger';
 import {
   Plus,
@@ -16,7 +16,6 @@ import {
   Bot,
   PieChart,
   Globe,
-  Zap,
   Cpu,
   Landmark,
   Calendar,
@@ -26,12 +25,10 @@ import { useScout, useAddStock } from '../hooks';
 import SystemStatusPanel from './SystemStatusPanel';
 
 const Sidebar: React.FC = () => {
-  const location = useLocation();
-
   // 手动添加状态
   const [isAdding, setIsAdding] = useState(false);
   const [newSymbol, setNewSymbol] = useState('');
-  const [newMarket, setNewMarket] = useState<'CN' | 'HK' | 'US'>('CN');
+  const [newMarket, setNewMarket] = useState<T.MarketRegion>('CN');
 
   // 系统状态面板展开状态
   const [statusExpanded, setStatusExpanded] = useState(false);
@@ -58,7 +55,7 @@ const Sidebar: React.FC = () => {
     await scout.scout();
   };
 
-  const handleAddScoutResult = async (stock: MarketOpportunity) => {
+  const handleAddScoutResult = async (stock: T.MarketOpportunity) => {
     try {
       await addStockMutation.mutateAsync(stock.symbol);
     } catch (error) {

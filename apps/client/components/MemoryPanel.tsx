@@ -9,7 +9,6 @@ import {
   History,
   Lightbulb,
   TrendingUp,
-  TrendingDown,
   Calendar,
   BarChart3,
   AlertCircle,
@@ -17,11 +16,10 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useMemoryRetrieve, useReflection } from '../hooks';
-import type { MemoryRetrievalResult, ReflectionReport } from '../types';
-
+import type * as T from '../src/types/schema';
 interface MemoryPanelProps {
   symbol: string;
-  onSelectMemory?: (memory: MemoryRetrievalResult) => void;
+  onSelectMemory?: (memory: T.MemoryRetrievalResult) => void;
 }
 
 const getSignalColor = (signal: string): string => {
@@ -76,7 +74,7 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ symbol, onSelectMemory }) => 
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-xs px-2 py-0.5 rounded ${getSignalColor(item.memory.signal)}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded ${getSignalColor(item.memory.signal as string)}`}>
                         {item.memory.signal}
                       </span>
                       <span className="text-xs text-gray-500">

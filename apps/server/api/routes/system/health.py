@@ -4,8 +4,14 @@ from fastapi import APIRouter, HTTPException, Query
 
 from services.health_monitor import (
     health_monitor,
-    HealthReport,
     HealthStatus
+)
+from api.schemas.health import (
+    HealthReport,
+    HealthErrorsResponse,
+    HealthQuickResponse,
+    ComponentHealthResponse,
+    SystemUptimeResponse
 )
 from services.api_metrics import api_metrics
 
@@ -13,7 +19,7 @@ router = APIRouter(prefix="/health", tags=["Health Monitor"])
 logger = structlog.get_logger()
 
 
-@router.get("/")
+@router.get("/", response_model=HealthQuickResponse)
 async def quick_health_check():
     """
     快速健康检查
@@ -32,10 +38,10 @@ async def quick_health_check():
                 }
             )
 
-        return {
-            "status": report.overall_status.value,
-            "uptime_seconds": report.uptime_seconds
-        }
+        return HealthQuickResponse(
+            status=report.overall_status.value,
+            uptime_seconds=report.uptime_seconds
+        )
 
     except HTTPException:
         raise
@@ -60,7 +66,7 @@ async def get_full_health_report(force_refresh: bool = Query(False)):
         raise HTTPException(status_code=500, detail=f"获取健康报告失败: {str(e)}")
 
 
-@router.get("/components")
+@router.get("/components", response_model=ComponentHealthResponse)
 async def get_component_health():
     """
     获取各组件健康状态
@@ -70,9 +76,9 @@ async def get_component_health():
     try:
         report = await health_monitor.get_health_report()
 
-        return {
-            "overall": report.overall_status.value,
-            "components": {
+        return ComponentHealthResponse(
+            overall=report.overall_status.value,
+            components={
                 c.name: {
                     "status": c.status.value,
                     "message": c.message,
@@ -81,7 +87,7 @@ async def get_component_health():
                 }
                 for c in report.components
             }
-        }
+        )
 
     except Exception as e:
         logger.error("Failed to get component health", error=str(e))
@@ -119,7 +125,7 @@ async def get_system_metrics():
         raise HTTPException(status_code=500, detail=f"获取系统指标失败: {str(e)}")
 
 
-@router.get("/errors")
+@router.get("/errors", response_model=HealthErrorsResponse)
 async def get_recent_errors(limit: int = Query(10, ge=1, le=100)):
     """
     获取最近的错误记录
@@ -129,10 +135,10 @@ async def get_recent_errors(limit: int = Query(10, ge=1, le=100)):
 
         errors = report.recent_errors[-limit:]
 
-        return {
-            "errors": [
+        return HealthErrorsResponse(
+            errors=[
                 {
-                    "timestamp": e.timestamp.isoformat(),
+                    "timestamp": e.timestamp,
                     "component": e.component,
                     "error_type": e.error_type,
                     "message": e.message,
@@ -140,8 +146,8 @@ async def get_recent_errors(limit: int = Query(10, ge=1, le=100)):
                 }
                 for e in errors
             ],
-            "total": len(errors)
-        }
+            total=len(errors)
+        )
 
     except Exception as e:
         logger.error("Failed to get errors", error=str(e))
@@ -166,12 +172,13 @@ async def clear_errors():
         raise HTTPException(status_code=500, detail=f"清除错误失败: {str(e)}")
 
 
-@router.get("/uptime")
+@router.get("/uptime", response_model=SystemUptimeResponse)
 async def get_uptime():
     """
     获取系统运行时间
     """
-    return health_monitor.get_uptime()
+    uptime = health_monitor.get_uptime()
+    return SystemUptimeResponse(**uptime)
 
 
 @router.get("/liveness")

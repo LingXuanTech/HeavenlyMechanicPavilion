@@ -1,0 +1,23 @@
+# https://moonrepo.dev/docs/config/tasks
+$schema: 'https://moonrepo.dev/schemas/tasks.json'
+
+tasks:
+  # 运行所有项目的类型检查
+  typecheck:
+    command: 'moon run :typecheck'
+    description: 'Run type checking for all projects'
+
+  # 运行所有项目的代码检查
+  lint:
+    command: 'moon run :lint'
+    description: 'Run linting for all projects'
+
+  # 运行所有项目的测试
+  test:
+    command: 'moon run :test'
+    description: 'Run tests for all projects'
+
+  # 运行所有项目的格式化
+  format:
+    command: 'moon run :format'
+    description: 'Run formatting for all projects'

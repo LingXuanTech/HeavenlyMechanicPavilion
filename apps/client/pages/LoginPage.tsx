@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { KeyRound, Mail, Eye, EyeOff, AlertCircle, ArrowRight, Sparkles } from 'lucide-react';
+import { Mail, Eye, EyeOff, AlertCircle, ArrowRight, Sparkles } from 'lucide-react';
 
 const API_BASE = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000/api';
 

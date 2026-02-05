@@ -7,22 +7,22 @@
  * - Moderator 结论
  */
 import React, { memo } from 'react';
-import type { AgentAnalysis } from '../types';
+import type * as T from '../src/types/schema';
 import { TrendingUp, TrendingDown, Bot, Gavel } from 'lucide-react';
 
 // ============ DebateMeter ============
 
 /** 辩论计组件 - 基于论点权重计算多空力量 */
-const DebateMeter: React.FC<{ debate: AgentAnalysis['debate'] }> = ({ debate }) => {
+const DebateMeter: React.FC<{ debate: T.ResearcherDebate }> = ({ debate }) => {
   if (!debate) return null;
 
   const weightMap: Record<string, number> = { High: 3, Medium: 2, Low: 1 };
 
-  const bullScore = debate.bull.points.reduce(
-    (sum, p) => sum + (weightMap[p.weight] || 1), 0
+  const bullScore = (debate.bull.points || []).reduce(
+    (sum: number, p: T.DebatePoint) => sum + (weightMap[p.weight] || 1), 0
   );
-  const bearScore = debate.bear.points.reduce(
-    (sum, p) => sum + (weightMap[p.weight] || 1), 0
+  const bearScore = (debate.bear.points || []).reduce(
+    (sum: number, p: T.DebatePoint) => sum + (weightMap[p.weight] || 1), 0
   );
 
   const total = bullScore + bearScore;
@@ -70,7 +70,7 @@ const DebateMeter: React.FC<{ debate: AgentAnalysis['debate'] }> = ({ debate }) 
 // ============ DebateSection ============
 
 interface DebateSectionProps {
-  debate: AgentAnalysis['debate'];
+  debate: T.ResearcherDebate;
 }
 
 const DebateSection: React.FC<DebateSectionProps> = memo(({ debate }) => {
@@ -105,7 +105,7 @@ const DebateSection: React.FC<DebateSectionProps> = memo(({ debate }) => {
           </div>
           <p className="text-sm font-semibold text-green-100 mb-3 italic leading-relaxed">"{debate.bull.thesis}"</p>
           <ul className="space-y-2">
-            {debate.bull.points.map((p, i) => (
+            {(debate.bull.points || []).map((p: T.DebatePoint, i: number) => (
               <li key={i} className="text-xs text-gray-300 flex gap-2 items-start">
                 <span className="mt-1.5 w-1 h-1 rounded-full bg-green-500 shrink-0"></span>
                 <span>{p.argument}</span>
@@ -131,7 +131,7 @@ const DebateSection: React.FC<DebateSectionProps> = memo(({ debate }) => {
           </div>
           <p className="text-sm font-semibold text-red-100 mb-3 italic leading-relaxed">"{debate.bear.thesis}"</p>
           <ul className="space-y-2">
-            {debate.bear.points.map((p, i) => (
+            {(debate.bear.points || []).map((p: T.DebatePoint, i: number) => (
               <li key={i} className="text-xs text-gray-300 flex gap-2 items-start">
                 <span className="mt-1.5 w-1 h-1 rounded-full bg-red-500 shrink-0"></span>
                 <span>{p.argument}</span>

@@ -4,7 +4,8 @@
  * 支持选择 2-3 个历史分析进行并排对比，
  * 可视化关键指标差异（信号、置信度、风险、辩论等）
  */
-import React, { useState, memo } from 'react';
+import * as React from 'react';
+import { useState, memo } from 'react';
 import {
   GitCompareArrows,
   ChevronDown,
@@ -17,7 +18,11 @@ import {
   Clock,
   Loader2,
 } from 'lucide-react';
-import { useAnalysisComparison, type AnalysisDetail } from '../hooks/useAnalysisHistory';
+import { useAnalysisComparison } from '../hooks/useAnalysisHistory';
+import type * as T from '../src/types/schema';
+
+// 使用从 schema 导出的统一类型
+type AnalysisDetail = T.AnalysisDetailResponse;
 
 interface AnalysisComparisonProps {
   symbol: string;
@@ -67,10 +72,11 @@ const AnalysisColumn: React.FC<{
   detail: AnalysisDetail;
   prevDetail?: AnalysisDetail;
   index: number;
-}> = ({ detail, prevDetail, index }) => {
+}> = ({ detail, prevDetail }) => {
   const report = detail.full_report;
-  const signalColorClass = SIGNAL_COLOR[report?.signal] || 'text-gray-400';
-  const riskScore = report?.riskAssessment?.score ?? 0;
+  const signal = report?.signal as string;
+  const signalColorClass = SIGNAL_COLOR[signal] || 'text-gray-400';
+  const riskScore = report?.risk_assessment?.score ?? 0;
   const confidence = report?.confidence ?? 0;
 
   return (
@@ -88,12 +94,12 @@ const AnalysisColumn: React.FC<{
 
       {/* 信号 */}
       <div className={`text-center py-2 rounded-lg ${signalColorClass}`}>
-        <div className="text-sm font-bold">{report?.signal || 'N/A'}</div>
+        <div className="text-sm font-bold">{signal || 'N/A'}</div>
         {prevDetail && (
           <div className="mt-1">
             <ChangeIndicator
-              current={SIGNAL_VALUE[report?.signal] ?? 3}
-              previous={SIGNAL_VALUE[prevDetail.full_report?.signal] ?? 3}
+              current={SIGNAL_VALUE[signal] ?? 3}
+              previous={SIGNAL_VALUE[prevDetail.full_report?.signal as string] ?? 3}
             />
           </div>
         )}
@@ -139,7 +145,7 @@ const AnalysisColumn: React.FC<{
           />
         </div>
         {prevDetail && (
-          <ChangeIndicator current={riskScore} previous={prevDetail.full_report?.riskAssessment?.score ?? 0} />
+          <ChangeIndicator current={riskScore} previous={prevDetail.full_report?.risk_assessment?.score ?? 0} />
         )}
       </div>
 
@@ -162,15 +168,15 @@ const AnalysisColumn: React.FC<{
       )}
 
       {/* 价格水平 */}
-      {report?.priceLevels && (
+      {report?.price_levels && (
         <div className="text-[10px] space-y-0.5">
           <div className="flex justify-between">
             <span className="text-gray-500">支撑</span>
-            <span className="text-green-400 font-mono">{report.priceLevels.support}</span>
+            <span className="text-green-400 font-mono">{report.price_levels.support}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-500">阻力</span>
-            <span className="text-red-400 font-mono">{report.priceLevels.resistance}</span>
+            <span className="text-red-400 font-mono">{report.price_levels.resistance}</span>
           </div>
         </div>
       )}

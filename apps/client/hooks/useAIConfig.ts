@@ -5,6 +5,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as T from '../src/types/schema';
 import {
   listAIProviders,
   getAIProvider,
@@ -16,11 +17,6 @@ import {
   updateAIModelConfig,
   refreshAIConfig,
   getAIConfigStatus,
-  AIProvider,
-  AIProviderType,
-  AIModelConfig,
-  AIConfigStatus,
-  TestProviderResult,
 } from '../services/api';
 
 // ============ Query Keys ============
@@ -64,15 +60,7 @@ export function useCreateAIProvider() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: {
-      name: string;
-      provider_type: AIProviderType;
-      base_url?: string;
-      api_key?: string;
-      models?: string[];
-      is_enabled?: boolean;
-      priority?: number;
-    }) => createAIProvider(data),
+    mutationFn: (data: T.ApiRequestBody<'/api/ai/providers', 'post'>) => createAIProvider(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: AI_PROVIDERS_KEY });
       queryClient.invalidateQueries({ queryKey: AI_STATUS_KEY });
@@ -92,15 +80,7 @@ export function useUpdateAIProvider() {
       data,
     }: {
       providerId: number;
-      data: Partial<{
-        name: string;
-        provider_type: AIProviderType;
-        base_url: string;
-        api_key: string;
-        models: string[];
-        is_enabled: boolean;
-        priority: number;
-      }>;
+      data: T.ApiRequestBody<'/api/ai/providers/{provider_id}', 'put'>;
     }) => updateAIProvider(providerId, data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: AI_PROVIDERS_KEY });
@@ -206,8 +186,8 @@ export function useAIConfigStatus() {
 /**
  * 获取提供商类型的显示名称
  */
-export function getProviderTypeLabel(type: AIProviderType): string {
-  const labels: Record<AIProviderType, string> = {
+export function getProviderTypeLabel(type: T.AIProviderType): string {
+  const labels: Record<T.AIProviderType, string> = {
     openai: 'OpenAI',
     openai_compatible: 'OpenAI Compatible',
     google: 'Google Gemini',
@@ -242,4 +222,4 @@ export function getConfigKeyDescription(key: string): string {
 }
 
 // Re-export types
-export type { AIProvider, AIProviderType, AIModelConfig, AIConfigStatus, TestProviderResult };
+export type { AIProvider, AIProviderType, AIModelConfig, AIConfigStatus, TestProviderResult } from '../src/types/schema';

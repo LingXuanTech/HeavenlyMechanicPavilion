@@ -15,7 +15,6 @@ import {
   checkLiveness,
   checkReadiness,
 } from '../services/api';
-import type { HealthReport, SystemMetrics } from '../types';
 
 export const HEALTH_KEY = ['health'];
 

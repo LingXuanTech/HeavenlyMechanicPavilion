@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useStreamTypewriter } from './useTypewriter';
-import type { AgentAnalysis } from '../types';
+import type * as T from '../src/types/schema';
 import { API_BASE } from '../services/api';
 
 /**
@@ -28,7 +28,7 @@ interface SSEStageEvent {
 
 interface SSEAnalysisCompleteEvent {
   event: 'analysis_complete';
-  data: AgentAnalysis;
+  data: T.AgentAnalysis;
 }
 
 type SSEEvent = SSETextChunkEvent | SSEStageEvent | SSEAnalysisCompleteEvent;
@@ -48,7 +48,7 @@ export interface StreamingAnalysisState {
   /** 是否正在打字 */
   isTyping: boolean;
   /** 最终分析结果 */
-  analysis: AgentAnalysis | null;
+  analysis: T.AgentAnalysis | null;
   /** 错误信息 */
   error: string | null;
   /** 是否已连接 */
@@ -66,7 +66,7 @@ export interface UseStreamingAnalysisOptions {
   /** 阶段变化回调 */
   onStageChange?: (stage: string) => void;
   /** 完成回调 */
-  onComplete?: (analysis: AgentAnalysis) => void;
+  onComplete?: (analysis: T.AgentAnalysis) => void;
   /** 错误回调 */
   onError?: (error: string) => void;
 }
@@ -114,7 +114,7 @@ export function useStreamingAnalysis(options: UseStreamingAnalysisOptions = {}) 
   // 状态
   const [stage, setStage] = useState<StreamingAnalysisState['stage']>('idle');
   const [stageProgress, setStageProgress] = useState(0);
-  const [analysis, setAnalysis] = useState<AgentAnalysis | null>(null);
+  const [analysis, setAnalysis] = useState<T.AgentAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 

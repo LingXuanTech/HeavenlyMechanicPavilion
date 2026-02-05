@@ -19,14 +19,14 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { useHealthReport, useHealthMetrics, useSystemUptime, useClearHealthErrors } from '../hooks';
-import type { HealthStatus } from '../types';
+import type * as T from '../src/types/schema';
 
 interface SystemStatusPanelProps {
   expanded?: boolean;
   onToggle?: () => void;
 }
 
-const getStatusColor = (status: HealthStatus): string => {
+const getStatusColor = (status: T.HealthStatus): string => {
   switch (status) {
     case 'healthy': return 'text-green-400';
     case 'degraded': return 'text-yellow-400';
@@ -35,7 +35,7 @@ const getStatusColor = (status: HealthStatus): string => {
   }
 };
 
-const getStatusIcon = (status: HealthStatus) => {
+const getStatusIcon = (status: T.HealthStatus | 'unknown') => {
   switch (status) {
     case 'healthy': return <CheckCircle2 className="w-4 h-4 text-green-400" />;
     case 'degraded': return <AlertTriangle className="w-4 h-4 text-yellow-400" />;
@@ -135,12 +135,12 @@ const SystemStatusPanel: React.FC<SystemStatusPanelProps> = ({ expanded = false,
                   <Cpu className="w-3 h-3" />
                   <span>CPU</span>
                 </div>
-                <span className="font-mono text-gray-300">{metrics.cpu.percent.toFixed(1)}%</span>
+                <span className="font-mono text-gray-300">{metrics.cpu_percent.toFixed(1)}%</span>
               </div>
               <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
                 <div
-                  className={`h-full ${getProgressColor(metrics.cpu.percent)} transition-all`}
-                  style={{ width: `${metrics.cpu.percent}%` }}
+                  className={`h-full ${getProgressColor(metrics.cpu_percent)} transition-all`}
+                  style={{ width: `${metrics.cpu_percent}%` }}
                 />
               </div>
             </div>
@@ -153,13 +153,13 @@ const SystemStatusPanel: React.FC<SystemStatusPanelProps> = ({ expanded = false,
                   <span>Memory</span>
                 </div>
                 <span className="font-mono text-gray-300">
-                  {metrics.memory.used_mb.toFixed(0)} / {metrics.memory.total_mb.toFixed(0)} MB
+                  {metrics.memory_used_mb.toFixed(0)} / {metrics.memory_total_mb.toFixed(0)} MB
                 </span>
               </div>
               <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
                 <div
-                  className={`h-full ${getProgressColor(metrics.memory.percent)} transition-all`}
-                  style={{ width: `${metrics.memory.percent}%` }}
+                  className={`h-full ${getProgressColor(metrics.memory_percent)} transition-all`}
+                  style={{ width: `${metrics.memory_percent}%` }}
                 />
               </div>
             </div>
@@ -172,13 +172,13 @@ const SystemStatusPanel: React.FC<SystemStatusPanelProps> = ({ expanded = false,
                   <span>Disk</span>
                 </div>
                 <span className="font-mono text-gray-300">
-                  {metrics.disk.used_gb.toFixed(1)} / {metrics.disk.total_gb.toFixed(1)} GB
+                  {metrics.disk_used_gb.toFixed(1)} / {metrics.disk_total_gb.toFixed(1)} GB
                 </span>
               </div>
               <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
                 <div
-                  className={`h-full ${getProgressColor(metrics.disk.percent)} transition-all`}
-                  style={{ width: `${metrics.disk.percent}%` }}
+                  className={`h-full ${getProgressColor(metrics.disk_percent)} transition-all`}
+                  style={{ width: `${metrics.disk_percent}%` }}
                 />
               </div>
             </div>
@@ -241,7 +241,7 @@ const SystemStatusPanel: React.FC<SystemStatusPanelProps> = ({ expanded = false,
         {/* Timestamp */}
         {report && (
           <div className="text-[10px] text-gray-500 text-right">
-            Last checked: {new Date(report.checked_at).toLocaleTimeString()}
+            Last checked: {new Date(report.timestamp).toLocaleTimeString()}
           </div>
         )}
       </div>

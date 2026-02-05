@@ -10,7 +10,7 @@
  */
 import React, { ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, LucideIcon, RefreshCw, Loader2 } from 'lucide-react';
+import { ArrowLeft, LucideIcon, Loader2 } from 'lucide-react';
 
 // === 类型定义 ===
 
@@ -251,7 +251,6 @@ export const StatCard: React.FC<StatCardProps> = ({
   icon: Icon,
   iconColor = 'text-gray-400',
   valueColor = 'text-white',
-  trend,
   subtitle,
 }) => (
   <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">

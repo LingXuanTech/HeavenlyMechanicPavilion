@@ -12,7 +12,7 @@ import {
   clearMemory,
   searchMemory,
 } from '../services/api';
-import type { AnalysisMemory, MemoryRetrievalResult, ReflectionReport } from '../types';
+import * as T from '../src/types/schema';
 
 export const MEMORY_KEY = ['memory'];
 
@@ -74,7 +74,7 @@ export function useStoreMemory() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (memory: AnalysisMemory) => storeMemory(memory),
+    mutationFn: (memory: T.AnalysisMemory) => storeMemory(memory),
     onSuccess: (_, variables) => {
       // 使该股票的记忆查询失效
       queryClient.invalidateQueries({

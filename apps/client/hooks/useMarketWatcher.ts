@@ -12,7 +12,7 @@ import {
   refreshMarketIndices,
   getMarketSentiment,
 } from '../services/api';
-import type { MarketRegion, MarketWatcherOverview, MarketWatcherIndex } from '../types';
+import * as T from '../src/types/schema';
 
 export const MARKET_WATCHER_KEY = ['marketWatcher'];
 
@@ -42,7 +42,7 @@ export function useMarketWatcherOverview(forceRefresh: boolean = false) {
 /**
  * 获取市场指数列表
  */
-export function useMarketIndices(region?: MarketRegion, forceRefresh: boolean = false) {
+export function useMarketIndices(region?: T.MarketRegion, forceRefresh: boolean = false) {
   return useQuery({
     queryKey: [...MARKET_WATCHER_KEY, 'indices', region, forceRefresh],
     queryFn: () => getMarketIndices(region, forceRefresh),

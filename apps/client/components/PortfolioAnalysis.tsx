@@ -1,9 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import * as React from 'react';
+import { useState, useMemo } from 'react';
 import { logger } from '../utils/logger';
 import {
   X,
-  TrendingUp,
-  TrendingDown,
   AlertTriangle,
   CheckCircle,
   RefreshCw,
@@ -11,8 +10,12 @@ import {
   PieChart,
   Link2,
 } from 'lucide-react';
-import { Stock } from '../types';
-import { usePortfolioAnalysis, PortfolioAnalysis as PortfolioAnalysisType } from '../hooks/usePortfolio';
+import type * as T from '../src/types/schema';
+import { usePortfolioAnalysis } from '../hooks/usePortfolio';
+
+// 使用从 schema 导出的统一类型
+type Stock = T.Watchlist; // Watchlist 在后端对应 Stock 模型
+type PortfolioAnalysisType = T.PortfolioAnalysis;
 
 interface PortfolioAnalysisProps {
   stocks: Stock[];
@@ -106,7 +109,12 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
   const sortedReturns = useMemo(() => {
     if (!analysis?.correlation.returns_summary) return [];
     return Object.entries(analysis.correlation.returns_summary)
-      .map(([symbol, data]) => ({ symbol, ...data }))
+      .map(([symbol, data]) => ({
+        symbol,
+        total_return: data.total_return || 0,
+        mean_return: data.mean_return || 0,
+        volatility: data.volatility || 0
+      }))
       .sort((a, b) => b.total_return - a.total_return);
   }, [analysis]);
 
@@ -206,7 +214,7 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
                   <p className="text-xs text-gray-500 mt-2">
                     {analysis.risk_clusters.length === 0
                       ? '无高度相关股票群'
-                      : `${analysis.risk_clusters.reduce((sum, c) => sum + c.stocks.length, 0)} stocks in correlated groups`}
+                      : `${analysis.risk_clusters.reduce((sum, c) => sum + (c.stocks?.length || 0), 0)} stocks in correlated groups`}
                   </p>
                 </div>
 

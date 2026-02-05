@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UIHints, AlertLevel, AgentAnalysis } from '../types';
+import type * as T from '../src/types/schema';
 import {
   AlertTriangle,
   AlertCircle,
@@ -20,7 +20,7 @@ import {
 
 // ============ Alert Banner ============
 
-const alertConfig: Record<AlertLevel, { bg: string; border: string; text: string; icon: React.ReactNode }> = {
+const alertConfig: Record<T.AlertLevel, { bg: string; border: string; text: string; icon: React.ReactNode }> = {
   critical: {
     bg: 'bg-red-950/60',
     border: 'border-red-500/60',
@@ -47,15 +47,15 @@ const alertConfig: Record<AlertLevel, { bg: string; border: string; text: string
   },
 };
 
-export const AlertBanner: React.FC<{ hints: UIHints }> = ({ hints }) => {
-  if (hints.alertLevel === 'none' || !hints.alertMessage) return null;
+export const AlertBanner: React.FC<{ hints: T.UIHints }> = ({ hints }) => {
+  if (hints.alert_level === 'none' || !hints.alert_message) return null;
 
-  const config = alertConfig[hints.alertLevel];
+  const config = alertConfig[hints.alert_level as T.AlertLevel];
 
   return (
     <div className={`${config.bg} border ${config.border} rounded-lg px-4 py-2.5 flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300`}>
       {config.icon}
-      <span className={`text-sm font-medium ${config.text}`}>{hints.alertMessage}</span>
+      <span className={`text-sm font-medium ${config.text}`}>{hints.alert_message}</span>
     </div>
   );
 };
@@ -162,7 +162,7 @@ const ConfidenceBadge: React.FC<{ value: number }> = ({ value }) => {
   );
 };
 
-export const ConfidenceDisplay: React.FC<{ value: number; mode: UIHints['confidenceDisplay'] }> = ({ value, mode }) => {
+export const ConfidenceDisplay: React.FC<{ value: number; mode: T.UIHints['confidence_display'] }> = ({ value, mode }) => {
   switch (mode) {
     case 'gauge':
       return <ConfidenceGauge value={value} />;
@@ -182,10 +182,10 @@ export const ConfidenceDisplay: React.FC<{ value: number; mode: UIHints['confide
 
 // ============ Planner Insight ============
 
-export const PlannerInsight: React.FC<{ hints: UIHints }> = ({ hints }) => {
+export const PlannerInsight: React.FC<{ hints: T.UIHints }> = ({ hints }) => {
   const [expanded, setExpanded] = useState(false);
 
-  if (!hints.showPlannerReasoning || !hints.plannerInsight) return null;
+  if (!hints.show_planner_reasoning || !hints.planner_insight) return null;
 
   return (
     <div className="bg-purple-950/20 border border-purple-800/30 rounded-lg overflow-hidden">
@@ -205,7 +205,7 @@ export const PlannerInsight: React.FC<{ hints: UIHints }> = ({ hints }) => {
       </button>
       {expanded && (
         <div className="px-4 pb-3 text-sm text-gray-300 border-t border-purple-800/20 pt-2 animate-in fade-in slide-in-from-top-1 duration-200">
-          {hints.plannerInsight}
+          {hints.planner_insight}
         </div>
       )}
     </div>
@@ -279,7 +279,7 @@ export const AnalysisLevelBadge: React.FC<{ level: 'L1' | 'L2' }> = ({ level }) 
 
 // ============ Diagnostics Panel ============
 
-export const DiagnosticsPanel: React.FC<{ diagnostics?: AgentAnalysis['diagnostics'] }> = ({ diagnostics }) => {
+export const DiagnosticsPanel: React.FC<{ diagnostics?: T.AgentAnalysisResponse['diagnostics'] }> = ({ diagnostics }) => {
   const [expanded, setExpanded] = useState(false);
 
   if (!diagnostics) return null;

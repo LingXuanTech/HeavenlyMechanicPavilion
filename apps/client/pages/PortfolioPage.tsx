@@ -6,8 +6,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { logger } from '../utils/logger';
 import {
-  TrendingUp,
-  TrendingDown,
   AlertTriangle,
   CheckCircle,
   RefreshCw,
@@ -17,7 +15,8 @@ import {
 } from 'lucide-react';
 import PageLayout, { LoadingState, EmptyState } from '../components/layout/PageLayout';
 import { useWatchlist } from '../hooks';
-import { usePortfolioAnalysis, PortfolioAnalysis as PortfolioAnalysisType } from '../hooks/usePortfolio';
+import { usePortfolioAnalysis } from '../hooks/usePortfolio';
+import type * as T from '../src/types/schema';
 
 // 相关性颜色映射
 const getCorrelationColor = (value: number): string => {
@@ -77,7 +76,7 @@ const HeatmapCell: React.FC<{
 const PortfolioPage: React.FC = () => {
   const { data: stocks = [] } = useWatchlist();
   const portfolioMutation = usePortfolioAnalysis();
-  const [analysis, setAnalysis] = useState<PortfolioAnalysisType | null>(null);
+  const [analysis, setAnalysis] = useState<T.PortfolioAnalysis | null>(null);
 
   const handleAnalyze = async () => {
     const symbols = stocks.map(s => s.symbol);
@@ -100,8 +99,12 @@ const PortfolioPage: React.FC = () => {
   const sortedReturns = useMemo(() => {
     if (!analysis?.correlation.returns_summary) return [];
     return Object.entries(analysis.correlation.returns_summary)
-      .map(([symbol, data]) => ({ symbol, ...data }))
-      .sort((a, b) => b.total_return - a.total_return);
+      .map(([symbol, data]) => ({
+        symbol,
+        total_return: (data as any).total_return as number,
+        volatility: (data as any).volatility as number
+      }))
+      .sort((a, b) => (b.total_return || 0) - (a.total_return || 0));
   }, [analysis]);
 
   return (
@@ -179,7 +182,7 @@ const PortfolioPage: React.FC = () => {
                 <p className="text-xs text-gray-500 mt-2">
                   {analysis.risk_clusters.length === 0
                     ? '无高度相关股票群'
-                    : `${analysis.risk_clusters.reduce((sum, c) => sum + c.stocks.length, 0)} stocks in correlated groups`}
+                    : `${analysis.risk_clusters.reduce((sum: number, c) => sum + c.stocks.length, 0)} stocks in correlated groups`}
                 </p>
               </div>
 
@@ -269,16 +272,16 @@ const PortfolioPage: React.FC = () => {
                     <div
                       key={item.symbol}
                       className={`p-3 rounded-lg border ${
-                        item.total_return >= 0
+                        (item.total_return || 0) >= 0
                           ? 'bg-green-950/30 border-green-900/50'
                           : 'bg-red-950/30 border-red-900/50'
                       }`}
                     >
                       <div className="text-xs text-gray-400 font-mono truncate">{item.symbol.split('.')[0]}</div>
-                      <div className={`text-lg font-bold ${item.total_return >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {item.total_return >= 0 ? '+' : ''}{item.total_return.toFixed(1)}%
+                      <div className={`text-lg font-bold ${(item.total_return || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {(item.total_return || 0) >= 0 ? '+' : ''}{(item.total_return || 0).toFixed(1)}%
                       </div>
-                      <div className="text-xs text-gray-500">Vol: {item.volatility.toFixed(1)}%</div>
+                      <div className="text-xs text-gray-500">Vol: {(item.volatility || 0).toFixed(1)}%</div>
                     </div>
                   ))}
                 </div>

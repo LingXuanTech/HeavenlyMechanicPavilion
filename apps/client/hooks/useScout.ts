@@ -6,14 +6,14 @@
 import { useState, useCallback } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { discoverStocks } from '../services/api';
-import type { MarketOpportunity } from '../types';
+import type * as T from '../src/types/schema';
 
 export const SCOUT_KEY = ['scout'];
 
 export interface UseScoutReturn {
   // 状态
   query: string;
-  results: MarketOpportunity[];
+  results: T.MarketOpportunity[];
   isLoading: boolean;
   error: Error | null;
   isOpen: boolean;
@@ -37,7 +37,7 @@ export interface UseScoutReturn {
  */
 export function useScout(): UseScoutReturn {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<MarketOpportunity[]>([]);
+  const [results, setResults] = useState<T.MarketOpportunity[]>([]);
   const [isOpen, setIsOpen] = useState(false);
 
   const mutation = useMutation({

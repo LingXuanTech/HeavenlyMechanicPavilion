@@ -10,26 +10,16 @@ import {
   Unlock,
   RefreshCw,
   TrendingUp,
-  TrendingDown,
-  Building2,
   Users,
   AlertTriangle,
   Calendar,
-  ChevronRight,
 } from 'lucide-react';
 import {
   useNorthMoneySummary,
   useLHBSummary,
   useJiejinSummary,
 } from '../hooks';
-import type {
-  NorthMoneySummary,
-  LHBSummary,
-  LHBStock,
-  HotMoneySeat,
-  JiejinSummary,
-  JiejinStock,
-} from '../types';
+import type * as T from '../src/types/schema';
 
 interface ChinaMarketPanelProps {
   onStockClick?: (symbol: string) => void;
@@ -53,7 +43,7 @@ const formatMoney = (value: number): string => {
 
 // ============ 北向资金内容 ============
 const NorthMoneyContent: React.FC<{
-  data: NorthMoneySummary;
+  data: T.NorthMoneySummary;
   onStockClick?: (symbol: string) => void;
 }> = ({ data, onStockClick }) => {
   const isInflow = data.trend === 'Inflow';
@@ -64,20 +54,20 @@ const NorthMoneyContent: React.FC<{
       <div className="grid grid-cols-3 gap-2">
         <div className="bg-gray-950/50 rounded p-2.5 border border-gray-800">
           <div className="text-[10px] text-gray-500">今日合计</div>
-          <div className={`text-base font-mono font-bold ${data.flow.total_net >= 0 ? 'text-red-400' : 'text-green-400'}`}>
-            {formatMoney(data.flow.total_net)}
+          <div className={`text-base font-mono font-bold ${data.today.total >= 0 ? 'text-red-400' : 'text-green-400'}`}>
+            {formatMoney(data.today.total)}
           </div>
         </div>
         <div className="bg-gray-950/50 rounded p-2.5 border border-gray-800">
           <div className="text-[10px] text-gray-500">沪股通</div>
-          <div className={`text-base font-mono font-bold ${data.flow.shanghai_connect >= 0 ? 'text-red-400' : 'text-green-400'}`}>
-            {formatMoney(data.flow.shanghai_connect)}
+          <div className={`text-base font-mono font-bold ${data.today.sh_connect >= 0 ? 'text-red-400' : 'text-green-400'}`}>
+            {formatMoney(data.today.sh_connect)}
           </div>
         </div>
         <div className="bg-gray-950/50 rounded p-2.5 border border-gray-800">
           <div className="text-[10px] text-gray-500">深股通</div>
-          <div className={`text-base font-mono font-bold ${data.flow.shenzhen_connect >= 0 ? 'text-red-400' : 'text-green-400'}`}>
-            {formatMoney(data.flow.shenzhen_connect)}
+          <div className={`text-base font-mono font-bold ${data.today.sz_connect >= 0 ? 'text-red-400' : 'text-green-400'}`}>
+            {formatMoney(data.today.sz_connect)}
           </div>
         </div>
       </div>
@@ -86,7 +76,7 @@ const NorthMoneyContent: React.FC<{
       <div className="flex items-center justify-between px-3 py-2 bg-gray-950/30 rounded border border-gray-800">
         <span className="text-xs text-gray-400">资金趋势</span>
         <span className={`text-xs font-medium ${isInflow ? 'text-red-400' : 'text-green-400'}`}>
-          连续{data.trend_days}日{isInflow ? '净流入' : '净流出'}
+          近期趋势: {isInflow ? '净流入' : '净流出'}
         </span>
       </div>
 
@@ -118,7 +108,7 @@ const NorthMoneyContent: React.FC<{
 
 // ============ 龙虎榜内容 ============
 const LHBContent: React.FC<{
-  data: LHBSummary;
+  data: T.LHBSummary;
   onStockClick?: (symbol: string) => void;
 }> = ({ data, onStockClick }) => {
   return (
@@ -198,7 +188,7 @@ const LHBContent: React.FC<{
 
 // ============ 限售解禁内容 ============
 const JiejinContent: React.FC<{
-  data: JiejinSummary;
+  data: T.JiejinSummary;
   onStockClick?: (symbol: string) => void;
 }> = ({ data, onStockClick }) => {
   return (

@@ -3,7 +3,8 @@
  *
  * 用于管理和编辑 Agent Prompt 配置
  */
-import React, { useState, useCallback } from 'react';
+import * as React from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getPromptList,
@@ -14,10 +15,12 @@ import {
   exportPromptsYaml,
   importPromptsYaml,
 } from '../services/api';
-import type { AgentPrompt, AgentPromptDetail, AgentCategory } from '../types';
+import type * as T from '../src/types/schema';
+
+type AgentCategory = T.AgentCategory;
 
 // Agent 分类显示名称
-const CATEGORY_LABELS: Record<AgentCategory, string> = {
+const CATEGORY_LABELS: Record<string, string> = {
   analyst: '分析师',
   researcher: '研究员',
   manager: '管理层',
@@ -27,7 +30,7 @@ const CATEGORY_LABELS: Record<AgentCategory, string> = {
 };
 
 // 分类图标
-const CATEGORY_ICONS: Record<AgentCategory, string> = {
+const CATEGORY_ICONS: Record<string, string> = {
   analyst: '📊',
   researcher: '🔬',
   manager: '👔',
@@ -42,7 +45,7 @@ interface PromptEditorPanelProps {
 
 const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
   const queryClient = useQueryClient();
-  const [selectedCategory, setSelectedCategory] = useState<AgentCategory | 'all'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string | 'all'>('all');
   const [selectedPromptId, setSelectedPromptId] = useState<number | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [editedSystemPrompt, setEditedSystemPrompt] = useState('');
@@ -54,7 +57,7 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
   // 获取 Prompt 列表
   const { data: promptsData, isLoading: isLoadingList } = useQuery({
     queryKey: ['prompts', selectedCategory],
-    queryFn: () => getPromptList(selectedCategory === 'all' ? undefined : selectedCategory),
+    queryFn: () => getPromptList(selectedCategory === 'all' ? undefined : selectedCategory as AgentCategory),
   });
 
   // 获取 Prompt 详情
@@ -239,7 +242,7 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
                         </span>
                       </div>
                       <div className="text-xs text-gray-500 mt-1 truncate">
-                        {prompt.agent_key} · v{prompt.version}
+                        {prompt.agent_key} · v{prompt.current_version}
                       </div>
                     </button>
                   ))}
@@ -274,7 +277,7 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-1 bg-gray-700 rounded text-xs">
-                        v{promptDetail.version}
+                        v{promptDetail.current_version}
                       </span>
                       {!editMode ? (
                         <button
@@ -306,7 +309,7 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
                   {/* Variables */}
                   <div className="mt-3 flex flex-wrap gap-2">
                     <span className="text-xs text-gray-500">可用变量：</span>
-                    {promptDetail.available_variables.map((v) => (
+                    {(promptDetail.available_variables || []).map((v) => (
                       <code
                         key={v}
                         className="px-2 py-0.5 bg-gray-700 rounded text-xs text-yellow-400"
@@ -376,13 +379,13 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
                   )}
 
                   {/* Version History */}
-                  {!editMode && promptDetail.version_history.length > 0 && (
+                  {!editMode && (promptDetail.version_history?.length || 0) > 0 && (
                     <div>
                       <label className="block text-sm font-medium text-gray-300 mb-2">
                         版本历史
                       </label>
                       <div className="bg-gray-800/50 border border-gray-700 rounded-lg divide-y divide-gray-700">
-                        {promptDetail.version_history.map((v) => (
+                        {(promptDetail.version_history || []).map((v) => (
                           <div
                             key={v.version}
                             className="flex items-center justify-between px-4 py-3"

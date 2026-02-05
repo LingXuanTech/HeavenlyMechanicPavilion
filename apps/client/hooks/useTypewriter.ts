@@ -61,7 +61,7 @@ export function useTypewriter(
   text: string,
   options: UseTypewriterOptions = {}
 ): UseTypewriterReturn {
-  const { speed = 30, autoStart = true, onComplete, cursor = true } = options;
+  const { speed = 30, autoStart = true, onComplete } = options;
 
   const [displayedText, setDisplayedText] = useState('');
   const [isTyping, setIsTyping] = useState(false);

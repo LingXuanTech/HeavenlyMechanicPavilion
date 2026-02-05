@@ -13,7 +13,7 @@ import {
   refreshAggregatedNews,
   getNewsSources,
 } from '../services/api';
-import type { NewsCategory, AggregatedNewsItem, NewsAggregateResult } from '../types';
+import * as T from '../src/types/schema';
 
 export const NEWS_AGGREGATOR_KEY = ['newsAggregator'];
 
@@ -55,7 +55,7 @@ export function useNewsFlash(limit: number = 10) {
 /**
  * 按分类获取新闻
  */
-export function useNewsByCategory(category: NewsCategory, limit: number = 20) {
+export function useNewsByCategory(category: T.NewsCategory, limit: number = 20) {
   return useQuery({
     queryKey: [...NEWS_AGGREGATOR_KEY, 'category', category, limit],
     queryFn: () => getNewsByCategory(category, limit),

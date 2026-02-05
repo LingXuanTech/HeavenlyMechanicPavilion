@@ -17,10 +17,10 @@ import {
   exportPromptsYaml,
   importPromptsYaml,
 } from '../services/api';
-import type { AgentPrompt, AgentPromptDetail, AgentCategory } from '../types';
+import type * as T from '../src/types/schema';
 
 // Agent 分类显示名称
-const CATEGORY_LABELS: Record<AgentCategory, string> = {
+const CATEGORY_LABELS: Record<T.AgentCategory, string> = {
   analyst: '分析师',
   researcher: '研究员',
   manager: '管理层',
@@ -30,7 +30,7 @@ const CATEGORY_LABELS: Record<AgentCategory, string> = {
 };
 
 // 分类图标
-const CATEGORY_ICONS: Record<AgentCategory, string> = {
+const CATEGORY_ICONS: Record<T.AgentCategory, string> = {
   analyst: '📊',
   researcher: '🔬',
   manager: '👔',
@@ -41,7 +41,7 @@ const CATEGORY_ICONS: Record<AgentCategory, string> = {
 
 const PromptsPage: React.FC = () => {
   const queryClient = useQueryClient();
-  const [selectedCategory, setSelectedCategory] = useState<AgentCategory | 'all'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<T.AgentCategory | 'all'>('all');
   const [selectedPromptId, setSelectedPromptId] = useState<number | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [editedSystemPrompt, setEditedSystemPrompt] = useState('');
@@ -162,13 +162,13 @@ const PromptsPage: React.FC = () => {
       <div className="p-3 border-b border-gray-800">
         <select
           value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value as AgentCategory | 'all')}
+          onChange={(e) => setSelectedCategory(e.target.value as T.AgentCategory | 'all')}
           className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
         >
           <option value="all">全部分类</option>
           {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
-              {CATEGORY_ICONS[value as AgentCategory]} {label}
+              {CATEGORY_ICONS[value as T.AgentCategory]} {label}
             </option>
           ))}
         </select>
@@ -200,7 +200,7 @@ const PromptsPage: React.FC = () => {
                   </span>
                 </div>
                 <div className="text-xs text-gray-500 mt-1 truncate">
-                  {prompt.agent_key} · v{prompt.version}
+                  {prompt.agent_key} · v{prompt.current_version}
                 </div>
               </button>
             ))}
@@ -267,7 +267,7 @@ const PromptsPage: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <span className="px-2 py-1 bg-gray-700 rounded text-xs">
-                  v{promptDetail.version}
+                  v{promptDetail.current_version}
                 </span>
                 {!editMode ? (
                   <button
@@ -299,7 +299,7 @@ const PromptsPage: React.FC = () => {
             {/* Variables */}
             <div className="mt-3 flex flex-wrap gap-2">
               <span className="text-xs text-gray-500">可用变量：</span>
-              {promptDetail.available_variables.map((v) => (
+              {(promptDetail.available_variables || []).map((v: string) => (
                 <code
                   key={v}
                   className="px-2 py-0.5 bg-gray-700 rounded text-xs text-yellow-400"
@@ -369,13 +369,13 @@ const PromptsPage: React.FC = () => {
             )}
 
             {/* Version History */}
-            {!editMode && promptDetail.version_history.length > 0 && (
+            {!editMode && (promptDetail.version_history || []).length > 0 && (
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   版本历史
                 </label>
                 <div className="bg-gray-800/50 border border-gray-700 rounded-lg divide-y divide-gray-700">
-                  {promptDetail.version_history.map((v) => (
+                  {(promptDetail.version_history || []).map((v: any) => (
                     <div
                       key={v.version}
                       className="flex items-center justify-between px-4 py-3"

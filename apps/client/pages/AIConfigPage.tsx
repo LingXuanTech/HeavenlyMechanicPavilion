@@ -269,7 +269,7 @@ const AIConfigPage: React.FC = () => {
 
     try {
       if (editMode === 'create') {
-        await createProvider.mutateAsync(data);
+        await createProvider.mutateAsync(data as any);
         toast.success(`已添加提供商: ${formData.name}`);
       } else if (editMode === 'edit' && editingProviderId) {
         await updateProvider.mutateAsync({ providerId: editingProviderId, data });
@@ -558,7 +558,7 @@ const AIConfigPage: React.FC = () => {
                     <div>
                       <label className="block text-xs text-gray-400 mb-1.5 flex items-center gap-1">
                         优先级
-                        <HelpCircle className="w-3 h-3 text-gray-600" title="数字越小优先级越高" />
+                        <HelpCircle className="w-3 h-3 text-gray-600" />
                       </label>
                       <input
                         type="number"

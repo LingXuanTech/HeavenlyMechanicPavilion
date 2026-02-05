@@ -15,13 +15,13 @@ import {
   Filter
 } from 'lucide-react';
 import { useMarketWatcherOverview, useMarketIndices, useMarketSentiment, useRefreshMarketIndices } from '../hooks';
-import type { MarketRegion, MarketWatcherIndex } from '../types';
+import type * as T from '../src/types/schema';
 
 interface MarketIndicesPanelProps {
   compact?: boolean;
 }
 
-const REGIONS: { value: MarketRegion | 'ALL'; label: string }[] = [
+const REGIONS: { value: T.MarketRegion | 'ALL'; label: string }[] = [
   { value: 'ALL', label: 'All' },
   { value: 'US', label: 'US' },
   { value: 'CN', label: 'China' },
@@ -57,7 +57,7 @@ const getStatusBadge = (status: string) => {
   }
 };
 
-const IndexCard: React.FC<{ index: MarketWatcherIndex }> = ({ index }) => {
+const IndexCard: React.FC<{ index: T.MarketIndex }> = ({ index }) => {
   const isUp = index.change_percent >= 0;
 
   return (
@@ -88,7 +88,7 @@ const IndexCard: React.FC<{ index: MarketWatcherIndex }> = ({ index }) => {
 };
 
 const MarketIndicesPanel: React.FC<MarketIndicesPanelProps> = ({ compact = false }) => {
-  const [selectedRegion, setSelectedRegion] = useState<MarketRegion | 'ALL'>('ALL');
+  const [selectedRegion, setSelectedRegion] = useState<T.MarketRegion | 'ALL'>('ALL');
   const [showFilter, setShowFilter] = useState(false);
 
   const { data: overview, isLoading: overviewLoading } = useMarketWatcherOverview();

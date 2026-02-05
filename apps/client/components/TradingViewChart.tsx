@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, memo, useCallback } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 import {
   createChart,
   ColorType,
@@ -190,7 +190,6 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = memo(({
   height = 400,
   showVolume = true,
   indicators = [],
-  isUp = true,
   className = '',
   crosshair = true,
   grid = true,

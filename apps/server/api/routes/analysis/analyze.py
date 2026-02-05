@@ -7,11 +7,20 @@ import structlog
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from typing import AsyncGenerator, Optional, Iterator, Any, List, Literal
+from typing import AsyncGenerator, Optional, Iterator, Any, List, Literal, Dict
 from pydantic import BaseModel, Field
 from sse_starlette.sse import ServerSentEvent, EventSourceResponse
 from sqlmodel import Session, select
 from api.sse import sse_manager
+from api.schemas.analysis import (
+    AgentAnalysisResponse,
+    AnalysisHistoryResponse,
+    AnalysisHistoryItem,
+    AnalysisDetailResponse,
+    FullReport,
+    AnalysisDiagnostics,
+    AnalysisTaskStatus,
+)
 from services.synthesizer import synthesizer, SynthesisContext
 from services.memory_service import memory_service, layered_memory, AnalysisMemory
 from services.cache_service import cache_service
@@ -465,7 +474,7 @@ async def stream_analysis(task_id: str):
     return EventSourceResponse(event_generator())
 
 
-@router.get("/latest/{symbol}")
+@router.get("/latest/{symbol}", response_model=AgentAnalysisResponse)
 async def get_latest_analysis(symbol: str, session: Session = Depends(get_session)):
     """获取指定股票的最新分析结果"""
     statement = (
@@ -480,22 +489,26 @@ async def get_latest_analysis(symbol: str, session: Session = Depends(get_sessio
     if not result:
         raise HTTPException(status_code=404, detail=f"No analysis found for symbol: {symbol}")
 
-    return {
-        "symbol": result.symbol,
-        "date": result.date,
-        "signal": result.signal,
-        "confidence": result.confidence,
-        "full_report": json.loads(result.full_report_json),
-        "anchor_script": result.anchor_script,
-        "created_at": result.created_at.isoformat(),
-        "task_id": result.task_id,
-        "diagnostics": {
-            "elapsed_seconds": result.elapsed_seconds,
-        }
-    }
+    # 解析 full_report_json
+    full_report_data = json.loads(result.full_report_json) if result.full_report_json else {}
+
+    return AgentAnalysisResponse(
+        id=result.id,
+        symbol=result.symbol,
+        date=result.date,
+        signal=result.signal,
+        confidence=result.confidence,
+        full_report=full_report_data,
+        anchor_script=result.anchor_script,
+        created_at=result.created_at.isoformat(),
+        task_id=result.task_id,
+        diagnostics=AnalysisDiagnostics(
+            elapsed_seconds=result.elapsed_seconds,
+        ),
+    )
 
 
-@router.get("/history/{symbol}")
+@router.get("/history/{symbol}", response_model=AnalysisHistoryResponse)
 async def get_analysis_history(
     symbol: str,
     limit: int = Query(default=10, ge=1, le=100),
@@ -523,26 +536,26 @@ async def get_analysis_history(
     statement = statement.offset(offset).limit(limit)
     results = session.exec(statement).all()
 
-    return {
-        "items": [
-            {
-                "id": r.id,
-                "date": r.date,
-                "signal": r.signal,
-                "confidence": r.confidence,
-                "status": r.status,
-                "created_at": r.created_at.isoformat(),
-                "task_id": r.task_id,
-            }
+    return AnalysisHistoryResponse(
+        items=[
+            AnalysisHistoryItem(
+                id=r.id,
+                date=r.date,
+                signal=r.signal,
+                confidence=r.confidence,
+                status=r.status,
+                created_at=r.created_at.isoformat(),
+                task_id=r.task_id,
+            )
             for r in results
         ],
-        "total": total,
-        "offset": offset,
-        "limit": limit,
-    }
+        total=total,
+        offset=offset,
+        limit=limit,
+    )
 
 
-@router.get("/detail/{analysis_id}")
+@router.get("/detail/{analysis_id}", response_model=AnalysisDetailResponse)
 async def get_analysis_detail(analysis_id: int, session: Session = Depends(get_session)):
     """获取指定 ID 的完整分析报告（用于历史对比）"""
     statement = select(AnalysisResult).where(AnalysisResult.id == analysis_id)
@@ -551,32 +564,36 @@ async def get_analysis_detail(analysis_id: int, session: Session = Depends(get_s
     if not result:
         raise HTTPException(status_code=404, detail=f"Analysis not found: {analysis_id}")
 
-    return {
-        "id": result.id,
-        "symbol": result.symbol,
-        "date": result.date,
-        "signal": result.signal,
-        "confidence": result.confidence,
-        "full_report": json.loads(result.full_report_json) if result.full_report_json else {},
-        "anchor_script": result.anchor_script,
-        "created_at": result.created_at.isoformat(),
-        "task_id": result.task_id,
-        "elapsed_seconds": result.elapsed_seconds,
-    }
+    # 解析 full_report_json
+    full_report_data = json.loads(result.full_report_json) if result.full_report_json else {}
+
+    return AnalysisDetailResponse(
+        id=result.id,
+        symbol=result.symbol,
+        date=result.date,
+        signal=result.signal,
+        confidence=result.confidence,
+        full_report=full_report_data,
+        anchor_script=result.anchor_script,
+        created_at=result.created_at.isoformat(),
+        task_id=result.task_id,
+        elapsed_seconds=result.elapsed_seconds,
+    )
 
 
-@router.get("/status/{task_id}")
+@router.get("/status/{task_id}", response_model=AnalysisTaskStatus)
 async def get_task_status(task_id: str, session: Session = Depends(get_session)):
     """查询分析任务状态"""
     # 先检查缓存中的任务（含进程内和分布式）
     cached_task = await cache_service.get_task(task_id)
     if cached_task:
-        return {
-            "task_id": task_id,
-            "status": cached_task.get("status", "unknown"),
-            "symbol": cached_task.get("symbol"),
-            "source": "cache"
-        }
+        return AnalysisTaskStatus(
+            task_id=task_id,
+            status=cached_task.get("status", "unknown"),
+            symbol=cached_task.get("symbol") or "",
+            created_at=datetime.now().isoformat(),
+            updated_at=datetime.now().isoformat()
+        )
 
     # 再检查数据库
     statement = select(AnalysisResult).where(AnalysisResult.task_id == task_id)
@@ -585,16 +602,16 @@ async def get_task_status(task_id: str, session: Session = Depends(get_session))
     if not result:
         raise HTTPException(status_code=404, detail=f"Task not found: {task_id}")
 
-    return {
-        "task_id": task_id,
-        "status": result.status,
-        "symbol": result.symbol,
-        "created_at": result.created_at.isoformat(),
-        "source": "database"
-    }
+    return AnalysisTaskStatus(
+        task_id=task_id,
+        status=result.status,
+        symbol=result.symbol,
+        created_at=result.created_at.isoformat(),
+        updated_at=result.created_at.isoformat()
+    )
 
 
-@router.get("/analysts/config/{symbol}")
+@router.get("/analysts/config/{symbol}", response_model=Dict[str, Any])
 async def get_analyst_config(symbol: str):
     """获取指定 symbol 的分析师路由配置
 
@@ -604,7 +621,7 @@ async def get_analyst_config(symbol: str):
     return MarketAnalystRouter.get_market_config(symbol)
 
 
-@router.get("/analysts/available")
+@router.get("/analysts/available", response_model=List[str])
 async def get_available_analysts():
     """获取所有可用的分析师及其描述"""
     return MarketAnalystRouter.get_available_analysts()

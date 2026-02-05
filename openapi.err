@@ -1,0 +1,11 @@
+/home/projects/lingxuan/HeavenlyMechanicPavilion/apps/server/.venv/lib/python3.10/site-packages/py_mini_racer/py_mini_racer.py:15: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/home/projects/lingxuan/HeavenlyMechanicPavilion/apps/server/main.py", line 128, in <module>
+    from api.routes import market, analysis, trading, system
+  File "/home/projects/lingxuan/HeavenlyMechanicPavilion/apps/server/api/routes/analysis/__init__.py", line 2, in <module>
+    from . import analyze, sentiment, macro, central_bank, policy, reflection, model_racing
+  File "/home/projects/lingxuan/HeavenlyMechanicPavilion/apps/server/api/routes/analysis/analyze.py", line 15, in <module>
+    from api.schemas.analysis import (
+ImportError: cannot import name 'AnalysisTaskStatus' from 'api.schemas.analysis' (/home/projects/lingxuan/HeavenlyMechanicPavilion/apps/server/api/schemas/analysis.py)

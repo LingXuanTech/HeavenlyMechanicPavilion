@@ -17,9 +17,9 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useAggregatedNews, useRefreshNews } from '../hooks';
-import type { AggregatedNewsItem, NewsSentiment } from '../types';
+import type * as T from '../src/types/schema';
 
-const SentimentIcon: React.FC<{ sentiment: NewsSentiment }> = ({ sentiment }) => {
+const SentimentIcon: React.FC<{ sentiment: T.NewsSentiment }> = ({ sentiment }) => {
   switch (sentiment) {
     case 'positive':
       return <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />;
@@ -50,7 +50,7 @@ const TimeAgo: React.FC<{ timestamp: string }> = ({ timestamp }) => {
   );
 };
 
-const NewsItem: React.FC<{ news: AggregatedNewsItem }> = ({ news }) => (
+const NewsItem: React.FC<{ news: T.AggregatedNewsItem }> = ({ news }) => (
   <a
     href={news.url}
     target="_blank"

@@ -48,7 +48,6 @@ export {
   useQuickPortfolioCheck,
   PORTFOLIO_KEY,
 } from './usePortfolio';
-export type { CorrelationResult, RiskCluster, PortfolioAnalysis } from './usePortfolio';
 
 // 宏观经济分析
 export {
@@ -57,7 +56,6 @@ export {
   useRefreshMacro,
   MACRO_KEY,
 } from './useMacro';
-export type { MacroIndicator, MacroOverview, MacroImpact, MacroAnalysisResult } from './useMacro';
 
 // 记忆服务
 export {
@@ -184,7 +182,6 @@ export {
   ANALYSIS_HISTORY_KEY,
   ANALYSIS_DETAIL_KEY,
 } from './useAnalysisHistory';
-export type { AnalysisHistoryItem, AnalysisDetail } from './useAnalysisHistory';
 
 // AI 配置
 export {
@@ -202,4 +199,3 @@ export {
   getConfigKeyLabel,
   getConfigKeyDescription,
 } from './useAIConfig';
-export type { AIProvider, AIProviderType, AIModelConfig, AIConfigStatus, TestProviderResult } from './useAIConfig';

@@ -4,17 +4,17 @@
  * 从 StockDetailModal 拆分，提供与 Fund Manager Agent 的对话功能。
  */
 import React, { useState, useRef, useEffect, memo } from 'react';
-import type { Stock, AgentAnalysis, ChatMessage } from '../types';
+import type * as T from '../src/types/schema';
 import * as api from '../services/api';
 import { Bot, Send } from 'lucide-react';
 
 interface ChatPanelProps {
-  stock: Stock;
-  analysis?: AgentAnalysis;
+  stock: T.AssetPrice;
+  analysis?: T.AgentAnalysisResponse;
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = memo(({ stock, analysis }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<T.ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -23,8 +23,9 @@ const ChatPanel: React.FC<ChatPanelProps> = memo(({ stock, analysis }) => {
   useEffect(() => {
     if (messages.length === 0) {
       setMessages([{
-        role: 'model',
-        text: `Hello! I've analyzed ${stock.name}. I have insights from the Bull Researcher, Bear Researcher, and Risk Manager. What would you like to know?`
+        role: 'assistant',
+        content: `Hello! I've analyzed ${stock.name}. I have insights from the Bull Researcher, Bear Researcher, and Risk Manager. What would you like to know?`,
+        timestamp: new Date().toISOString()
       }]);
     }
   }, [stock.name, messages.length]);
@@ -38,14 +39,22 @@ const ChatPanel: React.FC<ChatPanelProps> = memo(({ stock, analysis }) => {
     e.preventDefault();
     if (!input.trim() || !analysis) return;
 
-    const userMsg: ChatMessage = { role: 'user', text: input };
+    const userMsg: T.ChatMessage = {
+      role: 'user',
+      content: input,
+      timestamp: new Date().toISOString()
+    };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsTyping(true);
 
-    const response = await api.getChatResponse(stock.symbol, userMsg.text);
+    const response = await api.getChatResponse(stock.symbol, userMsg.content);
 
-    setMessages(prev => [...prev, { role: 'model', text: response.text }]);
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: response.content,
+      timestamp: new Date().toISOString()
+    }]);
     setIsTyping(false);
   };
 
@@ -60,9 +69,9 @@ const ChatPanel: React.FC<ChatPanelProps> = memo(({ stock, analysis }) => {
                 : 'bg-gray-800 text-gray-200 rounded-bl-none border border-gray-700'
             }`}>
               <div className="flex items-center gap-2 mb-1 opacity-50 text-xs">
-                {msg.role === 'model' ? <Bot className="w-3 h-3" /> : 'You'}
+                {msg.role === 'assistant' ? <Bot className="w-3 h-3" /> : 'You'}
               </div>
-              <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.text}</p>
+              <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
             </div>
           </div>
         ))}

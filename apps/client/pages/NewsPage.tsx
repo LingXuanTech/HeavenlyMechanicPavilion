@@ -28,11 +28,11 @@ import {
   useRefreshNews,
   useNewsSources,
 } from '../hooks';
-import type { NewsCategory, NewsSentiment, AggregatedNewsItem } from '../types';
+import type * as T from '../src/types/schema';
 
 // === 常量定义 ===
 
-const CATEGORY_LABELS: Record<NewsCategory, string> = {
+const CATEGORY_LABELS: Record<T.NewsCategory, string> = {
   market: '市场动态',
   stock: '个股新闻',
   macro: '宏观经济',
@@ -44,7 +44,7 @@ const CATEGORY_LABELS: Record<NewsCategory, string> = {
   general: '综合',
 };
 
-const CATEGORY_COLORS: Record<NewsCategory, string> = {
+const CATEGORY_COLORS: Record<T.NewsCategory, string> = {
   market: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
   stock: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
   macro: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
@@ -58,7 +58,7 @@ const CATEGORY_COLORS: Record<NewsCategory, string> = {
 
 // === 辅助组件 ===
 
-const SentimentIcon: React.FC<{ sentiment: NewsSentiment }> = ({ sentiment }) => {
+const SentimentIcon: React.FC<{ sentiment: T.NewsSentiment }> = ({ sentiment }) => {
   switch (sentiment) {
     case 'positive':
       return <TrendingUp className="w-4 h-4 text-emerald-400" />;
@@ -69,7 +69,7 @@ const SentimentIcon: React.FC<{ sentiment: NewsSentiment }> = ({ sentiment }) =>
   }
 };
 
-const CategoryBadge: React.FC<{ category: NewsCategory }> = ({ category }) => (
+const CategoryBadge: React.FC<{ category: T.NewsCategory }> = ({ category }) => (
   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${CATEGORY_COLORS[category]}`}>
     <Tag className="w-3 h-3" />
     {CATEGORY_LABELS[category]}
@@ -97,7 +97,7 @@ const TimeAgo: React.FC<{ timestamp: string }> = ({ timestamp }) => {
   );
 };
 
-const NewsCard: React.FC<{ news: AggregatedNewsItem }> = ({ news }) => (
+const NewsCard: React.FC<{ news: T.AggregatedNewsItem }> = ({ news }) => (
   <a
     href={news.url}
     target="_blank"
@@ -140,7 +140,7 @@ const NewsCard: React.FC<{ news: AggregatedNewsItem }> = ({ news }) => (
   </a>
 );
 
-const FlashNewsItem: React.FC<{ news: AggregatedNewsItem }> = ({ news }) => (
+const FlashNewsItem: React.FC<{ news: T.AggregatedNewsItem }> = ({ news }) => (
   <a
     href={news.url}
     target="_blank"
@@ -166,8 +166,8 @@ const FlashNewsItem: React.FC<{ news: AggregatedNewsItem }> = ({ news }) => (
 
 const NewsPage: React.FC = () => {
   // 筛选状态
-  const [selectedCategory, setSelectedCategory] = useState<NewsCategory | 'all'>('all');
-  const [selectedSentiment, setSelectedSentiment] = useState<NewsSentiment | 'all'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<T.NewsCategory | 'all'>('all');
+  const [selectedSentiment, setSelectedSentiment] = useState<T.NewsSentiment | 'all'>('all');
 
   // 数据 hooks
   const { data: allNews, isLoading: isAllLoading, isFetching: isAllFetching } = useAggregatedNews();
@@ -177,7 +177,7 @@ const NewsPage: React.FC = () => {
 
   // 按分类获取（当选择特定分类时）
   const { data: categoryNews, isLoading: isCategoryLoading } = useNewsByCategory(
-    selectedCategory as NewsCategory,
+    selectedCategory as T.NewsCategory,
     50
   );
 
@@ -204,12 +204,12 @@ const NewsPage: React.FC = () => {
   };
 
   // 分类列表
-  const categories: (NewsCategory | 'all')[] = ['all', ...Object.keys(CATEGORY_LABELS) as NewsCategory[]];
+  const categories: (T.NewsCategory | 'all')[] = ['all', ...Object.keys(CATEGORY_LABELS) as T.NewsCategory[]];
 
   return (
     <PageLayout
       title="News Aggregator"
-      subtitle={sourcesData ? `${sourcesData.total_sources} 个新闻源` : '多源聚合新闻'}
+      subtitle={sourcesData ? `${(sourcesData as any).total_sources} 个新闻源` : '多源聚合新闻'}
       icon={Newspaper}
       iconColor="text-orange-400"
       iconBgColor="bg-orange-500/10"

@@ -1,18 +1,18 @@
 import React, { useRef, useState, useEffect } from 'react';
 import StockCard from './StockCard';
 import StockCardSkeleton from './StockCardSkeleton';
-import type { Stock, StockPrice, AgentAnalysis } from '../types';
+import type * as T from '../src/types/schema';
 import type { AnalysisOptions } from '../services/api';
 
 interface LazyStockCardProps {
-  stock: Stock;
-  priceData?: StockPrice;
-  analysis?: AgentAnalysis;
+  stock: T.AssetPrice;
+  priceData?: T.StockPrice;
+  analysis?: T.AgentAnalysis;
   onRefresh: (symbol: string, name: string, options?: AnalysisOptions) => void;
   isAnalyzing: boolean;
   currentStage?: string;
   onDelete: (symbol: string) => void;
-  onClick: (stock: Stock) => void;
+  onClick: (stock: T.AssetPrice) => void;
 }
 
 /**

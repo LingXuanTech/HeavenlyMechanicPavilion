@@ -1,4 +1,57 @@
-
 # moon
 .moon/cache
 .moon/docker
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv
+venv/
+ENV/
+.env
+.env.*
+!.env.example
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# AI Tools & IDEs
+.cursor/
+.opencode/
+.windsurf/
+.gemini/
+.factory/
+.agents/
+.agent/
+.codex/
+.claude/
+.spec-workflow/
+.python-version
+.github/skills/
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Database
+*.db
+*.sqlite3
+# !apps/server/db/trading.db
+
+# Logs
+*.log

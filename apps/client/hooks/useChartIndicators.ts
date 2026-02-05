@@ -57,7 +57,14 @@ const PERIOD_TO_DAYS: Record<TimePeriod, number> = {
  */
 async function fetchKlineData(symbol: string, days: number): Promise<KlineDataPoint[]> {
   const data = await getMarketKline(symbol, days);
-  return data.kline || [];
+  return (data.data || []).map(item => ({
+    time: item.datetime,
+    open: item.open,
+    high: item.high,
+    low: item.low,
+    close: item.close,
+    volume: item.volume
+  }));
 }
 
 export function useChartIndicators(options: UseChartIndicatorsOptions = {}): UseChartIndicatorsReturn {

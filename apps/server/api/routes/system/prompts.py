@@ -10,32 +10,25 @@ from typing import Optional, List, Any, Dict
 
 from services.prompt_config_service import prompt_config_service
 from db.models import AgentCategory
+from api.schemas.prompts import (
+    PromptUpdateRequest,
+    PromptRollbackRequest,
+    YamlImportRequest,
+    PromptListResponse,
+    AgentPromptDetail,
+    PromptServiceStatus
+)
 
 router = APIRouter(prefix="/prompts", tags=["Prompt Config"])
 
 
 # ============ Pydantic Models ============
 
-class PromptUpdateRequest(BaseModel):
-    system_prompt: Optional[str] = None
-    user_prompt_template: Optional[str] = None
-    display_name: Optional[str] = None
-    description: Optional[str] = None
-    available_variables: Optional[List[str]] = None
-    change_note: Optional[str] = None
-
-
-class PromptRollbackRequest(BaseModel):
-    target_version: int
-
-
-class YamlImportRequest(BaseModel):
-    yaml_content: str
 
 
 # ============ 路由 ============
 
-@router.get("/")
+@router.get("/", response_model=PromptListResponse)
 async def list_prompts(
     category: Optional[str] = Query(None, description="Filter by category: analyst, researcher, manager, risk, trader, synthesizer")
 ):
@@ -69,13 +62,13 @@ async def list_categories():
     }
 
 
-@router.get("/status")
+@router.get("/status", response_model=PromptServiceStatus)
 async def get_service_status():
     """获取 Prompt 配置服务状态"""
     return prompt_config_service.get_status()
 
 
-@router.get("/{prompt_id}")
+@router.get("/{prompt_id}", response_model=AgentPromptDetail)
 async def get_prompt_detail(prompt_id: int):
     """
     获取单个 Prompt 详情

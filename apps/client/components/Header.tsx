@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MarketStatus, GlobalMarketAnalysis } from '../types';
+import type * as T from '../src/types/schema';
 import { Clock, RefreshCcw, Wifi, TrendingUp, TrendingDown, Globe, User, LogOut, ChevronDown } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface HeaderProps {
-  status: MarketStatus;
-  marketAnalysis: GlobalMarketAnalysis | null;
+  status: T.MarketStatus;
+  marketAnalysis: T.MarketOverview | null;
   onRefreshAll: () => void;
   onRefreshMarket: () => void;
   isGlobalRefreshing: boolean;
@@ -41,14 +41,14 @@ const Header: React.FC<HeaderProps> = ({
 
   // Use marketAnalysis if available, otherwise fallback to loading or empty
   const indices = marketAnalysis?.indices || [
-    { name: 'S&P 500', value: 0, change: 0, changePercent: 0 },
-    { name: 'Nasdaq', value: 0, change: 0, changePercent: 0 },
-    { name: 'HSI', value: 0, change: 0, changePercent: 0 },
-    { name: 'BTC/USD', value: 0, change: 0, changePercent: 0 },
+    { name: 'S&P 500', current: 0, change: 0, change_percent: 0, code: 'SPX', region: 'US', updated_at: '', name_en: 'S&P 500' },
+    { name: 'Nasdaq', current: 0, change: 0, change_percent: 0, code: 'IXIC', region: 'US', updated_at: '', name_en: 'Nasdaq' },
+    { name: 'HSI', current: 0, change: 0, change_percent: 0, code: 'HSI', region: 'HK', updated_at: '', name_en: 'HSI' },
+    { name: 'BTC/USD', current: 0, change: 0, change_percent: 0, code: 'BTC', region: 'GLOBAL', updated_at: '', name_en: 'BTC/USD' },
   ];
 
-  const marketSummary = marketAnalysis?.summary || "Initializing market agents...";
-  const sentiment = marketAnalysis?.sentiment || "Neutral";
+  const marketSummary = marketAnalysis?.global_sentiment || 'Initializing market agents...';
+  const sentiment = marketAnalysis?.global_sentiment || 'Neutral';
 
   return (
     <header className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-md sticky top-0 z-20 flex flex-col">
@@ -103,7 +103,7 @@ const Header: React.FC<HeaderProps> = ({
           <div className="text-right hidden md:block">
             <div className="text-sm font-mono text-gray-300 flex items-center justify-end gap-2">
               <Clock className="w-3 h-3 text-gray-500" />
-              {marketAnalysis?.lastUpdated || status.lastUpdated.toLocaleTimeString()}
+              {marketAnalysis?.updated_at || status.lastUpdated}
             </div>
             <div className="text-[10px] text-gray-500 flex items-center justify-end gap-1">
               <Wifi className="w-3 h-3" /> Connected
@@ -176,10 +176,20 @@ const Header: React.FC<HeaderProps> = ({
            {indices.map((idx, i) => (
              <div key={i} className="flex items-center gap-2 text-xs font-mono shrink-0">
                 <span className="font-bold text-gray-400">{idx.name}</span>
-                <span className="text-white">{idx.value ? idx.value.toFixed(2) : '---'}</span>
-                <span className={`flex items-center ${idx.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {idx.changePercent >= 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
-                  {idx.changePercent ? Math.abs(idx.changePercent).toFixed(2) : '0.00'}%
+                <span className="text-white">
+                  {'current' in idx ? idx.current.toFixed(2) : '---'}
+                </span>
+                <span
+                  className={`flex items-center ${
+                    (idx.change_percent ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'
+                  }`}
+                >
+                  {(idx.change_percent ?? 0) >= 0 ? (
+                    <TrendingUp className="w-3 h-3 mr-1" />
+                  ) : (
+                    <TrendingDown className="w-3 h-3 mr-1" />
+                  )}
+                  {idx.change_percent ? Math.abs(idx.change_percent).toFixed(2) : '0.00'}%
                 </span>
              </div>
            ))}
@@ -187,10 +197,20 @@ const Header: React.FC<HeaderProps> = ({
            {indices.map((idx, i) => (
              <div key={`dup-${i}`} className="flex items-center gap-2 text-xs font-mono shrink-0">
                 <span className="font-bold text-gray-400">{idx.name}</span>
-                <span className="text-white">{idx.value ? idx.value.toFixed(2) : '---'}</span>
-                <span className={`flex items-center ${idx.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {idx.changePercent >= 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
-                  {idx.changePercent ? Math.abs(idx.changePercent).toFixed(2) : '0.00'}%
+                <span className="text-white">
+                  {'current' in idx ? idx.current.toFixed(2) : '---'}
+                </span>
+                <span
+                  className={`flex items-center ${
+                    (idx.change_percent ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'
+                  }`}
+                >
+                  {(idx.change_percent ?? 0) >= 0 ? (
+                    <TrendingUp className="w-3 h-3 mr-1" />
+                  ) : (
+                    <TrendingDown className="w-3 h-3 mr-1" />
+                  )}
+                  {idx.change_percent ? Math.abs(idx.change_percent).toFixed(2) : '0.00'}%
                 </span>
              </div>
            ))}

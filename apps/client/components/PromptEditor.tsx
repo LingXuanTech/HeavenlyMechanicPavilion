@@ -5,7 +5,6 @@ import {
   Save,
   RefreshCw,
   Bot,
-  ChevronDown,
   ChevronRight,
   AlertCircle,
   Check,

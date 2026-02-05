@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as api from '../services/api';
-import { Stock } from '../types';
+import type * as T from '../src/types/schema';
 
-const INITIAL_STOCKS: Stock[] = [
+const INITIAL_STOCKS: T.Watchlist[] = [
   { symbol: '600276.SH', name: 'Jiangsu Hengrui', market: 'CN' },
   { symbol: '603993.SH', name: 'China Moly', market: 'CN' },
   { symbol: '00700.HK', name: 'Tencent', market: 'HK' },
@@ -51,10 +51,10 @@ export function useAddStock() {
       return api.addToWatchlist(symbol);
     },
     onSuccess: (newStock) => {
-      queryClient.setQueryData<Stock[]>(WATCHLIST_KEY, (old) => {
+      queryClient.setQueryData<T.Watchlist[]>(WATCHLIST_KEY, (old) => {
         if (!old) return [newStock];
         // 避免重复
-        if (old.some(s => s.symbol === newStock.symbol)) return old;
+        if (old.some((s) => s.symbol === newStock.symbol)) return old;
         return [...old, newStock];
       });
     },
@@ -73,9 +73,9 @@ export function useRemoveStock() {
       return symbol;
     },
     onSuccess: (symbol) => {
-      queryClient.setQueryData<Stock[]>(WATCHLIST_KEY, (old) => {
+      queryClient.setQueryData<T.Watchlist[]>(WATCHLIST_KEY, (old) => {
         if (!old) return [];
-        return old.filter(s => s.symbol !== symbol);
+        return old.filter((s) => s.symbol !== symbol);
       });
     },
   });

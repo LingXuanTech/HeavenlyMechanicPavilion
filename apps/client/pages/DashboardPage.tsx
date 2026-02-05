@@ -4,7 +4,7 @@
  * 显示股票监控卡片、市场概览和新闻摘要
  */
 import React, { useState, useCallback, useMemo } from 'react';
-import { Stock, MarketStatus } from '../types';
+import type * as T from '../src/types/schema';
 import { logger } from '../utils/logger';
 import Header from '../components/Header';
 import LazyStockCard from '../components/LazyStockCard';
@@ -30,7 +30,7 @@ const DashboardPage: React.FC = () => {
   const removeStockMutation = useRemoveStock();
 
   // 价格数据（自动并行获取所有股票价格）
-  const { prices, isLoading: isPricesLoading } = useStockPrices(stocks);
+  const { prices } = useStockPrices(stocks);
 
   // 分析相关
   const {
@@ -44,24 +44,23 @@ const DashboardPage: React.FC = () => {
   // 市场数据
   const {
     data: globalMarketData,
-    isLoading: isGlobalMarketLoading,
     isFetching: isMarketRefreshing,
   } = useGlobalMarket();
 
   const { data: flashNews = [], isFetching: isFlashNewsRefreshing } = useFlashNews();
-  const { refreshGlobalMarket, refreshFlashNews } = useMarketStatus();
+  const { refreshGlobalMarket } = useMarketStatus();
 
   // === 本地状态 ===
   const [marketFilter, setMarketFilter] = useState('ALL');
-  const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
+  const [selectedStock, setSelectedStock] = useState<T.AssetPrice | null>(null);
   // 跟踪新鲜分析（用于打字机效果）
   const [freshAnalyses, setFreshAnalyses] = useState<Set<string>>(new Set());
 
   // === 计算属性 ===
-  const marketStatus: MarketStatus = useMemo(
+  const marketStatus: T.MarketStatus = useMemo(
     () => ({
-      sentiment: globalMarketData?.sentiment || 'Neutral',
-      lastUpdated: new Date(),
+      sentiment: (globalMarketData?.global_sentiment as any) || 'Neutral',
+      lastUpdated: new Date().toISOString(),
       activeAgents: Object.values(analyzingStates).filter(Boolean).length,
     }),
     [globalMarketData, analyzingStates]
@@ -99,7 +98,7 @@ const DashboardPage: React.FC = () => {
 
   const handleRunAll = useCallback(() => {
     const symbols = filteredStocks.map((s) => s.symbol);
-    runMultipleAnalyses(symbols, 2000);
+    runMultipleAnalyses(symbols, {}, 2000);
   }, [filteredStocks, runMultipleAnalyses]);
 
   const handleDeleteStock = useCallback(
@@ -135,7 +134,17 @@ const DashboardPage: React.FC = () => {
       />
 
       {/* Watchdog Ticker */}
-      <FlashNewsTicker news={flashNews} isRefreshing={isFlashNewsRefreshing} />
+      <FlashNewsTicker
+        news={flashNews.map((n) => ({
+          id: n.id,
+          time: n.published_at,
+          headline: n.title,
+          impact: 'Medium',
+          sentiment: n.sentiment === 'positive' ? 'Positive' : 'Negative',
+          relatedSymbols: n.symbols,
+        }))}
+        isRefreshing={isFlashNewsRefreshing}
+      />
 
       <main className="flex-1 overflow-hidden flex">
         {/* Stock Cards Area */}
@@ -149,14 +158,23 @@ const DashboardPage: React.FC = () => {
             {filteredStocks.map((stock) => (
               <LazyStockCard
                 key={stock.symbol}
-                stock={stock}
+                stock={
+                  {
+                    ...stock,
+                    asset_class: 'Equity',
+                    price: prices[stock.symbol]?.price || 0,
+                    change_1d: prices[stock.symbol]?.change || 0,
+                    change_5d: 0,
+                    change_20d: 0,
+                  } as T.AssetPrice
+                }
                 priceData={prices[stock.symbol]}
-                analysis={getAnalysis(stock.symbol)}
+                analysis={getAnalysis(stock.symbol) as any}
                 onRefresh={handleRunAnalysis}
                 isAnalyzing={analyzingStates[stock.symbol] || false}
                 currentStage={analyzingStages[stock.symbol]}
                 onDelete={handleDeleteStock}
-                onClick={setSelectedStock}
+                onClick={(s) => setSelectedStock(s as T.AssetPrice)}
               />
             ))}
 
@@ -181,9 +199,14 @@ const DashboardPage: React.FC = () => {
       {/* Detail Modal */}
       {selectedStock && (
         <StockDetailModal
-          stock={selectedStock}
+          stock={
+            {
+              ...selectedStock,
+              market: (selectedStock as any).market || 'CN',
+            } as any
+          }
           priceData={prices[selectedStock.symbol]}
-          analysis={getAnalysis(selectedStock.symbol)}
+          analysis={getAnalysis(selectedStock.symbol) as any}
           onClose={() => {
             // 关闭时清除新鲜标记
             setFreshAnalyses(prev => {

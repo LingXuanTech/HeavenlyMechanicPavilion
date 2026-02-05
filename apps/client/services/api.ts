@@ -9,58 +9,12 @@
 
 import { logger } from '../utils/logger';
 
-import {
-  MarketOpportunity,
-  FlashNews,
-  AnalysisMemory,
-  MemoryRetrievalResult,
-  ReflectionReport,
-  MarketWatcherOverview,
-  MarketWatcherIndex,
-  MarketRegion,
-  AggregatedNewsItem,
-  NewsAggregateResult,
-  NewsCategory,
-  HealthReport,
-  GlobalMarketResponse,
-  KlineDataResponse,
-  StockPriceResponse,
-  MemorySearchResponse,
-  NewsSourcesResponse,
-  HealthErrorsResponse,
-  SSEEventData,
-  ErrorRecord,
-  ServiceStatusResponse,
-  RegionSentimentInfo,
-  ComponentHealthInfo,
-  NorthMoneyFlow,
-  NorthMoneySummary,
-  NorthMoneyHistory,
-  NorthMoneyHolding,
-  NorthMoneyTopStock,
-  IntradayFlowSummary,
-  NorthMoneyAnomaly,
-  NorthMoneyRealtime,
-  NorthMoneySectorFlow,
-  SectorRotationSignal,
-  LHBStock,
-  LHBSummary,
-  HotMoneySeat,
-  JiejinStock,
-  JiejinCalendar,
-  JiejinSummary,
-  // 新增类型
-  Stock,
-  AgentAnalysis,
-  ChatMessage,
-  AnalysisHistoryItem,
-  AnalysisTaskStatus,
-  CorrelationMatrix,
-  PortfolioAnalysisResult,
-  QuickPortfolioCheck,
-  MacroOverview,
-  MacroImpactAnalysis,
-} from '../types';
+import * as T from '../src/types/schema';
+
+// 暂时保留旧的导入，直到全部替换完成
+
+/** SSE 事件数据类型 */
+export type SSEEventData = Record<string, unknown>;
 
 // ============ 基础配置 ============
 
@@ -386,7 +340,7 @@ export const analyzeStockWithAgent = async (
  * 获取最新分析结果
  */
 export const getLatestAnalysis = (symbol: string) =>
-  request<AgentAnalysis>(`/analyze/latest/${symbol}`);
+  request<T.AgentAnalysis>(`/analyze/latest/${symbol}`);
 
 /**
  * 快速扫描（L1 模式）
@@ -394,50 +348,32 @@ export const getLatestAnalysis = (symbol: string) =>
  * 仅运行 Market + News + Macro 三个分析师，跳过辩论和风险评估。
  */
 export const quickScanStock = (symbol: string) =>
-  request<{
-    task_id: string;
-    symbol: string;
-    status: string;
-    analysis_level: string;
-    analysts: string[];
-    estimated_time_seconds: number;
-  }>(`/analyze/quick/${symbol}`, { method: 'POST' });
+  request<T.ApiResponse<'/api/analyze/quick/{symbol}', 'post'>>(`/analyze/quick/${symbol}`, { method: 'POST' });
 
 /**
  * 获取分析历史
  */
 export const getAnalysisHistory = (symbol: string, limit: number = 10) =>
-  request<{ items: AnalysisHistoryItem[]; total: number; offset: number; limit: number }>(`/analyze/history/${symbol}?limit=${limit}&status=completed`);
+  request<T.ApiResponse<'/api/analyze/history/{symbol}'>>(`/analyze/history/${symbol}?limit=${limit}&status=completed`);
 
 /**
  * 获取指定 ID 的完整分析报告
  */
 export const getAnalysisDetail = (analysisId: number) =>
-  request<{
-    id: number;
-    symbol: string;
-    date: string;
-    signal: string;
-    confidence: number;
-    full_report: AgentAnalysis;
-    anchor_script: string;
-    created_at: string;
-    task_id: string;
-    elapsed_seconds: number;
-  }>(`/analyze/detail/${analysisId}`);
+  request<T.ApiResponse<'/api/analyze/detail/{analysis_id}'>>(`/analyze/detail/${analysisId}`);
 
 /**
  * 获取分析任务状态
  */
 export const getAnalysisStatus = (taskId: string) =>
-  request<AnalysisTaskStatus>(`/analyze/status/${taskId}`);
+  request<T.AnalysisTaskStatus>(`/analyze/status/${taskId}`);
 
 // ============ 监听列表 API ============
 
-export const getWatchlist = () => request<Stock[]>('/watchlist/');
+export const getWatchlist = () => request<T.Watchlist[]>('/watchlist/');
 
 export const addToWatchlist = (symbol: string) =>
-  request<Stock>(`/watchlist/${symbol}`, { method: 'POST' });
+  request<T.Watchlist>(`/watchlist/${symbol}`, { method: 'POST' });
 
 export const removeFromWatchlist = (symbol: string) =>
   request<{ deleted: boolean }>(`/watchlist/${symbol}`, { method: 'DELETE' });
@@ -445,20 +381,20 @@ export const removeFromWatchlist = (symbol: string) =>
 // ============ 市场数据 API ============
 
 export const getMarketPrice = (symbol: string) =>
-  request<StockPriceResponse>(`/market/price/${symbol}`);
+  request<T.StockPrice>(`/market/price/${symbol}`);
 
 export const getMarketHistory = (symbol: string, period: string = '1mo') =>
-  request<KlineDataResponse[]>(`/market/history/${symbol}?period=${period}`);
+  request<T.KlineData[]>(`/market/history/${symbol}?period=${period}`);
 
 export const getMarketKline = (symbol: string, days: number = 90) =>
-  request<{ data: KlineDataResponse[]; symbol: string }>(`/market/kline/${encodeURIComponent(symbol)}?days=${days}`);
+  request<{ data: T.KlineData[]; symbol: string }>(`/market/kline/${encodeURIComponent(symbol)}?days=${days}`);
 
-export const getGlobalMarket = () => request<GlobalMarketResponse>('/market/global');
+export const getGlobalMarket = () => request<T.MarketOverview>('/market/global');
 
 // ============ 发现 API ============
 
-export const discoverStocks = async (query: string): Promise<MarketOpportunity[]> => {
-  const data = await request<{ results: MarketOpportunity[] }>(
+export const discoverStocks = async (query: string): Promise<T.MarketOpportunity[]> => {
+  const data = await request<{ results: T.MarketOpportunity[] }>(
     `/discover/?query=${encodeURIComponent(query)}`
   );
   return data.results;
@@ -466,20 +402,20 @@ export const discoverStocks = async (query: string): Promise<MarketOpportunity[]
 
 // ============ 新闻 API (旧版) ============
 
-export const getFlashNews = () => request<FlashNews[]>('/news/flash');
+export const getFlashNews = () => request<T.FlashNews[]>('/news/flash');
 
 export const getStockNews = (symbol: string) =>
-  request<FlashNews[]>(`/news/${symbol}`);
+  request<T.FlashNews[]>(`/news/${symbol}`);
 
 // ============ 聊天 API ============
 
 export const getChatResponse = (threadId: string, message: string) =>
-  request<ChatMessage>(`/chat/${threadId}?message=${encodeURIComponent(message)}`, {
+  request<T.ChatMessage>(`/chat/${threadId}?message=${encodeURIComponent(message)}`, {
     method: 'POST',
   });
 
 export const getChatHistory = (threadId: string) =>
-  request<ChatMessage[]>(`/chat/${threadId}`);
+  request<T.ChatMessage[]>(`/chat/${threadId}`);
 
 // ============ Prompt 管理 API ============
 
@@ -513,144 +449,135 @@ export const reloadPrompts = () =>
 // ============ Portfolio 分析 API ============
 
 export const getPortfolioCorrelation = (symbols: string[], period: string = '1mo') =>
-  request<CorrelationMatrix>('/portfolio/correlation', {
+  request<T.CorrelationResult>('/portfolio/correlation', {
     method: 'POST',
     body: JSON.stringify({ symbols, period }),
   });
 
 export const getPortfolioAnalysis = (symbols: string[], period: string = '1mo') =>
-  request<PortfolioAnalysisResult>('/portfolio/analyze', {
+  request<T.PortfolioAnalysisResult>('/portfolio/analyze', {
     method: 'POST',
     body: JSON.stringify({ symbols, period }),
   });
 
 export const getQuickPortfolioCheck = (symbols: string[]) =>
-  request<QuickPortfolioCheck>(`/portfolio/quick-check?symbols=${symbols.join(',')}`);
+  request<T.QuickPortfolioCheck>(`/portfolio/quick-check?symbols=${symbols.join(',')}`);
 
 // ============ 宏观经济 API ============
 
-export const getMacroOverview = () => request<MacroOverview>('/macro/overview');
+export const getMacroOverview = () => request<T.MacroOverview>('/macro/overview');
 
 export const getMacroIndicator = (name: string) =>
   request<Record<string, unknown>>(`/macro/indicator/${name}`);
 
 export const getMacroImpactAnalysis = (market?: string) => {
   const query = market ? `?market=${market}` : '';
-  return request<MacroImpactAnalysis>(`/macro/impact-analysis${query}`);
+  return request<T.MacroImpactAnalysis>(`/macro/impact-analysis${query}`);
 };
 
 export const refreshMacro = () =>
-  request<ServiceStatusResponse>('/macro/refresh', { method: 'POST' });
+  request<T.ApiResponse<'/api/macro/refresh', 'post'>>('/macro/refresh', { method: 'POST' });
 
 // ============ 记忆服务 API ============
 
 export const getMemoryStatus = () =>
-  request<{ status: string; total_memories: number; chroma_path: string }>('/memory/status');
+  request<T.ApiResponse<'/api/memory/status'>>('/memory/status');
 
 export const getMemoryRetrieve = (symbol: string, nResults: number = 5, maxDays: number = 365) =>
-  request<MemoryRetrievalResult[]>(
+  request<T.MemoryRetrievalResult[]>(
     `/memory/retrieve/${symbol}?n_results=${nResults}&max_days=${maxDays}`
   );
 
 export const getReflection = (symbol: string) =>
-  request<ReflectionReport | null>(`/memory/reflection/${symbol}`);
+  request<T.ReflectionReport | null>(`/memory/reflection/${symbol}`);
 
-export const storeMemory = (memory: AnalysisMemory) =>
-  request<ServiceStatusResponse>('/memory/store', {
+export const storeMemory = (memory: T.AnalysisMemory) =>
+  request<T.ApiResponse<'/api/memory/store', 'post'>>('/memory/store', {
     method: 'POST',
     body: JSON.stringify(memory),
   });
 
 export const clearMemory = (symbol?: string) => {
   const query = symbol ? `?symbol=${symbol}` : '';
-  return request<ServiceStatusResponse>(`/memory/clear${query}`, { method: 'DELETE' });
+  return request<T.ApiResponse<'/api/memory/clear', 'delete'>>(`/memory/clear${query}`, { method: 'DELETE' });
 };
 
 export const searchMemory = (query: string, nResults: number = 10) =>
-  request<MemorySearchResponse>(
+  request<T.ApiResponse<'/api/memory/search'>>(
     `/memory/search?query=${encodeURIComponent(query)}&n_results=${nResults}`
   );
 
 // ============ 市场监控 API ============
 
 export const getMarketWatcherStatus = () =>
-  request<ServiceStatusResponse>('/market-watcher/status');
+  request<T.ApiResponse<'/api/market-watcher/status'>>('/market-watcher/status');
 
 export const getMarketWatcherOverview = (forceRefresh: boolean = false) =>
-  request<MarketWatcherOverview>(
+  request<T.MarketOverview>(
     `/market-watcher/overview${forceRefresh ? '?force_refresh=true' : ''}`
   );
 
-export const getMarketIndices = (region?: MarketRegion, forceRefresh: boolean = false) => {
+export const getMarketIndices = (region?: T.MarketRegion, forceRefresh: boolean = false) => {
   const params = new URLSearchParams();
   if (region) params.append('region', region);
   if (forceRefresh) params.append('force_refresh', 'true');
   const query = params.toString() ? `?${params.toString()}` : '';
-  return request<MarketWatcherIndex[]>(`/market-watcher/indices${query}`);
+  return request<T.MarketIndex[]>(`/market-watcher/indices${query}`);
 };
 
 export const getMarketIndex = (code: string) =>
-  request<MarketWatcherIndex>(`/market-watcher/index/${code}`);
+  request<T.MarketIndex>(`/market-watcher/index/${code}`);
 
 export const refreshMarketIndices = () =>
-  request<ServiceStatusResponse>('/market-watcher/refresh', { method: 'POST' });
+  request<T.ApiResponse<'/api/market-watcher/refresh', 'post'>>('/market-watcher/refresh', { method: 'POST' });
 
 export const getMarketSentiment = () =>
-  request<{
-    global_sentiment: string;
-    risk_level: number;
-    regions: Record<string, RegionSentimentInfo>;
-    updated_at: string;
-  }>('/market-watcher/sentiment');
+  request<T.MarketSentiment>('/market-watcher/sentiment');
 
 // ============ 新闻聚合 API ============
 
 export const getNewsAggregatorStatus = () =>
-  request<ServiceStatusResponse>('/news-aggregator/status');
+  request<T.ApiResponse<'/api/news-aggregator/status'>>('/news-aggregator/status');
 
 export const getAggregatedNews = (forceRefresh: boolean = false) =>
-  request<NewsAggregateResult>(
+  request<T.NewsAggregateResult>(
     `/news-aggregator/all${forceRefresh ? '?force_refresh=true' : ''}`
   );
 
 export const getNewsFlashAggregated = (limit: number = 10) =>
-  request<AggregatedNewsItem[]>(`/news-aggregator/flash?limit=${limit}`);
+  request<T.NewsItem[]>(`/news-aggregator/flash?limit=${limit}`);
 
-export const getNewsByCategory = (category: NewsCategory, limit: number = 20) =>
-  request<AggregatedNewsItem[]>(`/news-aggregator/category/${category}?limit=${limit}`);
+export const getNewsByCategory = (category: T.NewsCategory, limit: number = 20) =>
+  request<T.NewsItem[]>(`/news-aggregator/category/${category}?limit=${limit}`);
 
 export const getNewsBySymbol = (symbol: string, limit: number = 20) =>
-  request<AggregatedNewsItem[]>(`/news-aggregator/symbol/${symbol}?limit=${limit}`);
+  request<T.NewsItem[]>(`/news-aggregator/symbol/${symbol}?limit=${limit}`);
 
 export const refreshAggregatedNews = () =>
-  request<ServiceStatusResponse>('/news-aggregator/refresh', { method: 'POST' });
+  request<T.ApiResponse<'/api/news-aggregator/refresh', 'post'>>('/news-aggregator/refresh', { method: 'POST' });
 
 export const getNewsSources = () =>
-  request<NewsSourcesResponse>('/news-aggregator/sources');
+  request<T.ApiResponse<'/api/news-aggregator/sources'>>('/news-aggregator/sources');
 
 // ============ 健康监控 API ============
 
 export const getHealthQuick = () =>
-  request<{ status: string; uptime_seconds: number }>('/health/');
+  request<T.ApiResponse<'/api/health/'>>('/health/');
 
 export const getHealthReport = (forceRefresh: boolean = false) =>
-  request<HealthReport>(`/health/report${forceRefresh ? '?force_refresh=true' : ''}`);
+  request<T.HealthReport>(`/health/report${forceRefresh ? '?force_refresh=true' : ''}`);
 
 export const getHealthComponents = () =>
-  request<{ overall: string; components: Record<string, ComponentHealthInfo> }>('/health/components');
+  request<T.ApiResponse<'/api/health/components'>>('/health/components');
 
 export const getHealthMetrics = () =>
-  request<{
-    cpu: { percent: number };
-    memory: { percent: number; used_mb: number; total_mb: number };
-    disk: { percent: number; used_gb: number; total_gb: number };
-  }>('/health/metrics');
+  request<T.SystemMetrics>('/health/metrics');
 
 export const getHealthErrors = (limit: number = 10) =>
-  request<HealthErrorsResponse>(`/health/errors?limit=${limit}`);
+  request<T.ApiResponse<'/api/health/errors'>>(`/health/errors?limit=${limit}`);
 
 export const clearHealthErrors = () =>
-  request<ServiceStatusResponse>('/health/errors', { method: 'DELETE' });
+  request<T.ApiResponse<'/api/health/errors', 'delete'>>('/health/errors', { method: 'DELETE' });
 
 export const getSystemUptime = () =>
   request<{
@@ -740,33 +667,17 @@ export const listAIProviders = () =>
 export const getAIProvider = (providerId: number) =>
   request<AIProvider>(`/ai/providers/${providerId}`);
 
-export const createAIProvider = (data: {
-  name: string;
-  provider_type: AIProviderType;
-  base_url?: string;
-  api_key?: string;
-  models?: string[];
-  is_enabled?: boolean;
-  priority?: number;
-}) =>
-  request<{ id: number; name: string; provider_type: string }>('/ai/providers', {
+export const createAIProvider = (data: T.ApiRequestBody<'/api/ai/providers', 'post'>) =>
+  request<T.AIProvider>('/ai/providers', {
     method: 'POST',
     body: JSON.stringify(data),
   });
 
 export const updateAIProvider = (
   providerId: number,
-  data: Partial<{
-    name: string;
-    provider_type: AIProviderType;
-    base_url: string;
-    api_key: string;
-    models: string[];
-    is_enabled: boolean;
-    priority: number;
-  }>
+  data: T.ApiRequestBody<'/api/ai/providers/{provider_id}', 'put'>
 ) =>
-  request<{ id: number; name: string; updated: boolean }>(`/ai/providers/${providerId}`, {
+  request<T.AIProvider>(`/ai/providers/${providerId}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
@@ -783,13 +694,13 @@ export const testAIProvider = (providerId: number) =>
 
 // 模型配置
 export const getAIModelConfigs = () =>
-  request<{ configs: AIModelConfig[] }>('/ai/models');
+  request<T.ModelConfigListResponse>('/ai/models');
 
 export const updateAIModelConfig = (
   configKey: string,
-  data: { provider_id: number; model_name: string }
+  data: T.ApiRequestBody<'/api/ai/models/{config_key}', 'put'>
 ) =>
-  request<{ config_key: string; updated: boolean }>(`/ai/models/${configKey}`, {
+  request<T.AIModelConfig>(`/ai/models/${configKey}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
@@ -799,110 +710,108 @@ export const refreshAIConfig = () =>
   request<{ refreshed: boolean }>('/ai/refresh', { method: 'POST' });
 
 export const getAIConfigStatus = () =>
-  request<AIConfigStatus>('/ai/status');
+  request<T.AIConfigStatus>('/ai/status');
 
 // ============ 北向资金 API (A股特有) ============
 
 export const getNorthMoneyFlow = () =>
-  request<NorthMoneyFlow>('/north-money/flow');
+  request<T.NorthMoneyFlow>('/north-money/flow');
 
 export const getNorthMoneySummary = () =>
-  request<NorthMoneySummary>('/north-money/summary');
+  request<T.NorthMoneySummary>('/north-money/summary');
 
 export const getNorthMoneyHistory = (days: number = 30) =>
-  request<NorthMoneyHistory[]>(`/north-money/history?days=${days}`);
+  request<T.NorthMoneyHistory[]>(`/north-money/history?days=${days}`);
 
 export const getNorthMoneyHolding = (symbol: string) =>
-  request<NorthMoneyHolding>(`/north-money/holding/${symbol}`);
+  request<T.StockNorthHolding>(`/north-money/holding/${symbol}`);
 
 export const getNorthMoneyTopBuys = (limit: number = 20) =>
-  request<NorthMoneyTopStock[]>(`/north-money/top-buys?limit=${limit}`);
+  request<T.NorthMoneyTopStock[]>(`/north-money/top-buys?limit=${limit}`);
 
 export const getNorthMoneyTopSells = (limit: number = 20) =>
-  request<NorthMoneyTopStock[]>(`/north-money/top-sells?limit=${limit}`);
+  request<T.NorthMoneyTopStock[]>(`/north-money/top-sells?limit=${limit}`);
 
 export const getNorthMoneyIntraday = () =>
-  request<IntradayFlowSummary>('/north-money/intraday');
+  request<T.IntradayFlowSummary>('/north-money/intraday');
 
 export const getNorthMoneyAnomalies = () =>
-  request<NorthMoneyAnomaly[]>('/north-money/anomalies');
+  request<T.NorthMoneyAnomaly[]>('/north-money/anomalies');
 
 export const getNorthMoneyRealtime = () =>
-  request<NorthMoneyRealtime>('/north-money/realtime');
+  request<T.NorthMoneyRealtime>('/north-money/realtime');
 
 export const getNorthMoneySectorFlow = () =>
-  request<NorthMoneySectorFlow[]>('/north-money/sector-flow');
+  request<T.NorthMoneySectorFlow[]>('/north-money/sector-flow');
 
 export const getNorthMoneyRotationSignal = () =>
-  request<SectorRotationSignal>('/north-money/rotation-signal');
+  request<T.SectorRotationSignal>('/north-money/rotation-signal');
 
 // ============ 龙虎榜 API (A股特有) ============
 
 export const getLHBDaily = (tradeDate?: string) => {
   const query = tradeDate ? `?trade_date=${tradeDate}` : '';
-  return request<LHBStock[]>(`/lhb/daily${query}`);
+  return request<T.LHBStock[]>(`/lhb/daily${query}`);
 };
 
 export const getLHBSummary = () =>
-  request<LHBSummary>('/lhb/summary');
+  request<T.LHBSummary>('/lhb/summary');
 
 export const getLHBStockHistory = (symbol: string, days: number = 30) =>
-  request<LHBStock[]>(`/lhb/stock/${symbol}?days=${days}`);
+  request<T.LHBStock[]>(`/lhb/stock/${symbol}?days=${days}`);
 
 export const getLHBHotMoneyActivity = (days: number = 5) =>
-  request<HotMoneySeat[]>(`/lhb/hot-money?days=${days}`);
+  request<T.HotMoneySeat[]>(`/lhb/hot-money?days=${days}`);
 
 export const getLHBTopBuys = (limit: number = 10) =>
-  request<LHBStock[]>(`/lhb/top-buys?limit=${limit}`);
+  request<T.LHBStock[]>(`/lhb/top-buys?limit=${limit}`);
 
 export const getLHBTopSells = (limit: number = 10) =>
-  request<LHBStock[]>(`/lhb/top-sells?limit=${limit}`);
+  request<T.LHBStock[]>(`/lhb/top-sells?limit=${limit}`);
 
 export const getLHBInstitutionActivity = (direction: 'buy' | 'sell' | 'all' = 'all') =>
-  request<LHBStock[]>(`/lhb/institution-activity?direction=${direction}`);
+  request<T.LHBStock[]>(`/lhb/institution-activity?direction=${direction}`);
 
 export const getLHBHotMoneyStocks = () =>
-  request<LHBStock[]>('/lhb/hot-money-stocks');
+  request<T.LHBStock[]>('/lhb/hot-money-stocks');
 
 // ============ 限售解禁 API (A股特有) ============
 
 export const getJiejinUpcoming = (days: number = 30) =>
-  request<JiejinStock[]>(`/jiejin/upcoming?days=${days}`);
+  request<T.JiejinStock[]>(`/jiejin/upcoming?days=${days}`);
 
 export const getJiejinCalendar = (days: number = 30) =>
-  request<JiejinCalendar[]>(`/jiejin/calendar?days=${days}`);
+  request<T.JiejinCalendar[]>(`/jiejin/calendar?days=${days}`);
 
 export const getJiejinSummary = (days: number = 30) =>
-  request<JiejinSummary>(`/jiejin/summary?days=${days}`);
+  request<T.JiejinSummary>(`/jiejin/summary?days=${days}`);
 
 export const getJiejinStockPlan = (symbol: string) =>
-  request<JiejinStock>(`/jiejin/stock/${symbol}`);
+  request<T.JiejinStock>(`/jiejin/stock/${symbol}`);
 
 export const getJiejinHighPressure = (days: number = 7) =>
-  request<JiejinStock[]>(`/jiejin/high-pressure?days=${days}`);
+  request<T.JiejinStock[]>(`/jiejin/high-pressure?days=${days}`);
 
 export const getJiejinWarning = (symbol: string, days: number = 30) =>
-  request<{ symbol: string; warning: boolean; message: string; upcoming: JiejinStock[] }>(`/jiejin/warning/${symbol}?days=${days}`);
+  request<{ symbol: string; warning: boolean; message: string; upcoming: T.JiejinStock[] }>(`/jiejin/warning/${symbol}?days=${days}`);
 
 export const getJiejinToday = () =>
-  request<JiejinStock[]>('/jiejin/today');
+  request<T.JiejinStock[]>('/jiejin/today');
 
 export const getJiejinWeek = () =>
-  request<JiejinStock[]>('/jiejin/week');
+  request<T.JiejinStock[]>('/jiejin/week');
 
 // ============ Prompt 配置 API ============
 
-import type { AgentPrompt, AgentPromptDetail, AgentCategory, PromptServiceStatus } from '../types';
-
 /** 获取所有 Prompt 列表 */
-export const getPromptList = (category?: AgentCategory) => {
+export const getPromptList = (category?: T.AgentCategory) => {
   const query = category ? `?category=${category}` : '';
-  return request<{ prompts: AgentPrompt[]; total: number }>(`/prompts/${query}`);
+  return request<T.PromptListResponse>(`/prompts/${query}`);
 };
 
 /** 获取 Prompt 详情（含版本历史） */
 export const getPromptDetail = (promptId: number) =>
-  request<AgentPromptDetail>(`/prompts/${promptId}`);
+  request<T.AgentPromptDetail>(`/prompts/${promptId}`);
 
 /** 更新 Prompt */
 export const updatePrompt = (
@@ -930,11 +839,11 @@ export const rollbackPrompt = (promptId: number, targetVersion: number) =>
 
 /** 刷新 Prompt 缓存 */
 export const refreshPromptCache = () =>
-  request<PromptServiceStatus>('/prompts/refresh', { method: 'POST' });
+  request<T.PromptServiceStatus>('/prompts/refresh', { method: 'POST' });
 
 /** 获取 Prompt 服务状态 */
 export const getPromptServiceStatus = () =>
-  request<PromptServiceStatus>('/prompts/status');
+  request<T.PromptServiceStatus>('/prompts/status');
 
 /** 导出 Prompt 为 YAML */
 export const exportPromptsYaml = async (): Promise<string> => {

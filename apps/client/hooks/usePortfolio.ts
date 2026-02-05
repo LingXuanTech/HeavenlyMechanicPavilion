@@ -12,29 +12,6 @@ import {
 
 export const PORTFOLIO_KEY = ['portfolio'];
 
-export interface CorrelationResult {
-  symbols: string[];
-  matrix: number[][];
-  returns_summary: Record<string, {
-    mean_return: number;
-    volatility: number;
-    total_return: number;
-    data_points: number;
-  }>;
-}
-
-export interface RiskCluster {
-  stocks: string[];
-  avg_correlation: number;
-  risk_level: string;
-}
-
-export interface PortfolioAnalysis {
-  correlation: CorrelationResult;
-  diversification_score: number;
-  risk_clusters: RiskCluster[];
-  recommendations: string[];
-}
 
 /**
  * 计算组合相关性

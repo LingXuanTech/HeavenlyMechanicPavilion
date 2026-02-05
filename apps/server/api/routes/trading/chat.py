@@ -56,13 +56,15 @@ class ChatService:
 
 chat_service = ChatService()
 
-@router.get("/{thread_id}", response_model=List[Dict[str, Any]])
+from api.schemas.chat import ChatMessage, ChatResponse
+
+@router.get("/{thread_id}", response_model=List[ChatMessage])
 async def get_chat_history(thread_id: str, session: Session = Depends(get_session)):
     statement = select(ChatHistory).where(ChatHistory.thread_id == thread_id).order_by(ChatHistory.created_at)
     results = session.exec(statement).all()
-    return [{"role": r.role, "content": r.content, "timestamp": r.created_at} for r in results]
+    return [ChatMessage(role=r.role, content=r.content, timestamp=r.created_at.isoformat() if hasattr(r.created_at, 'isoformat') else str(r.created_at)) for r in results]
 
-@router.post("/{thread_id}")
+@router.post("/{thread_id}", response_model=ChatMessage)
 async def send_message(thread_id: str, message: str, session: Session = Depends(get_session)):
     # Get history
     statement = select(ChatHistory).where(ChatHistory.thread_id == thread_id).order_by(ChatHistory.created_at)

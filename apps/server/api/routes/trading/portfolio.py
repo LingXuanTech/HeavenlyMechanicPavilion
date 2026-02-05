@@ -18,6 +18,13 @@ class CorrelationRequest(BaseModel):
     period: str = "1mo"  # 1d, 5d, 1mo, 3mo, 6mo, 1y
 
 
+class RiskCluster(BaseModel):
+    """风险聚类"""
+    stocks: List[str]
+    avg_correlation: float
+    risk_level: str
+
+
 class CorrelationResult(BaseModel):
     """相关性矩阵结果"""
     symbols: List[str]
@@ -29,7 +36,7 @@ class PortfolioAnalysis(BaseModel):
     """组合分析结果"""
     correlation: CorrelationResult
     diversification_score: float
-    risk_clusters: List[Dict[str, Any]]
+    risk_clusters: List[RiskCluster]
     recommendations: List[str]
 
 

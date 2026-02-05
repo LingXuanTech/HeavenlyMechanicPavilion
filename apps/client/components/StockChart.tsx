@@ -1,16 +1,15 @@
 import React from 'react';
 import { AreaChart, Area, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
-import { StockPrice } from '../types';
 
 interface StockChartProps {
-  data: StockPrice['history'];
+  data: Array<{ datetime: string; value: number }>;
   color: string;
   height?: number;
 }
 
 const StockChart: React.FC<StockChartProps> = ({ data, color, height = 60 }) => {
-  const min = Math.min(...data.map(d => d.value));
-  const max = Math.max(...data.map(d => d.value));
+  const min = Math.min(...data.map((d) => d.value));
+  const max = Math.max(...data.map((d) => d.value));
   const domain = [min - (max - min) * 0.2, max + (max - min) * 0.2];
 
   return (
@@ -24,10 +23,10 @@ const StockChart: React.FC<StockChartProps> = ({ data, color, height = 60 }) => 
             </linearGradient>
           </defs>
           <YAxis hide domain={domain} />
-          <Tooltip 
+          <Tooltip
             contentStyle={{ backgroundColor: '#1f2937', border: 'none', borderRadius: '4px', fontSize: '12px' }}
             itemStyle={{ color: '#fff' }}
-            formatter={(value: number) => [value.toFixed(2), 'Price']}
+            formatter={(value: any) => [typeof value === 'number' ? value.toFixed(2) : value, 'Price']}
             labelStyle={{ display: 'none' }}
           />
           <Area 

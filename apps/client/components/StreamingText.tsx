@@ -149,7 +149,6 @@ export const StreamingReasoning: React.FC<StreamingReasoningProps> = memo(({
   isStreaming = false,
   stage = '',
   progress = 0,
-  onComplete,
 }) => {
   // 阶段标签映射
   const stageLabels: Record<string, string> = {

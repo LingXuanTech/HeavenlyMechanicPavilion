@@ -38,7 +38,7 @@ import {
   useClearHealthErrors,
   useSystemUptime,
 } from '../hooks';
-import type { HealthStatus, ComponentHealth, ErrorRecord } from '../types';
+import type * as T from '../src/types/schema';
 
 // === 类型定义 ===
 
@@ -52,8 +52,8 @@ interface SettingsSection {
 
 // === 辅助组件 ===
 
-const StatusBadge: React.FC<{ status: HealthStatus }> = ({ status }) => {
-  const config: Record<HealthStatus, { bg: string; text: string; icon: React.ElementType }> = {
+const StatusBadge: React.FC<{ status: T.HealthStatus }> = ({ status }) => {
+  const config: Record<T.HealthStatus, { bg: string; text: string; icon: React.ElementType }> = {
     healthy: { bg: 'bg-emerald-500/20', text: 'text-emerald-400', icon: CheckCircle },
     degraded: { bg: 'bg-amber-500/20', text: 'text-amber-400', icon: AlertTriangle },
     unhealthy: { bg: 'bg-red-500/20', text: 'text-red-400', icon: AlertCircle },
@@ -306,11 +306,11 @@ const SettingsPage: React.FC = () => {
             组件状态
           </h4>
           <div className="space-y-2">
-            {healthReport.components.map((comp: ComponentHealth) => (
+            {healthReport.components.map((comp: T.ComponentHealth) => (
               <div key={comp.name} className="flex items-center justify-between text-sm">
                 <span className="text-gray-300">{comp.name}</span>
                 <div className="flex items-center gap-2">
-                  {comp.latency_ms !== undefined && (
+                  {comp.latency_ms !== null && comp.latency_ms !== undefined && (
                     <span className="text-xs text-gray-500">{comp.latency_ms}ms</span>
                   )}
                   <StatusBadge status={comp.status} />
@@ -339,7 +339,7 @@ const SettingsPage: React.FC = () => {
             </button>
           </div>
           <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
-            {errorsData.errors.map((err: ErrorRecord, idx: number) => (
+            {errorsData.errors.map((err: T.ErrorRecord, idx: number) => (
               <div key={idx} className="text-xs p-2 bg-red-900/20 rounded border border-red-900/30">
                 <div className="flex justify-between text-red-300">
                   <span>{err.component}</span>

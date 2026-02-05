@@ -12,47 +12,6 @@ import {
 
 export const MACRO_KEY = ['macro'];
 
-export interface MacroIndicator {
-  name: string;
-  value: number;
-  previous_value?: number;
-  change?: number;
-  change_percent?: number;
-  unit: string;
-  date: string;
-  source: string;
-  trend: 'up' | 'down' | 'stable';
-}
-
-export interface MacroOverview {
-  fed_rate?: MacroIndicator;
-  gdp_growth?: MacroIndicator;
-  cpi?: MacroIndicator;
-  unemployment?: MacroIndicator;
-  pmi?: MacroIndicator;
-  treasury_10y?: MacroIndicator;
-  vix?: MacroIndicator;
-  dxy?: MacroIndicator;
-  sentiment: string;
-  summary: string;
-  last_updated: string;
-}
-
-export interface MacroImpact {
-  indicator: string;
-  impact_level: string;
-  direction: string;
-  reasoning: string;
-}
-
-export interface MacroAnalysisResult {
-  overview: MacroOverview;
-  impacts: MacroImpact[];
-  market_outlook: string;
-  risk_factors: string[];
-  opportunities: string[];
-}
-
 /**
  * 获取宏观经济概览
  */

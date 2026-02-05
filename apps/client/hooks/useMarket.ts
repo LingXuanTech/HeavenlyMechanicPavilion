@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import * as api from '../services/api';
-import { GlobalMarketAnalysis, FlashNews, GlobalIndexResponse } from '../types';
+import type * as T from '../src/types/schema';
 
 export const GLOBAL_MARKET_KEY = ['globalMarket'];
 export const FLASH_NEWS_KEY = ['flashNews'];
@@ -12,19 +12,8 @@ export const FLASH_NEWS_KEY = ['flashNews'];
 export function useGlobalMarket() {
   return useQuery({
     queryKey: GLOBAL_MARKET_KEY,
-    queryFn: async (): Promise<GlobalMarketAnalysis> => {
-      const globalData = await api.getGlobalMarket();
-      return {
-        sentiment: globalData.sentiment || 'Neutral',
-        summary: globalData.summary || 'Market data from backend',
-        indices: globalData.indices.map((idx: GlobalIndexResponse) => ({
-          name: idx.name,
-          value: idx.value,
-          change: idx.change,
-          changePercent: idx.change_percent,
-        })),
-        lastUpdated: new Date().toLocaleTimeString(),
-      };
+    queryFn: async (): Promise<T.MarketOverview> => {
+      return api.getMarketWatcherOverview();
     },
     staleTime: 2 * 60 * 1000, // 2分钟
     refetchOnWindowFocus: true,
@@ -37,8 +26,9 @@ export function useGlobalMarket() {
 export function useFlashNews() {
   return useQuery({
     queryKey: FLASH_NEWS_KEY,
-    queryFn: async (): Promise<FlashNews[]> => {
-      return api.getFlashNews();
+    queryFn: async (): Promise<T.NewsItem[]> => {
+      const result = await api.getAggregatedNews();
+      return result.news;
     },
     staleTime: 5 * 60 * 1000, // 5分钟
     refetchInterval: 5 * 60 * 1000, // 每5分钟自动刷新

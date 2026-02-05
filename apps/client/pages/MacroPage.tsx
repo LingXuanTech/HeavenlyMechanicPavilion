@@ -17,7 +17,8 @@ import {
   Activity,
 } from 'lucide-react';
 import PageLayout, { LoadingState, EmptyState } from '../components/layout/PageLayout';
-import { useMacroImpactAnalysis, useRefreshMacro, MacroIndicator } from '../hooks/useMacro';
+import { useMacroImpactAnalysis, useRefreshMacro } from '../hooks/useMacro';
+import type * as T from '../src/types/schema';
 
 // 趋势图标组件
 const TrendIcon: React.FC<{ trend: string; className?: string }> = ({ trend, className = "w-4 h-4" }) => {
@@ -27,7 +28,7 @@ const TrendIcon: React.FC<{ trend: string; className?: string }> = ({ trend, cla
 };
 
 // 单个指标卡片
-const IndicatorCard: React.FC<{ indicator: MacroIndicator; icon: React.ReactNode }> = ({ indicator, icon }) => {
+const IndicatorCard: React.FC<{ indicator: T.MacroIndicator; icon: React.ReactNode }> = ({ indicator, icon }) => {
   const changeColor = indicator.change && indicator.change > 0 ? 'text-green-400' :
                       indicator.change && indicator.change < 0 ? 'text-red-400' : 'text-gray-400';
 
@@ -45,10 +46,10 @@ const IndicatorCard: React.FC<{ indicator: MacroIndicator; icon: React.ReactNode
         <span className="text-2xl font-bold text-white">
           {indicator.value}{indicator.unit}
         </span>
-        {indicator.change !== undefined && (
+        {indicator.change !== undefined && indicator.change !== null && (
           <span className={`text-sm ${changeColor}`}>
             {indicator.change > 0 ? '+' : ''}{indicator.change.toFixed(2)}
-            {indicator.change_percent !== undefined && (
+            {indicator.change_percent !== undefined && indicator.change_percent !== null && (
               <span className="ml-1">({indicator.change_percent.toFixed(1)}%)</span>
             )}
           </span>
@@ -215,7 +216,7 @@ const MacroPage: React.FC = () => {
             </div>
 
             {/* 影响分析 */}
-            {analysis.impacts.length > 0 && (
+            {analysis.impacts && analysis.impacts.length > 0 && (
               <div>
                 <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                   <Activity className="w-5 h-5 text-orange-400" />
@@ -241,7 +242,7 @@ const MacroPage: React.FC = () => {
             {/* 风险与机会 */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* 风险因素 */}
-              {analysis.risk_factors.length > 0 && (
+              {analysis.risk_factors && analysis.risk_factors.length > 0 && (
                 <div className="bg-red-950/20 rounded-xl p-4 border border-red-900/50">
                   <h4 className="text-sm font-bold text-red-400 mb-3 flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4" />
@@ -259,7 +260,7 @@ const MacroPage: React.FC = () => {
               )}
 
               {/* 机会 */}
-              {analysis.opportunities.length > 0 && (
+              {analysis.opportunities && analysis.opportunities.length > 0 && (
                 <div className="bg-green-950/20 rounded-xl p-4 border border-green-900/50">
                   <h4 className="text-sm font-bold text-green-400 mb-3 flex items-center gap-2">
                     <Lightbulb className="w-4 h-4" />

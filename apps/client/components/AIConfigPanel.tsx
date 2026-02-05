@@ -22,8 +22,6 @@ import {
   Zap,
   Brain,
   FileText,
-  ChevronDown,
-  ChevronUp,
   Loader2,
   AlertTriangle,
 } from 'lucide-react';
@@ -42,7 +40,6 @@ import {
   getConfigKeyDescription,
   AIProvider,
   AIProviderType,
-  AIModelConfig,
 } from '../hooks/useAIConfig';
 
 interface AIConfigPanelProps {
@@ -147,12 +144,12 @@ export function AIConfigPanel({ onClose }: AIConfigPanelProps) {
     const data = {
       name: formData.name,
       provider_type: formData.provider_type,
-      base_url: formData.base_url || undefined,
-      api_key: formData.api_key || undefined,
+      base_url: formData.base_url || null,
+      api_key: formData.api_key || '',
       models: modelsArray,
       is_enabled: formData.is_enabled,
       priority: formData.priority,
-    };
+    } as any;
 
     try {
       if (editMode === 'create') {

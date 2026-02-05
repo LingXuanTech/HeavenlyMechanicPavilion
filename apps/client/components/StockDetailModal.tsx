@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Stock, StockPrice, AgentAnalysis } from '../types';
+import type * as T from '../src/types/schema';
 import { logger } from '../utils/logger';
 import StockChart from './StockChart';
 import { TradingViewChart } from './TradingViewChart';
@@ -9,9 +9,6 @@ import {
   AlertBanner,
   KeyMetricsBar,
   ConfidenceDisplay,
-  PlannerInsight,
-  DataQualityWarning,
-  ActionSuggestions,
   AnalysisLevelBadge,
   DiagnosticsPanel,
   HistoricalCasesCount,
@@ -22,12 +19,12 @@ import DebateSection from './DebateSection';
 import RiskGauge from './RiskGauge';
 import ChatPanel from './ChatPanel';
 import { useChartIndicators } from '../hooks';
-import { X, MessageSquare, FileText, Volume2, Pause, Play, Square, Copy, Check, BrainCircuit, BarChart2, Target, ShieldAlert, Scale, CheckCircle2, Search, Swords, UserCog, CandlestickChart, LineChart } from 'lucide-react';
+import { X, MessageSquare, FileText, Volume2, Pause, Play, Square, Copy, Check, BrainCircuit, ShieldAlert, CheckCircle2, Search, Swords, UserCog, CandlestickChart, LineChart } from 'lucide-react';
 
 interface StockDetailModalProps {
-  stock: Stock;
-  priceData?: StockPrice;
-  analysis?: AgentAnalysis;
+  stock: T.AssetPrice;
+  priceData?: T.StockPrice;
+  analysis?: T.AgentAnalysisResponse;
   onClose: () => void;
   /** 是否启用打字机效果（新分析时为 true） */
   enableTypewriter?: boolean;
@@ -59,14 +56,14 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
 
   // 当 analysis 变化时，决定是否启用打字机
   useEffect(() => {
-    if (analysis?.reasoning && analysis.reasoning !== analysisRef.current) {
+    if (analysis?.full_report.reasoning && analysis.full_report.reasoning !== analysisRef.current) {
       // 新的分析结果到来
       if (enableTypewriter) {
         setTypewriterEnabled(true);
       }
-      analysisRef.current = analysis.reasoning;
+      analysisRef.current = analysis.full_report.reasoning;
     }
-  }, [analysis?.reasoning, enableTypewriter]);
+  }, [analysis?.full_report.reasoning, enableTypewriter]);
 
   // 打字机完成回调
   const handleTypewriterComplete = () => {
@@ -134,7 +131,7 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
 
     // 新建播放
     try {
-      const textToSpeak = analysis.anchor_script || analysis.reasoning;
+      const textToSpeak = analysis.anchor_script || analysis.full_report.reasoning;
       const utterance = new SpeechSynthesisUtterance(textToSpeak);
       utterance.lang = 'zh-CN';
       utterance.rate = 1.1;
@@ -160,7 +157,13 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
 
   const handleCopyReport = () => {
     if (!analysis) return;
-    const text = `Stock: ${stock.symbol}\nSignal: ${analysis.signal}\nSetup: Entry ${analysis.tradeSetup?.entryZone || 'N/A'} -> TP ${analysis.tradeSetup?.targetPrice || 'N/A'}\n\nReasoning:\n${analysis.reasoning}`;
+    const { full_report } = analysis;
+    const text = `Stock: ${stock.symbol}
+Signal: ${analysis.signal}
+Setup: Entry ${full_report.trade_setup?.entry_zone || 'N/A'} -> TP ${full_report.trade_setup?.target_price || 'N/A'}
+
+Reasoning:
+${full_report.reasoning}`;
     navigator.clipboard.writeText(text);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
@@ -171,11 +174,6 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
   };
 
   // Helper to calculate position for price bar
-  const calculatePosition = (val: number, min: number, max: number) => {
-    if (!val || !min || !max) return 50;
-    const pos = ((val - min) / (max - min)) * 100;
-    return Math.min(Math.max(pos, 0), 100);
-  };
 
   return (
     <div 
@@ -190,10 +188,12 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
               <div>
                 <h2 className="text-2xl font-bold text-white flex items-center gap-3">
                   {stock.symbol}
-                  <span className="text-sm font-normal text-gray-400 bg-gray-800 px-2 py-1 rounded-md">{stock.market}</span>
+                  <span className="text-sm font-normal text-gray-400 bg-gray-800 px-2 py-1 rounded-md">
+                    {priceData?.market || 'N/A'}
+                  </span>
                   {/* Analysis Level Badge */}
-                  {analysis?.uiHints?.analysisLevel && (
-                    <AnalysisLevelBadge level={analysis.uiHints.analysisLevel} />
+                  {analysis?.ui_hints?.analysis_level && (
+                    <AnalysisLevelBadge level={analysis.ui_hints.analysis_level as 'L1' | 'L2'} />
                   )}
                 </h2>
                 <p className="text-gray-400">{stock.name}</p>
@@ -203,7 +203,7 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
                 <div className="hidden sm:block pl-6 border-l border-gray-800 ml-2">
                    <div className="text-2xl font-mono font-bold text-white">{priceData.price.toFixed(2)}</div>
                    <div className={`text-sm font-bold ${isUp ? 'text-green-400' : 'text-red-400'}`}>
-                      {priceData.change > 0 ? '+' : ''}{priceData.change.toFixed(2)} ({priceData.changePercent.toFixed(2)}%)
+                      {priceData.change > 0 ? '+' : ''}{priceData.change.toFixed(2)} ({priceData.change_percent.toFixed(2)}%)
                    </div>
                 </div>
               )}
@@ -251,17 +251,17 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
         )}
 
         {/* Agentic UI Alerts & Key Metrics */}
-        {analysis?.uiHints && (
+        {analysis?.ui_hints && (
           <div className="px-6 py-3 space-y-3 border-b border-gray-800/50 bg-gray-900/30">
             {/* Alert Banner */}
-            <AlertBanner hints={analysis.uiHints} />
+            <AlertBanner hints={analysis.ui_hints} />
 
             {/* Key Metrics & Market Hints Row */}
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <KeyMetricsBar metrics={analysis.uiHints.keyMetrics} />
+              <KeyMetricsBar metrics={analysis.ui_hints.key_metrics || []} />
               <div className="flex items-center gap-3">
-                <MarketHints hints={analysis.uiHints.marketSpecificHints} />
-                <HistoricalCasesCount count={analysis.uiHints.historicalCasesCount} />
+                <MarketHints hints={analysis.ui_hints.market_specific_hints || []} />
+                <HistoricalCasesCount count={analysis.ui_hints.historical_cases_count ?? undefined} />
               </div>
             </div>
           </div>
@@ -309,7 +309,7 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
                           </button>
                         </div>
                         <div className="w-px h-4 bg-gray-700" />
-                        <span className="text-xs text-gray-500">{stock.symbol} · {stock.market}</span>
+                        <span className="text-xs text-gray-500">{stock.symbol} · {priceData?.market || 'N/A'}</span>
                         {isChartFullscreen && (
                           <button
                             onClick={toggleChartFullscreen}
@@ -343,7 +343,7 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
                           chartType === 'candlestick' ? (
                             <TradingViewChart
                               data={klineData.length > 0 ? klineData : undefined}
-                              simpleData={klineData.length === 0 ? priceData?.history : undefined}
+                              simpleData={undefined}
                               symbol={stock.symbol}
                               height={isChartFullscreen ? window.innerHeight - 100 : 240}
                               showVolume={showVolume}
@@ -355,7 +355,7 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
                             />
                           ) : (
                             <StockChart
-                              data={priceData?.history}
+                              data={[]}
                               color={chartColor}
                               height={isChartFullscreen ? window.innerHeight - 100 : 240}
                             />
@@ -423,14 +423,14 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
 
                         {/* Executive Summary - 使用打字机效果 */}
                         <AnalysisTypewriter
-                          reasoning={analysis.reasoning}
+                          reasoning={analysis.full_report.reasoning}
                           enabled={typewriterEnabled}
                           speed={15}
                           onComplete={handleTypewriterComplete}
                         />
 
                         {/* Researcher Team Debate Section */}
-                        <DebateSection debate={analysis.debate} />
+                        <DebateSection debate={analysis.full_report.debate} />
 
                       </div>
                     )}
@@ -442,161 +442,82 @@ const StockDetailModal: React.FC<StockDetailModalProps> = ({ stock, priceData, a
                       <div className="space-y-6">
                         {/* Signal & Trade Setup Card */}
                         <div className="bg-gray-800/40 rounded-xl p-5 border border-gray-700">
-                            <div className={`text-center py-4 rounded-lg border-2 mb-4 ${
-                                analysis.signal.includes('Buy') ? 'border-green-500 bg-green-500/10 text-green-400' :
-                                analysis.signal.includes('Sell') ? 'border-red-500 bg-red-500/10 text-red-400' :
-                                'border-yellow-500 bg-yellow-500/10 text-yellow-400'
-                            }`}>
-                              <div className="text-2xl font-black uppercase tracking-wider">{analysis.signal}</div>
-                            </div>
+                          <div
+                            className={`text-center py-4 rounded-lg border-2 mb-4 ${
+                              analysis.signal.includes('Buy')
+                                ? 'border-green-500 bg-green-500/10 text-green-400'
+                                : analysis.signal.includes('Sell')
+                                ? 'border-red-500 bg-red-500/10 text-red-400'
+                                : 'border-yellow-500 bg-yellow-500/10 text-yellow-400'
+                            }`}
+                          >
+                            <div className="text-2xl font-black uppercase tracking-wider">{analysis.signal}</div>
+                          </div>
 
-                            {/* Confidence Display - Adaptive based on uiHints */}
-                            <div className="flex justify-center mb-6">
-                              <ConfidenceDisplay
-                                value={analysis.confidence}
-                                mode={analysis.uiHints?.confidenceDisplay || 'number'}
-                              />
-                            </div>
-
-                            {/* Trade Setup Visualizer */}
-                            {analysis.tradeSetup ? (
-                                <div className="space-y-4">
-                                   <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
-                                      <span className="flex items-center gap-1"><Scale className="w-3 h-3" /> Risk/Reward</span>
-                                      <span className={`font-mono font-bold ${analysis.tradeSetup.rewardToRiskRatio > 2 ? 'text-green-400' : 'text-gray-300'}`}>
-                                        {analysis.tradeSetup.rewardToRiskRatio}R
-                                      </span>
-                                   </div>
-
-                                   <div className="space-y-2">
-                                      {/* Target */}
-                                      <div className="flex justify-between items-center p-2.5 bg-gray-900/80 rounded border-l-4 border-green-500 hover:bg-gray-800 transition-colors">
-                                          <div className="flex flex-col">
-                                            <span className="text-[10px] text-gray-500 uppercase">Target</span>
-                                            <span className="text-green-400 font-mono font-bold">{analysis.tradeSetup.targetPrice}</span>
-                                          </div>
-                                          <Target className="w-4 h-4 text-green-500/50" />
-                                      </div>
-                                      
-                                      {/* Entry Zone */}
-                                      <div className="flex justify-between items-center p-2.5 bg-gray-900/80 rounded border-l-4 border-blue-500 hover:bg-gray-800 transition-colors">
-                                          <div className="flex flex-col">
-                                            <span className="text-[10px] text-gray-500 uppercase">Entry Zone</span>
-                                            <span className="text-blue-400 font-mono font-bold">{analysis.tradeSetup.entryZone}</span>
-                                          </div>
-                                          <div className="text-[10px] text-blue-300 bg-blue-500/20 px-2 py-0.5 rounded">Buy Zone</div>
-                                      </div>
-
-                                      {/* Stop Loss */}
-                                      <div className="flex justify-between items-center p-2.5 bg-gray-900/80 rounded border-l-4 border-red-500 hover:bg-gray-800 transition-colors">
-                                          <div className="flex flex-col">
-                                            <span className="text-[10px] text-gray-500 uppercase">Stop Loss</span>
-                                            <span className="text-red-400 font-mono font-bold">{analysis.tradeSetup.stopLossPrice}</span>
-                                          </div>
-                                          <ShieldAlert className="w-4 h-4 text-red-500/50" />
-                                      </div>
-                                   </div>
-                                </div>
-                            ) : (
-                                <div className="text-center text-xs text-gray-500 py-4">No specific trade setup generated.</div>
-                            )}
+                          {/* Confidence Display */}
+                          <div className="flex justify-center mb-6">
+                            <ConfidenceDisplay value={analysis.confidence} mode={(analysis.ui_hints?.confidence_display as any) || "number"} />
+                          </div>
                         </div>
 
                         {/* --- RISK MANAGEMENT TEAM (ENHANCED UI) --- */}
-                        {analysis.riskAssessment && (
-                             <div className="bg-gray-800/40 rounded-xl p-4 border border-gray-700">
-                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                                  <ShieldAlert className="w-4 h-4" /> Risk Assessment
-                                </h4>
-
-                                <div className="flex items-center justify-between mb-4">
-                                    {/* 使用增强的半圆仪表盘组件 */}
-                                    <RiskGauge score={analysis.riskAssessment.score} verdict={analysis.riskAssessment.verdict} />
-
-                                    <div className="text-right">
-                                        <div className={`inline-block px-3 py-1 rounded-full text-xs font-bold border mb-1 ${
-                                            analysis.riskAssessment.verdict === 'Approved' ? 'bg-green-500/20 border-green-500 text-green-400' :
-                                            analysis.riskAssessment.verdict === 'Rejected' ? 'bg-red-500/20 border-red-500 text-red-400' :
-                                            'bg-yellow-500/20 border-yellow-500 text-yellow-400'
-                                        }`}>
-                                            {analysis.riskAssessment.verdict.toUpperCase()}
-                                        </div>
-                                        <p className="text-[10px] text-gray-500">Risk Score (0-10)</p>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2 text-xs">
-                                    <div className="flex justify-between border-b border-gray-700/50 pb-1">
-                                        <span className="text-gray-400">Volatility</span>
-                                        <span className="text-gray-200">{analysis.riskAssessment.volatilityStatus}</span>
-                                    </div>
-                                    <div className="flex justify-between border-b border-gray-700/50 pb-1">
-                                        <span className="text-gray-400">Max Drawdown Risk</span>
-                                        <span className="text-gray-200">{analysis.riskAssessment.maxDrawdownRisk}</span>
-                                    </div>
-                                    <div className="flex justify-between pt-1">
-                                        <span className="text-gray-400">Liquidity</span>
-                                        <span className={analysis.riskAssessment.liquidityConcerns ? "text-red-400 font-bold" : "text-green-400"}>
-                                            {analysis.riskAssessment.liquidityConcerns ? "Concerns Detected" : "Good"}
-                                        </span>
-                                    </div>
-                                </div>
-                             </div>
-                        )}
-
-                        {/* Price Levels (Visual Bar) */}
-                        {analysis.priceLevels && priceData && (
+                        {analysis.full_report.risk_assessment && (
                           <div className="bg-gray-800/40 rounded-xl p-4 border border-gray-700">
                             <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                              <BarChart2 className="w-4 h-4" /> Technical Levels
+                              <ShieldAlert className="w-4 h-4" /> Risk Assessment
                             </h4>
-                            <div className="relative h-12 mt-6 mb-2">
-                              {/* Range Bar */}
-                              <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-700 -translate-y-1/2 rounded-full"></div>
-                              
-                              {/* Support */}
-                              <div className="absolute top-1/2 -translate-y-1/2" style={{ left: '0%' }}>
-                                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                <div className="absolute top-4 left-0 -translate-x-1/2 text-[10px] text-green-400 font-mono whitespace-nowrap">
-                                  Sup: {analysis.priceLevels.support}
-                                </div>
-                              </div>
-                              
-                              {/* Resistance */}
-                              <div className="absolute top-1/2 -translate-y-1/2" style={{ right: '0%' }}>
-                                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                                <div className="absolute top-4 right-0 translate-x-1/2 text-[10px] text-red-400 font-mono whitespace-nowrap">
-                                  Res: {analysis.priceLevels.resistance}
-                                </div>
-                              </div>
 
-                              {/* Current Price Marker */}
-                              <div 
-                                className="absolute top-1/2 -translate-y-1/2 transition-all duration-500"
-                                style={{ 
-                                  left: `${calculatePosition(priceData.price, analysis.priceLevels.support * 0.98, analysis.priceLevels.resistance * 1.02)}%` 
-                                }}
-                              >
-                                <div className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[8px] border-t-white -translate-x-1/2 -translate-y-full mb-1"></div>
-                                <div className="absolute -top-6 left-0 -translate-x-1/2 bg-white text-gray-950 text-[10px] font-bold px-1.5 rounded shadow-sm">
-                                  {priceData.price.toFixed(2)}
+                            <div className="flex items-center justify-between mb-4">
+                              {/* 使用增强的半圆仪表盘组件 */}
+                              <RiskGauge
+                                score={analysis.full_report.risk_assessment.score}
+                                verdict={analysis.full_report.risk_assessment.verdict}
+                              />
+
+                              <div className="text-right">
+                                <div
+                                  className={`inline-block px-3 py-1 rounded-full text-xs font-bold border mb-1 ${
+                                    analysis.full_report.risk_assessment.verdict === 'Approved'
+                                      ? 'bg-green-500/20 border-green-500 text-green-400'
+                                      : analysis.full_report.risk_assessment.verdict === 'Rejected'
+                                      ? 'bg-red-500/20 border-red-500 text-red-400'
+                                      : 'bg-yellow-500/20 border-yellow-500 text-yellow-400'
+                                  }`}
+                                >
+                                  {analysis.full_report.risk_assessment.verdict.toUpperCase()}
                                 </div>
+                                <p className="text-[10px] text-gray-500">Risk Score (0-10)</p>
                               </div>
                             </div>
-                          </div>
-                        )}
 
-                        {/* Agentic UI Components */}
-                        {analysis.uiHints && (
-                          <div className="space-y-4">
-                            {/* Planner Insight */}
-                            <PlannerInsight hints={analysis.uiHints} />
-
-                            {/* Data Quality Warning */}
-                            <DataQualityWarning issues={analysis.uiHints.dataQualityIssues} />
-
-                            {/* Action Suggestions */}
-                            <ActionSuggestions suggestions={analysis.uiHints.actionSuggestions} />
+                            <div className="space-y-2 text-xs">
+                              <div className="flex justify-between border-b border-gray-700/50 pb-1">
+                                <span className="text-gray-400">Volatility</span>
+                                <span className="text-gray-200">
+                                  {analysis.full_report.risk_assessment.volatility_status}
+                                </span>
+                              </div>
+                              <div className="flex justify-between border-b border-gray-700/50 pb-1">
+                                <span className="text-gray-400">Max Drawdown Risk</span>
+                                <span className="text-gray-200">
+                                  {analysis.full_report.risk_assessment.max_drawdown_risk}
+                                </span>
+                              </div>
+                              <div className="flex justify-between pt-1">
+                                <span className="text-gray-400">Liquidity</span>
+                                <span
+                                  className={
+                                    analysis.full_report.risk_assessment.liquidity_concerns
+                                      ? 'text-red-400 font-bold'
+                                      : 'text-green-400'
+                                  }
+                                >
+                                  {analysis.full_report.risk_assessment.liquidity_concerns
+                                    ? 'Concerns Detected'
+                                    : 'Good'}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         )}
 

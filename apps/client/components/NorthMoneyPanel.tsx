@@ -35,16 +35,7 @@ import {
   useNorthMoneySectorFlow,
   useNorthMoneyRotationSignal,
 } from '../hooks';
-import type {
-  NorthMoneySummary,
-  NorthMoneyTopStock,
-  NorthMoneyHistory,
-  IntradayFlowSummary,
-  IntradayFlowPoint,
-  NorthMoneyAnomaly,
-  NorthMoneySectorFlow,
-  SectorRotationSignal,
-} from '../types';
+import type * as T from '../src/types/schema';
 
 interface NorthMoneyPanelProps {
   compact?: boolean;
@@ -133,7 +124,7 @@ const FlowCard: React.FC<{
 
 /** TOP 股票行 */
 const TopStockRow: React.FC<{
-  stock: NorthMoneyTopStock;
+  stock: T.NorthMoneyTopStock;
   onClick?: () => void;
 }> = ({ stock, onClick }) => {
   const isPositive = stock.net_buy >= 0;
@@ -162,10 +153,10 @@ const TopStockRow: React.FC<{
 };
 
 /** 历史迷你图 */
-const MiniChart: React.FC<{ data: NorthMoneyHistory[] }> = ({ data }) => {
+const MiniChart: React.FC<{ data: T.NorthMoneyHistory[] }> = ({ data }) => {
   if (!data || data.length === 0) return null;
 
-  const values = data.map(d => d.total_net);
+  const values = data.map(d => d.total);
   const max = Math.max(...values.map(Math.abs));
   const height = 40;
   const width = 120;
@@ -174,9 +165,9 @@ const MiniChart: React.FC<{ data: NorthMoneyHistory[] }> = ({ data }) => {
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-10">
       {data.map((d, i) => {
-        const barHeight = (Math.abs(d.total_net) / max) * (height / 2 - 2);
-        const y = d.total_net >= 0 ? height / 2 - barHeight : height / 2;
-        const fill = d.total_net >= 0 ? '#f87171' : '#4ade80';
+        const barHeight = (Math.abs(d.total) / max) * (height / 2 - 2);
+        const y = d.total >= 0 ? height / 2 - barHeight : height / 2;
+        const fill = d.total >= 0 ? '#f87171' : '#4ade80';
 
         return (
           <rect
@@ -196,7 +187,7 @@ const MiniChart: React.FC<{ data: NorthMoneyHistory[] }> = ({ data }) => {
 };
 
 /** 盘中分时图 */
-const IntradayChart: React.FC<{ data: IntradayFlowSummary }> = memo(({ data }) => {
+const IntradayChart: React.FC<{ data: T.IntradayFlowSummary }> = memo(({ data }) => {
   const points = data.flow_points;
   if (!points || points.length === 0) {
     return (
@@ -320,7 +311,7 @@ const IntradayChart: React.FC<{ data: IntradayFlowSummary }> = memo(({ data }) =
 IntradayChart.displayName = 'IntradayChart';
 
 /** 异常信号提示 */
-const AnomalyAlerts: React.FC<{ anomalies: NorthMoneyAnomaly[] }> = memo(({ anomalies }) => {
+const AnomalyAlerts: React.FC<{ anomalies: T.NorthMoneyAnomaly[] }> = memo(({ anomalies }) => {
   if (!anomalies || anomalies.length === 0) return null;
 
   return (
@@ -343,7 +334,7 @@ const AnomalyAlerts: React.FC<{ anomalies: NorthMoneyAnomaly[] }> = memo(({ anom
               <p className="text-[10px] opacity-70">
                 💡 {anomaly.recommendation}
               </p>
-              {anomaly.affected_stocks.length > 0 && (
+              {anomaly.affected_stocks && anomaly.affected_stocks.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {anomaly.affected_stocks.slice(0, 3).map((stock, i) => (
                     <span key={i} className="text-[10px] px-1.5 py-0.5 bg-black/20 rounded">
@@ -363,8 +354,8 @@ AnomalyAlerts.displayName = 'AnomalyAlerts';
 
 /** 板块轮动面板 */
 const SectorRotationPanel: React.FC<{
-  sectorFlow: NorthMoneySectorFlow[];
-  rotationSignal: SectorRotationSignal | null;
+  sectorFlow: T.NorthMoneySectorFlow[];
+  rotationSignal: T.SectorRotationSignal | null;
 }> = memo(({ sectorFlow, rotationSignal }) => {
   const [showAll, setShowAll] = useState(false);
 
@@ -498,13 +489,15 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
           <span className="text-xs text-gray-400">北向资金</span>
         </div>
         <div className={`text-sm font-mono font-semibold ${isInflow ? 'text-red-400' : 'text-green-400'}`}>
-          {formatMoney(summary.flow.total_net)}
+          {formatMoney(summary.today.total)}
         </div>
         <div className="text-[10px] text-gray-500">
-          连续{summary.trend_days}日{isInflow ? '流入' : '流出'}
+          近期趋势: {isInflow ? '流入' : '流出'}
         </div>
         {hasAnomaly && (
-          <AlertTriangle className="w-3 h-3 text-yellow-500" title="检测到异常信号" />
+          <div title="检测到异常信号">
+            <AlertTriangle className="w-3 h-3 text-yellow-500" />
+          </div>
         )}
       </div>
     );
@@ -524,7 +517,7 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
             <div className="hidden sm:flex items-center gap-2">
               {getTrendIcon(summary.trend)}
               <span className={`text-xs font-medium ${getTrendColor(summary.trend)}`}>
-                连续{summary.trend_days}日{summary.trend === 'Inflow' ? '净流入' : summary.trend === 'Outflow' ? '净流出' : '持平'}
+                近期趋势: {summary.trend === 'Inflow' ? '净流入' : summary.trend === 'Outflow' ? '净流出' : '持平'}
               </span>
             </div>
           )}
@@ -602,19 +595,19 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
                 <div className="grid grid-cols-3 gap-3 mb-4">
                   <FlowCard
                     title="今日合计"
-                    value={summary.flow.total_net}
+                    value={summary.today.total}
                   />
                   <FlowCard
                     title="沪股通"
-                    value={summary.flow.shanghai_connect}
+                    value={summary.today.sh_connect}
                     subTitle="买入"
-                    subValue={summary.flow.shanghai_buy}
+                    subValue={summary.today.sh_buy || 0}
                   />
                   <FlowCard
                     title="深股通"
-                    value={summary.flow.shenzhen_connect}
+                    value={summary.today.sz_connect}
                     subTitle="买入"
-                    subValue={summary.flow.shenzhen_buy}
+                    subValue={summary.today.sz_buy || 0}
                   />
                 </div>
 
@@ -624,8 +617,8 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs text-gray-500">近期走势</span>
                       <span className="text-[10px] text-gray-500">
-                        累计: <span className={summary.flow.cumulative_net >= 0 ? 'text-red-400' : 'text-green-400'}>
-                          {formatMoney(summary.flow.cumulative_net)}
+                        累计: <span className={summary.week_total >= 0 ? 'text-red-400' : 'text-green-400'}>
+                          {formatMoney(summary.week_total)}
                         </span>
                       </span>
                     </div>
@@ -635,7 +628,7 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
 
                 {/* Timestamp */}
                 <div className="text-[10px] text-gray-500 text-right mt-3">
-                  数据日期: {summary.date}
+                  数据日期: {summary.today.date}
                 </div>
               </>
             )}

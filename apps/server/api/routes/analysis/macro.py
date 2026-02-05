@@ -3,8 +3,8 @@ import structlog
 from fastapi import APIRouter, HTTPException
 from typing import List, Optional
 
-from services.macro_service import (
-    MacroDataService,
+from services.macro_service import MacroDataService
+from api.schemas.macro import (
     MacroOverview,
     MacroIndicator,
     MacroImpact,
@@ -63,7 +63,7 @@ async def get_indicator(indicator_name: str):
     return indicator
 
 
-@router.get("/impact-analysis")
+@router.get("/impact-analysis", response_model=MacroAnalysisResult)
 async def get_macro_impact_analysis(market: str = "US"):
     """
     获取宏观因素对市场的影响分析

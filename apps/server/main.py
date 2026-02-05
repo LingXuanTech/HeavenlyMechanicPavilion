@@ -12,6 +12,8 @@ from api.exceptions import AppException
 from services.data_router import close_http_client
 from services.cache_service import cache_service
 from services.task_queue import task_queue
+from services.scheduler import watchlist_scheduler
+from db.models import init_db
 
 # Load environment variables
 load_dotenv()
@@ -19,15 +21,12 @@ load_dotenv()
 # Configure structured logging
 structlog.configure(
     processors=[
-        structlog.contextvars.merge_contextvars,  # 支持上下文变量（request_id）
+        structlog.contextvars.merge_contextvars,
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.JSONRenderer(),
     ]
 )
 logger = structlog.get_logger()
-
-from services.scheduler import watchlist_scheduler
-from db.models import init_db
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -41,9 +40,9 @@ async def lifespan(app: FastAPI):
     # Shutdown logic
     logger.info("Shutting down API")
     watchlist_scheduler.shutdown()
-    await close_http_client()  # 关闭共享 HTTP 客户端
-    await cache_service.close()  # 关闭缓存连接
-    await task_queue.close()  # 关闭任务队列连接
+    await close_http_client()
+    await cache_service.close()
+    await task_queue.close()
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -95,15 +94,12 @@ async def generic_exception_handler(request: Request, exc: Exception):
 # 中间件
 # =============================================================================
 
-# 请求追踪（必须在 CORS 之前添加，以确保所有请求都有 request_id）
 from api.middleware import RequestTracingMiddleware
 app.add_middleware(RequestTracingMiddleware)
 
-# Session 中间件（OAuth 2.0 授权流程需要 session 存储 state）
 from starlette.middleware.sessions import SessionMiddleware
 app.add_middleware(SessionMiddleware, secret_key=settings.JWT_SECRET_KEY)
 
-# Set up CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -112,7 +108,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files for agent avatars and other assets
+# Mount static files
 assets_path = os.path.join(os.path.dirname(__file__), "assets")
 if os.path.exists(assets_path):
     app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
@@ -125,115 +121,23 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
-# Import and include routers
-from api.routes import analyze, watchlist, market
-from db.models import init_db
+# =============================================================================
+# 路由注册 (分组重构)
+# =============================================================================
 
-app.include_router(analyze.router, prefix=settings.API_V1_STR)
-app.include_router(watchlist.router, prefix=settings.API_V1_STR)
+from api.routes import market, analysis, trading, system
+
+# 1. 市场数据模块
 app.include_router(market.router, prefix=settings.API_V1_STR)
 
-from api.routes import discover, news, chat
-app.include_router(discover.router, prefix=settings.API_V1_STR)
-app.include_router(news.router, prefix=settings.API_V1_STR)
-app.include_router(chat.router, prefix=settings.API_V1_STR)
+# 2. 分析决策模块
+app.include_router(analysis.router, prefix=settings.API_V1_STR)
 
-from api.routes import portfolio
-app.include_router(portfolio.router, prefix=settings.API_V1_STR)
+# 3. 交易执行模块
+app.include_router(trading.router, prefix=settings.API_V1_STR)
 
-from api.routes import macro
-app.include_router(macro.router, prefix=settings.API_V1_STR)
-
-from api.routes import memory
-app.include_router(memory.router, prefix=settings.API_V1_STR)
-
-from api.routes import admin
-from api.dependencies import verify_api_key
-# Admin 路由需要 API Key 认证
-app.include_router(
-    admin.router,
-    prefix=settings.API_V1_STR,
-    dependencies=[Depends(verify_api_key)]
-)
-
-from api.routes import settings as settings_routes
-app.include_router(settings_routes.router, prefix=settings.API_V1_STR)
-
-from api.routes import market_watcher
-app.include_router(market_watcher.router, prefix=settings.API_V1_STR)
-
-from api.routes import news_aggregator
-app.include_router(news_aggregator.router, prefix=settings.API_V1_STR)
-
-from api.routes import health as health_routes
-app.include_router(health_routes.router, prefix=settings.API_V1_STR)
-
-from api.routes import ai_config
-app.include_router(ai_config.router, prefix=settings.API_V1_STR)
-
-# Prompt 配置路由
-from api.routes import prompts
-app.include_router(prompts.router, prefix=settings.API_V1_STR)
-
-# 北向资金路由
-from api.routes import north_money
-app.include_router(north_money.router, prefix=settings.API_V1_STR)
-
-# 龙虎榜路由
-from api.routes import lhb
-app.include_router(lhb.router, prefix=settings.API_V1_STR)
-
-# 限售解禁路由
-from api.routes import jiejin
-app.include_router(jiejin.router, prefix=settings.API_V1_STR)
-
-# 用户认证路由
-from api.routes import auth
-app.include_router(auth.router, prefix=settings.API_V1_STR)
-
-# OAuth 2.0 路由
-from api.routes import oauth
-app.include_router(oauth.router, prefix=settings.API_V1_STR)
-
-# Passkey (WebAuthn) 路由
-from api.routes import passkey
-app.include_router(passkey.router, prefix=settings.API_V1_STR)
-
-# TTS 语音合成路由
-from api.routes import tts
-app.include_router(tts.router, prefix=settings.API_V1_STR)
-
-# 反思闭环路由
-from api.routes import reflection
-app.include_router(reflection.router, prefix=settings.API_V1_STR)
-
-# 多模型赛马路由
-from api.routes import model_racing
-app.include_router(model_racing.router, prefix=settings.API_V1_STR)
-
-# 回测路由
-from api.routes import backtest
-app.include_router(backtest.router, prefix=settings.API_V1_STR)
-
-# 舆情分析路由
-from api.routes import sentiment
-app.include_router(sentiment.router, prefix=settings.API_V1_STR)
-
-# 政策-行业板块映射路由
-from api.routes import policy
-app.include_router(policy.router, prefix=settings.API_V1_STR)
-
-# 限售解禁路由
-from api.routes import unlock
-app.include_router(unlock.router, prefix=settings.API_V1_STR)
-
-# 央行 NLP 分析路由
-from api.routes import central_bank
-app.include_router(central_bank.router, prefix=settings.API_V1_STR)
-
-# 跨资产联动分析路由
-from api.routes import cross_asset
-app.include_router(cross_asset.router, prefix=settings.API_V1_STR)
+# 4. 系统服务模块
+app.include_router(system.router, prefix=settings.API_V1_STR)
 
 
 if __name__ == "__main__":

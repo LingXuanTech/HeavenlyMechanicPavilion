@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useCallback, useRef } from 'react';
 import * as api from '../services/api';
 import type { SSEConnectionState, SSEAnalysisController, AnalysisOptions } from '../services/api';
-import { AgentAnalysis } from '../types';
+import * as T from '../src/types/schema';
 import { logger } from '../utils/logger';
 
 export const ANALYSIS_KEY = (symbol: string) => ['analysis', symbol];
@@ -40,8 +40,7 @@ export function useLatestAnalysis(symbol: string) {
     queryKey: LATEST_ANALYSIS_KEY(symbol),
     queryFn: async () => {
       try {
-        const data = await api.getLatestAnalysis(symbol);
-        return data.analysis as AgentAnalysis;
+        return await api.getLatestAnalysis(symbol);
       } catch {
         return null;
       }
@@ -117,7 +116,7 @@ export function useStockAnalysis() {
                 updateState(symbol, {
                   isAnalyzing: false,
                   connectionState: 'error',
-                  error: data?.message || '分析失败',
+                  error: (data?.message as string) || '分析失败',
                 });
               }
             },
@@ -204,7 +203,7 @@ export function useStockAnalysis() {
     runAnalysis,
     cancelAnalysis,
     runMultipleAnalyses,
-    getAnalysis: (symbol: string) => queryClient.getQueryData<AgentAnalysis>(ANALYSIS_KEY(symbol)),
+    getAnalysis: (symbol: string) => queryClient.getQueryData<T.AgentAnalysis>(ANALYSIS_KEY(symbol)),
 
     // 兼容旧接口
     analyzingStates,
@@ -218,14 +217,14 @@ export function useStockAnalysis() {
 export function useCachedAnalyses() {
   const queryClient = useQueryClient();
 
-  const getAll = useCallback((): Record<string, AgentAnalysis> => {
+  const getAll = useCallback((): Record<string, T.AgentAnalysis> => {
     const cache = queryClient.getQueryCache().getAll();
-    const analyses: Record<string, AgentAnalysis> = {};
+    const analyses: Record<string, T.AgentAnalysis> = {};
 
-    cache.forEach(query => {
+    cache.forEach((query) => {
       if (query.queryKey[0] === 'analysis' && query.queryKey[1] !== 'latest' && query.state.data) {
         const symbol = query.queryKey[1] as string;
-        analyses[symbol] = query.state.data as AgentAnalysis;
+        analyses[symbol] = query.state.data as T.AgentAnalysis;
       }
     });
 

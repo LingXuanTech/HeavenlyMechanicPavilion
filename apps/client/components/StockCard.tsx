@@ -1,28 +1,32 @@
 import React, { useState, useCallback, memo } from 'react';
-import { AgentAnalysis, SignalType, Stock, StockPrice } from '../types';
-import StockChart from './StockChart';
+import * as T from '../src/types/schema';
 import { AnalysisProgressBar } from './AnalysisProgressBar';
-import { ArrowUp, ArrowDown, RefreshCw, Target, TrendingUp, TrendingDown, Minus, Maximize2, Calendar, Scale, Zap, BrainCircuit, ChevronDown } from 'lucide-react';
+import { ArrowUp, ArrowDown, RefreshCw, Target, TrendingUp, TrendingDown, Minus, Maximize2, Zap, BrainCircuit, ChevronDown } from 'lucide-react';
 import type { AnalysisOptions } from '../services/api';
 
 interface StockCardProps {
-  stock: Stock;
-  priceData?: StockPrice;
-  analysis?: AgentAnalysis;
+  stock: T.AssetPrice;
+  priceData?: T.StockPrice;
+  analysis?: T.AgentAnalysisResponse;
   onRefresh: (symbol: string, name: string, options?: AnalysisOptions) => void;
   isAnalyzing: boolean;
   currentStage?: string;
   onDelete: (symbol: string) => void;
-  onClick: (stock: Stock) => void;
+  onClick: (stock: T.AssetPrice) => void;
 }
 
-const getSignalColor = (signal: SignalType) => {
+const getSignalColor = (signal: string | T.SignalType) => {
   switch (signal) {
-    case SignalType.STRONG_BUY: return 'text-green-400 border-green-500';
-    case SignalType.BUY: return 'text-green-400 border-green-500/50';
-    case SignalType.STRONG_SELL: return 'text-red-500 border-red-500';
-    case SignalType.SELL: return 'text-red-400 border-red-500/50';
-    default: return 'text-yellow-400 border-yellow-500/50';
+    case 'Strong Buy':
+      return 'text-green-400 border-green-500';
+    case 'Buy':
+      return 'text-green-400 border-green-500/50';
+    case 'Strong Sell':
+      return 'text-red-500 border-red-500';
+    case 'Sell':
+      return 'text-red-400 border-red-500/50';
+    default:
+      return 'text-yellow-400 border-yellow-500/50';
   }
 };
 
@@ -34,7 +38,6 @@ const getTrendIcon = (trend: string) => {
 
 const StockCardComponent: React.FC<StockCardProps> = ({ stock, priceData, analysis, onRefresh, isAnalyzing, currentStage, onDelete, onClick }) => {
   const isUp = priceData && priceData.change >= 0;
-  const chartColor = isUp ? '#10B981' : '#EF4444';
 
   // Analysis level state
   const [showLevelMenu, setShowLevelMenu] = useState(false);
@@ -74,18 +77,25 @@ const StockCardComponent: React.FC<StockCardProps> = ({ stock, priceData, analys
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-xl font-bold text-white tracking-wider">{stock.symbol}</h3>
-            <span className="text-xs font-mono text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded">{stock.market}</span>
+            <span className="text-xs font-mono text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded">
+              {priceData?.market || 'N/A'}
+            </span>
           </div>
           <p className="text-xs text-gray-500 truncate max-w-[150px]">{stock.name}</p>
         </div>
-        
-        <div className="text-right pr-6"> {/* pr-6 to avoid overlap with maximize icon */}
+
+        <div className="text-right pr-6">
+          {/* pr-6 to avoid overlap with maximize icon */}
           {priceData ? (
             <>
               <div className="text-xl font-mono text-white">{priceData.price.toFixed(2)}</div>
-              <div className={`text-xs font-bold flex items-center justify-end ${isUp ? 'text-green-400' : 'text-red-400'}`}>
+              <div
+                className={`text-xs font-bold flex items-center justify-end ${
+                  isUp ? 'text-green-400' : 'text-red-400'
+                }`}
+              >
                 {isUp ? <ArrowUp className="w-3 h-3 mr-1" /> : <ArrowDown className="w-3 h-3 mr-1" />}
-                {Math.abs(priceData.changePercent).toFixed(2)}%
+                {Math.abs(priceData.change_percent).toFixed(2)}%
               </div>
             </>
           ) : (
@@ -94,9 +104,9 @@ const StockCardComponent: React.FC<StockCardProps> = ({ stock, priceData, analys
         </div>
       </div>
 
-      {/* Chart */}
+      {/* Chart Placeholder */}
       <div className="h-16 -mx-2 pointer-events-none">
-        {priceData && <StockChart data={priceData.history} color={chartColor} />}
+        {priceData && <div className="h-full w-full bg-gray-800/20 rounded" />}
       </div>
 
       {/* Agent Analysis Section */}
@@ -105,9 +115,7 @@ const StockCardComponent: React.FC<StockCardProps> = ({ stock, priceData, analys
           <span className="text-xs text-gray-400 uppercase font-semibold flex items-center gap-1">
             <Target className="w-3 h-3" /> Agent Signal
           </span>
-          {analysis && (
-             <span className="text-xs text-gray-500">{analysis.timestamp}</span>
-          )}
+          {analysis && <span className="text-xs text-gray-500">{analysis.created_at}</span>}
         </div>
 
         {isAnalyzing && !analysis ? (
@@ -122,60 +130,51 @@ const StockCardComponent: React.FC<StockCardProps> = ({ stock, priceData, analys
           </div>
         ) : analysis ? (
           <>
-            <div className={`flex items-center justify-between border-l-4 pl-2 py-1 ${getSignalColor(analysis.signal)} bg-gray-900/50`}>
-              <span className="font-bold text-lg">{analysis.signal}</span>
-              <span className="text-xs font-mono bg-gray-800 px-2 py-1 rounded text-white">{analysis.confidence}% Conf.</span>
+            <div
+              className={`flex items-center justify-between border-l-4 pl-2 py-1 ${getSignalColor(
+                analysis.full_report.signal
+              )} bg-gray-900/50`}
+            >
+              <span className="font-bold text-lg">{analysis.full_report.signal}</span>
+              <span className="text-xs font-mono bg-gray-800 px-2 py-1 rounded text-white">
+                {analysis.full_report.confidence}% Conf.
+              </span>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs mt-1">
               <div className="flex flex-col">
-                <span className="text-gray-500">Take Profit</span>
-                <span className="text-green-400 font-mono">{analysis.tradeSetup ? analysis.tradeSetup.targetPrice : 'N/A'}</span>
+                <span className="text-gray-500">Signal</span>
+                <span className="text-green-400 font-mono">{analysis.signal}</span>
               </div>
               <div className="flex flex-col text-right">
-                <span className="text-gray-500">Stop Loss</span>
-                <span className="text-red-400 font-mono">{analysis.tradeSetup ? analysis.tradeSetup.stopLossPrice : 'N/A'}</span>
+                <span className="text-gray-500">Confidence</span>
+                <span className="text-blue-400 font-mono">{analysis.confidence}%</span>
               </div>
             </div>
 
-            {analysis.tradeSetup && (
-               <div className="flex justify-between items-center bg-gray-900/80 p-2 rounded mt-2 border border-dashed border-gray-700/50 hover:border-blue-500/30 transition-colors">
-                  <div className="flex flex-col">
-                     <span className="text-[9px] text-gray-500 uppercase">Entry Zone</span>
-                     <span className="text-xs text-blue-300 font-mono">{analysis.tradeSetup.entryZone}</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-[10px] font-bold text-green-400 bg-green-900/20 border border-green-900/50 px-1.5 py-0.5 rounded">
-                    <Scale className="w-3 h-3" />
-                    {analysis.tradeSetup.rewardToRiskRatio}R
-                  </div>
-               </div>
-            )}
-            
             <div className="mt-2 pt-2 border-t border-gray-800">
-               <div className="flex gap-2 items-center mb-1">
-                 <span className="text-xs text-gray-400">Indicators:</span>
-                 <div className="flex gap-2">
-                   <span className="text-[10px] bg-gray-800 px-1 rounded text-gray-300">RSI: {analysis.technicalIndicators.rsi}</span>
-                   <span className="text-[10px] bg-gray-800 px-1 rounded text-gray-300 flex items-center gap-1">
-                     Trend: {getTrendIcon(analysis.technicalIndicators.trend)}
-                   </span>
-                 </div>
-               </div>
-               
-               {analysis.catalysts && analysis.catalysts.length > 0 && (
-                 <div className="flex items-center gap-1 mb-1 text-[10px] text-blue-400 font-bold">
-                   <Calendar className="w-3 h-3" />
-                   {analysis.catalysts[0].name} ({analysis.catalysts[0].date})
-                 </div>
-               )}
+              <div className="flex gap-2 items-center mb-1">
+                <span className="text-xs text-gray-400">Indicators:</span>
+                <div className="flex gap-2">
+                  {analysis.full_report.technical_indicators && (
+                    <>
+                      <span className="text-[10px] bg-gray-800 px-1 rounded text-gray-300">
+                        RSI: {analysis.full_report.technical_indicators.rsi}
+                      </span>
+                      <span className="text-[10px] bg-gray-800 px-1 rounded text-gray-300 flex items-center gap-1">
+                        Trend: {getTrendIcon(analysis.full_report.technical_indicators.trend)}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
 
-               {/* Use structured news if available */}
-               <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed opacity-80">
-                  {analysis.newsAnalysis && analysis.newsAnalysis.length > 0 
-                    ? analysis.newsAnalysis[0].headline 
-                    : 'No news available'
-                  }
-               </p>
+              {/* Use structured news if available */}
+              <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed opacity-80">
+                {analysis.full_report.news_analysis && analysis.full_report.news_analysis.length > 0
+                  ? analysis.full_report.news_analysis[0].headline
+                  : 'No news available'}
+              </p>
             </div>
           </>
         ) : (
@@ -256,9 +255,9 @@ const StockCard = memo(StockCardComponent, (prevProps, nextProps) => {
     prevProps.stock.symbol === nextProps.stock.symbol &&
     prevProps.isAnalyzing === nextProps.isAnalyzing &&
     prevProps.currentStage === nextProps.currentStage &&
-    prevProps.analysis?.timestamp === nextProps.analysis?.timestamp &&
+    prevProps.analysis?.created_at === nextProps.analysis?.created_at &&
     prevProps.priceData?.price === nextProps.priceData?.price &&
-    prevProps.priceData?.changePercent === nextProps.priceData?.changePercent
+    prevProps.priceData?.change_percent === nextProps.priceData?.change_percent
   );
 });
 
