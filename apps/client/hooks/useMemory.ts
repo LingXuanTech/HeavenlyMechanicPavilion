@@ -12,7 +12,7 @@ import {
   clearMemory,
   searchMemory,
 } from '../services/api';
-import * as T from '../src/types/schema';
+import type * as T from '../src/types/schema';
 
 export const MEMORY_KEY = ['memory'];
 

@@ -15,7 +15,7 @@ import akshare as ak
 import pandas as pd
 import asyncio
 
-from utils import TTLCache
+from services.cache_service import cache_service
 
 logger = structlog.get_logger(__name__)
 
@@ -75,7 +75,7 @@ class UnlockService:
     """限售解禁监控服务"""
 
     def __init__(self):
-        self._cache = TTLCache(default_ttl=3600)  # 1 小时缓存
+        pass
 
     async def get_unlock_calendar(self, start_date: date = None, end_date: date = None) -> List[UnlockCalendar]:
         """获取解禁日历
@@ -90,7 +90,7 @@ class UnlockService:
             end_date = start_date + timedelta(days=30)
 
         cache_key = f"unlock_calendar_{start_date}_{end_date}"
-        cached = self._cache.get(cache_key)
+        cached = cache_service.get_sync(cache_key)
         if cached:
             return cached
 
@@ -158,7 +158,7 @@ class UnlockService:
                     stocks=sorted(stocks, key=lambda x: x.unlock_value, reverse=True),
                 ))
 
-            self._cache.set(cache_key, result)
+            cache_service.set_sync(cache_key, result, ttl=3600)
             logger.info("Fetched unlock calendar", days=len(result), total_stocks=sum(c.total_stocks for c in result))
             return result
 
@@ -338,7 +338,7 @@ class UnlockService:
     async def get_market_unlock_overview(self) -> MarketUnlockOverview:
         """获取市场解禁概览"""
         cache_key = "market_unlock_overview"
-        cached = self._cache.get(cache_key)
+        cached = cache_service.get_sync(cache_key)
         if cached:
             return cached
 
@@ -400,7 +400,7 @@ class UnlockService:
                 market_impact=market_impact,
             )
 
-            self._cache.set(cache_key, overview)
+            cache_service.set_sync(cache_key, overview, ttl=3600)
             logger.info(
                 "Market unlock overview fetched",
                 this_week=f"{this_week_value:.1f}亿",

@@ -83,7 +83,7 @@ export const StreamingText: React.FC<StreamingTextProps> = memo(({
       {(isStreaming || isTyping) && (
         <div className="absolute top-2 right-2 flex items-center gap-2 z-10">
           {isStreaming && (
-            <span className="flex items-center gap-1.5 text-xs text-blue-400">
+            <span className="flex items-center gap-1.5 text-xs text-accent">
               <Loader2 className="w-3 h-3 animate-spin" />
               接收中...
             </span>
@@ -91,7 +91,7 @@ export const StreamingText: React.FC<StreamingTextProps> = memo(({
           {showSkip && (
             <button
               onClick={skip}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-gray-200 bg-gray-800/80 hover:bg-gray-700/80 rounded transition-colors"
+              className="flex items-center gap-1 px-2 py-1 text-xs text-stone-400 hover:text-stone-200 bg-surface-overlay/80 hover:bg-surface-muted/80 rounded transition-colors"
               title="跳过动画"
             >
               <SkipForward className="w-3 h-3" />
@@ -109,12 +109,12 @@ export const StreamingText: React.FC<StreamingTextProps> = memo(({
           lines.map((line, i) => (
             <p
               key={i}
-              className={`mb-2 ${line.startsWith('#') ? 'font-bold text-lg text-blue-200' : ''} ${line.startsWith('##') ? 'font-semibold text-base text-blue-300' : ''}`}
+              className={`mb-2 ${line.startsWith('#') ? 'font-bold text-lg text-amber-200' : ''} ${line.startsWith('##') ? 'font-semibold text-base text-amber-300' : ''}`}
             >
               {line.replace(/\*\*/g, '').replace(/^#+\s*/, '')}
               {/* 光标显示在最后一行末尾 */}
               {(isTyping || isStreaming) && i === lines.length - 1 && (
-                <span className="animate-pulse text-blue-400 ml-0.5">{cursorChar}</span>
+                <span className="animate-pulse text-accent ml-0.5">{cursorChar}</span>
               )}
             </p>
           ))
@@ -162,26 +162,26 @@ export const StreamingReasoning: React.FC<StreamingReasoningProps> = memo(({
   const lines = reasoning.split('\n');
 
   return (
-    <div className="bg-gray-900/50 rounded-lg border border-gray-800 shadow-inner overflow-hidden">
+    <div className="bg-surface-raised/50 rounded-lg border border-border shadow-inner overflow-hidden">
       {/* 头部：阶段和进度 */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-800/50 border-b border-gray-700">
+      <div className="flex items-center justify-between px-4 py-2 bg-surface-overlay/50 border-b border-border-strong">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-200">
+          <span className="text-sm font-medium text-stone-200">
             {stageLabels[stage] || stage}
           </span>
           {isStreaming && (
-            <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+            <Loader2 className="w-4 h-4 text-accent animate-spin" />
           )}
         </div>
         {progress > 0 && (
           <div className="flex items-center gap-2">
-            <div className="w-24 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+            <div className="w-24 h-1.5 bg-border-strong rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"
+                className="h-full bg-gradient-to-r from-accent to-purple-500 transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
-            <span className="text-xs text-gray-400">{Math.round(progress)}%</span>
+            <span className="text-xs text-stone-400">{Math.round(progress)}%</span>
           </div>
         )}
       </div>
@@ -192,22 +192,22 @@ export const StreamingReasoning: React.FC<StreamingReasoningProps> = memo(({
           <p
             key={i}
             className={`mb-2 text-sm leading-relaxed ${
-              line.startsWith('#') ? 'font-bold text-blue-200 mt-3' :
-              line.startsWith('-') ? 'pl-4 text-gray-300' :
-              'text-gray-200'
+              line.startsWith('#') ? 'font-bold text-amber-200 mt-3' :
+              line.startsWith('-') ? 'pl-4 text-stone-300' :
+              'text-stone-200'
             }`}
           >
             {line.replace(/\*\*/g, '').replace(/^#+\s*/, '')}
             {/* 光标显示在最后一行末尾 */}
             {isStreaming && i === lines.length - 1 && line && (
-              <span className="animate-pulse text-blue-400 ml-0.5">▌</span>
+              <span className="animate-pulse text-accent ml-0.5">▌</span>
             )}
           </p>
         ))}
 
         {/* 空状态 */}
         {!reasoning && isStreaming && (
-          <div className="flex items-center gap-2 text-gray-400">
+          <div className="flex items-center gap-2 text-stone-400">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span className="text-sm">等待分析结果...</span>
           </div>
@@ -216,7 +216,7 @@ export const StreamingReasoning: React.FC<StreamingReasoningProps> = memo(({
 
       {/* 完成指示 */}
       {!isStreaming && reasoning && (
-        <div className="px-4 py-2 bg-gray-800/30 border-t border-gray-700/50 flex items-center gap-2">
+        <div className="px-4 py-2 bg-surface-overlay/30 border-t border-border-strong/50 flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           <span className="text-xs text-green-400/80">分析完成</span>
         </div>

@@ -39,6 +39,9 @@ PLANNER_SYSTEM_PROMPT = """你是一个智能分析师调度器（Planner）。�
 - policy: 政策分析师 - 分析政策影响、监管动态
 - fund_flow: 资金流向分析师 - 分析北向资金、龙虎榜
 
+**扩展分析师（所有市场可用，深度分析时推荐）：**
+- supply_chain: 产业链分析师 - 分析上下游关系、供应链风险、传导效应
+
 ## 决策原则
 
 1. **低成交量股票**（日均成交额 < 1亿）：
@@ -240,12 +243,15 @@ def _get_available_analysts(market: str) -> List[str]:
     """
     core = [AnalystType.MARKET, AnalystType.NEWS, AnalystType.FUNDAMENTALS, AnalystType.SOCIAL]
 
+    # 扩展分析师（所有市场可用，L2 模式可选）
+    extended = [AnalystType.SUPPLY_CHAIN]
+
     if market == "CN":
-        return core + [AnalystType.SENTIMENT, AnalystType.POLICY, AnalystType.FUND_FLOW]
+        return core + [AnalystType.SENTIMENT, AnalystType.POLICY, AnalystType.FUND_FLOW] + extended
     elif market == "HK":
-        return core + [AnalystType.SENTIMENT]
+        return core + [AnalystType.SENTIMENT] + extended
     else:
-        return core
+        return core + extended
 
 
 def _parse_planner_decision(response: str, available: List[str]) -> Dict[str, Any]:

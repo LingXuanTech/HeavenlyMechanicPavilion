@@ -84,10 +84,10 @@ function formatJobName(id: string): string {
  * 获取 job 的图标颜色
  */
 function getJobColor(id: string): string {
-  if (id.includes('market')) return 'text-blue-400';
+  if (id.includes('market')) return 'text-accent';
   if (id.includes('price') || id.includes('watchlist')) return 'text-green-400';
   if (id.includes('analysis')) return 'text-amber-400';
-  return 'text-gray-400';
+  return 'text-stone-400';
 }
 
 const JobCard: React.FC<{ job: SchedulerJob }> = ({ job }) => {
@@ -97,27 +97,27 @@ const JobCard: React.FC<{ job: SchedulerJob }> = ({ job }) => {
   const color = getJobColor(job.id);
 
   return (
-    <div className="bg-gray-800/50 border border-gray-700/50 rounded-lg p-4 hover:border-gray-600 transition-colors">
+    <div className="bg-surface-overlay/50 border border-border-strong/50 rounded-lg p-4 hover:border-border-strong transition-colors">
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
           <Timer className={`w-4 h-4 ${color}`} />
           <span className="text-sm font-semibold text-white">{jobName}</span>
         </div>
-        <span className="text-[10px] bg-gray-700 text-gray-300 px-2 py-0.5 rounded-full">
+        <span className="text-[10px] bg-surface-muted text-stone-300 px-2 py-0.5 rounded-full">
           {triggerText}
         </span>
       </div>
 
-      <div className="flex items-center gap-2 text-xs text-gray-400">
+      <div className="flex items-center gap-2 text-xs text-stone-400">
         <Clock className="w-3 h-3" />
         <span>Next: </span>
-        <span className={nextRunText === 'Overdue' ? 'text-red-400' : 'text-gray-300'}>
+        <span className={nextRunText === 'Overdue' ? 'text-red-400' : 'text-stone-300'}>
           {nextRunText}
         </span>
       </div>
 
       {job.next_run_time && (
-        <div className="text-[10px] text-gray-500 mt-1 ml-5">
+        <div className="text-[10px] text-stone-500 mt-1 ml-5">
           {new Date(job.next_run_time).toLocaleString('zh-CN', {
             month: '2-digit',
             day: '2-digit',
@@ -141,29 +141,29 @@ const SchedulerPanel: React.FC<SchedulerPanelProps> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-gray-900 border border-gray-700 rounded-xl w-full max-w-lg shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-surface-raised border border-border-strong rounded-xl w-full max-w-lg shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-gray-800">
+        <div className="flex items-center justify-between p-5 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-500/10 rounded-lg">
-              <Zap className="w-5 h-5 text-blue-400" />
+            <div className="p-2 bg-accent/10 rounded-lg">
+              <Zap className="w-5 h-5 text-accent" />
             </div>
             <div>
               <h2 className="text-lg font-bold text-white">Scheduler</h2>
-              <p className="text-xs text-gray-400">Manage background tasks</p>
+              <p className="text-xs text-stone-400">Manage background tasks</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={refresh}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+              className="p-2 text-stone-400 hover:text-stone-50 hover:bg-surface-overlay rounded-lg transition-colors"
               title="Refresh"
             >
               <RefreshCw className="w-4 h-4" />
             </button>
             <button
               onClick={onClose}
-              className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+              className="p-2 text-stone-400 hover:text-stone-50 hover:bg-surface-overlay rounded-lg transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -174,7 +174,7 @@ const SchedulerPanel: React.FC<SchedulerPanelProps> = ({ onClose }) => {
         <div className="px-5 pt-4 pb-3">
           <div className="grid grid-cols-3 gap-3">
             {/* Running Status */}
-            <div className="bg-gray-800/50 rounded-lg p-3 text-center">
+            <div className="bg-surface-overlay/50 rounded-lg p-3 text-center">
               <div className="flex items-center justify-center mb-1">
                 {status?.running ? (
                   <CheckCircle2 className="w-5 h-5 text-emerald-400" />
@@ -182,7 +182,7 @@ const SchedulerPanel: React.FC<SchedulerPanelProps> = ({ onClose }) => {
                   <AlertCircle className="w-5 h-5 text-red-400" />
                 )}
               </div>
-              <div className="text-xs text-gray-400">Status</div>
+              <div className="text-xs text-stone-400">Status</div>
               <div
                 className={`text-sm font-bold ${status?.running ? 'text-emerald-400' : 'text-red-400'}`}
               >
@@ -191,29 +191,29 @@ const SchedulerPanel: React.FC<SchedulerPanelProps> = ({ onClose }) => {
             </div>
 
             {/* Analysis Progress */}
-            <div className="bg-gray-800/50 rounded-lg p-3 text-center">
+            <div className="bg-surface-overlay/50 rounded-lg p-3 text-center">
               <div className="flex items-center justify-center mb-1">
                 {status?.analysis_in_progress ? (
                   <Loader className="w-5 h-5 text-amber-400 animate-spin" />
                 ) : (
-                  <Play className="w-5 h-5 text-gray-500" />
+                  <Play className="w-5 h-5 text-stone-500" />
                 )}
               </div>
-              <div className="text-xs text-gray-400">Analysis</div>
+              <div className="text-xs text-stone-400">Analysis</div>
               <div
-                className={`text-sm font-bold ${status?.analysis_in_progress ? 'text-amber-400' : 'text-gray-500'}`}
+                className={`text-sm font-bold ${status?.analysis_in_progress ? 'text-amber-400' : 'text-stone-500'}`}
               >
                 {isLoading ? '...' : status?.analysis_in_progress ? 'Running' : 'Idle'}
               </div>
             </div>
 
             {/* Jobs Count */}
-            <div className="bg-gray-800/50 rounded-lg p-3 text-center">
+            <div className="bg-surface-overlay/50 rounded-lg p-3 text-center">
               <div className="flex items-center justify-center mb-1">
-                <Clock className="w-5 h-5 text-blue-400" />
+                <Clock className="w-5 h-5 text-accent" />
               </div>
-              <div className="text-xs text-gray-400">Jobs</div>
-              <div className="text-sm font-bold text-blue-400">
+              <div className="text-xs text-stone-400">Jobs</div>
+              <div className="text-sm font-bold text-accent">
                 {isLoading ? '...' : status?.jobs_count ?? 0}
               </div>
             </div>
@@ -222,13 +222,13 @@ const SchedulerPanel: React.FC<SchedulerPanelProps> = ({ onClose }) => {
 
         {/* Job List */}
         <div className="px-5 pb-3">
-          <div className="text-xs text-gray-500 uppercase font-bold mb-2">Scheduled Jobs</div>
+          <div className="text-xs text-stone-500 uppercase font-bold mb-2">Scheduled Jobs</div>
           {isLoading ? (
-            <div className="flex items-center justify-center py-8 text-gray-500">
+            <div className="flex items-center justify-center py-8 text-stone-500">
               <Loader className="w-5 h-5 animate-spin" />
             </div>
           ) : jobs.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 text-sm">No scheduled jobs</div>
+            <div className="text-center py-8 text-stone-500 text-sm">No scheduled jobs</div>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
               {jobs.map((job) => (
@@ -239,7 +239,7 @@ const SchedulerPanel: React.FC<SchedulerPanelProps> = ({ onClose }) => {
         </div>
 
         {/* Actions */}
-        <div className="px-5 pb-5 pt-2 border-t border-gray-800">
+        <div className="px-5 pb-5 pt-2 border-t border-border">
           <button
             onClick={() => triggerMutation.mutate()}
             disabled={triggerMutation.isPending || status?.analysis_in_progress}

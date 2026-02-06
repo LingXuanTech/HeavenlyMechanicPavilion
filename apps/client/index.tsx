@@ -21,6 +21,8 @@ const PromptsPage = lazy(() => import('./pages/PromptsPage'));
 const SchedulerPage = lazy(() => import('./pages/SchedulerPage'));
 const AIConfigPage = lazy(() => import('./pages/AIConfigPage'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const HealthPage = lazy(() => import('./pages/HealthPage'));
+const SupplyChainPage = lazy(() => import('./pages/SupplyChainPage'));
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 // 创建 QueryClient 实例，配置全局默认值
@@ -74,6 +76,8 @@ root.render(
                     <Route path="prompts" element={<PromptsPage />} />
                     <Route path="scheduler" element={<SchedulerPage />} />
                     <Route path="ai-config" element={<AIConfigPage />} />
+                    <Route path="health" element={<HealthPage />} />
+                    <Route path="supply-chain" element={<SupplyChainPage />} />
                     <Route path="settings" element={<SettingsPage />} />
                     {/* 404 页面 - 放在 MainLayout 内以保持侧边栏 */}
                     <Route path="*" element={<NotFoundPage />} />

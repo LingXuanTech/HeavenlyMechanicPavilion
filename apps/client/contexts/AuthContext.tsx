@@ -149,7 +149,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   // 注册
   const register = useCallback(async (email: string, password: string, displayName?: string) => {
-    const response = await apiRequest<User>(
+    await apiRequest<User>(
       '/auth/register',
       {
         method: 'POST',
@@ -157,8 +157,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     );
 
-    // 注册后从响应头获取 token
-    // 注意：这里简化处理，实际可能需要再次登录
+    // 注册后自动登录
     await login(email, password);
   }, [login]);
 

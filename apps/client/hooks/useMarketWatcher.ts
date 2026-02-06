@@ -12,7 +12,7 @@ import {
   refreshMarketIndices,
   getMarketSentiment,
 } from '../services/api';
-import * as T from '../src/types/schema';
+import type * as T from '../src/types/schema';
 
 export const MARKET_WATCHER_KEY = ['marketWatcher'];
 

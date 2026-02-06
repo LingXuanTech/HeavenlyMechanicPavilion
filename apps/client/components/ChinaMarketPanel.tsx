@@ -52,20 +52,20 @@ const NorthMoneyContent: React.FC<{
     <div className="space-y-4">
       {/* 汇总数据 */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-gray-950/50 rounded p-2.5 border border-gray-800">
-          <div className="text-[10px] text-gray-500">今日合计</div>
+        <div className="bg-surface/50 rounded p-2.5 border border-border">
+          <div className="text-[10px] text-stone-500">今日合计</div>
           <div className={`text-base font-mono font-bold ${data.today.total >= 0 ? 'text-red-400' : 'text-green-400'}`}>
             {formatMoney(data.today.total)}
           </div>
         </div>
-        <div className="bg-gray-950/50 rounded p-2.5 border border-gray-800">
-          <div className="text-[10px] text-gray-500">沪股通</div>
+        <div className="bg-surface/50 rounded p-2.5 border border-border">
+          <div className="text-[10px] text-stone-500">沪股通</div>
           <div className={`text-base font-mono font-bold ${data.today.sh_connect >= 0 ? 'text-red-400' : 'text-green-400'}`}>
             {formatMoney(data.today.sh_connect)}
           </div>
         </div>
-        <div className="bg-gray-950/50 rounded p-2.5 border border-gray-800">
-          <div className="text-[10px] text-gray-500">深股通</div>
+        <div className="bg-surface/50 rounded p-2.5 border border-border">
+          <div className="text-[10px] text-stone-500">深股通</div>
           <div className={`text-base font-mono font-bold ${data.today.sz_connect >= 0 ? 'text-red-400' : 'text-green-400'}`}>
             {formatMoney(data.today.sz_connect)}
           </div>
@@ -73,8 +73,8 @@ const NorthMoneyContent: React.FC<{
       </div>
 
       {/* 趋势 */}
-      <div className="flex items-center justify-between px-3 py-2 bg-gray-950/30 rounded border border-gray-800">
-        <span className="text-xs text-gray-400">资金趋势</span>
+      <div className="flex items-center justify-between px-3 py-2 bg-surface/30 rounded border border-border">
+        <span className="text-xs text-stone-400">资金趋势</span>
         <span className={`text-xs font-medium ${isInflow ? 'text-red-400' : 'text-green-400'}`}>
           近期趋势: {isInflow ? '净流入' : '净流出'}
         </span>
@@ -82,7 +82,7 @@ const NorthMoneyContent: React.FC<{
 
       {/* TOP 股票 */}
       <div>
-        <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
+        <div className="flex items-center gap-1 text-xs text-stone-500 mb-2">
           <TrendingUp className="w-3 h-3 text-red-400" />
           <span>净买入 TOP</span>
         </div>
@@ -90,12 +90,12 @@ const NorthMoneyContent: React.FC<{
           {data.top_buys.slice(0, 5).map((stock) => (
             <div
               key={stock.symbol}
-              className="flex items-center justify-between py-1.5 px-2 bg-gray-950/30 rounded hover:bg-gray-800/30 cursor-pointer transition-colors"
+              className="flex items-center justify-between py-1.5 px-2 bg-surface/30 rounded hover:bg-surface-overlay/30 cursor-pointer transition-colors"
               onClick={() => onStockClick?.(stock.symbol)}
             >
               <div className="flex items-center gap-2">
                 <span className="text-xs text-white">{stock.name}</span>
-                <span className="text-[10px] text-gray-500">{stock.holding_ratio.toFixed(1)}%</span>
+                <span className="text-[10px] text-stone-500">{stock.holding_ratio.toFixed(1)}%</span>
               </div>
               <span className="text-xs font-mono text-red-400">{formatMoney(stock.net_buy)}</span>
             </div>
@@ -115,18 +115,18 @@ const LHBContent: React.FC<{
     <div className="space-y-4">
       {/* 汇总数据 */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-gray-950/50 rounded p-2.5 border border-gray-800">
-          <div className="text-[10px] text-gray-500">上榜股票</div>
+        <div className="bg-surface/50 rounded p-2.5 border border-border">
+          <div className="text-[10px] text-stone-500">上榜股票</div>
           <div className="text-base font-mono font-bold text-white">{data.total_stocks}</div>
         </div>
-        <div className="bg-gray-950/50 rounded p-2.5 border border-gray-800">
-          <div className="text-[10px] text-gray-500">市场净买</div>
+        <div className="bg-surface/50 rounded p-2.5 border border-border">
+          <div className="text-[10px] text-stone-500">市场净买</div>
           <div className={`text-base font-mono font-bold ${data.total_net_buy >= 0 ? 'text-red-400' : 'text-green-400'}`}>
             {formatMoney(data.total_net_buy)}
           </div>
         </div>
-        <div className="bg-gray-950/50 rounded p-2.5 border border-gray-800">
-          <div className="text-[10px] text-gray-500">机构净买</div>
+        <div className="bg-surface/50 rounded p-2.5 border border-border">
+          <div className="text-[10px] text-stone-500">机构净买</div>
           <div className={`text-base font-mono font-bold ${data.institution_net_buy >= 0 ? 'text-red-400' : 'text-green-400'}`}>
             {formatMoney(data.institution_net_buy)}
           </div>
@@ -136,7 +136,7 @@ const LHBContent: React.FC<{
       {/* 活跃游资 */}
       {data.hot_money_active.length > 0 && (
         <div>
-          <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
+          <div className="flex items-center gap-1 text-xs text-stone-500 mb-2">
             <Users className="w-3 h-3 text-yellow-400" />
             <span>活跃游资</span>
           </div>
@@ -155,7 +155,7 @@ const LHBContent: React.FC<{
 
       {/* 净买入 TOP */}
       <div>
-        <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
+        <div className="flex items-center gap-1 text-xs text-stone-500 mb-2">
           <TrendingUp className="w-3 h-3 text-red-400" />
           <span>净买入 TOP</span>
         </div>
@@ -163,7 +163,7 @@ const LHBContent: React.FC<{
           {data.top_buys.slice(0, 5).map((stock) => (
             <div
               key={stock.symbol}
-              className="flex items-center justify-between py-1.5 px-2 bg-gray-950/30 rounded hover:bg-gray-800/30 cursor-pointer transition-colors"
+              className="flex items-center justify-between py-1.5 px-2 bg-surface/30 rounded hover:bg-surface-overlay/30 cursor-pointer transition-colors"
               onClick={() => onStockClick?.(stock.symbol)}
             >
               <div className="flex items-center gap-2">
@@ -172,7 +172,7 @@ const LHBContent: React.FC<{
                   <span className="text-[9px] px-1 py-0.5 bg-yellow-900/30 text-yellow-400 rounded">游资</span>
                 )}
                 {stock.institution_net > 0 && (
-                  <span className="text-[9px] px-1 py-0.5 bg-blue-900/30 text-blue-400 rounded">机构</span>
+                  <span className="text-[9px] px-1 py-0.5 bg-accent/10 text-accent rounded">机构</span>
                 )}
               </div>
               <div className="text-right">
@@ -195,34 +195,34 @@ const JiejinContent: React.FC<{
     <div className="space-y-4">
       {/* 汇总数据 */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-gray-950/50 rounded p-2.5 border border-gray-800">
-          <div className="text-[10px] text-gray-500">涉及股票</div>
+        <div className="bg-surface/50 rounded p-2.5 border border-border">
+          <div className="text-[10px] text-stone-500">涉及股票</div>
           <div className="text-base font-mono font-bold text-white">{data.total_stocks}</div>
         </div>
-        <div className="bg-gray-950/50 rounded p-2.5 border border-gray-800">
-          <div className="text-[10px] text-gray-500">总解禁市值</div>
+        <div className="bg-surface/50 rounded p-2.5 border border-border">
+          <div className="text-[10px] text-stone-500">总解禁市值</div>
           <div className="text-base font-mono font-bold text-orange-400">
             {data.total_market_value.toFixed(0)}亿
           </div>
         </div>
-        <div className="bg-gray-950/50 rounded p-2.5 border border-gray-800">
-          <div className="text-[10px] text-gray-500">日均解禁</div>
-          <div className="text-base font-mono font-bold text-gray-300">
+        <div className="bg-surface/50 rounded p-2.5 border border-border">
+          <div className="text-[10px] text-stone-500">日均解禁</div>
+          <div className="text-base font-mono font-bold text-stone-300">
             {data.daily_average.toFixed(1)}亿
           </div>
         </div>
       </div>
 
       {/* 统计周期 */}
-      <div className="flex items-center justify-between px-3 py-2 bg-gray-950/30 rounded border border-gray-800">
-        <span className="text-xs text-gray-400">统计周期</span>
-        <span className="text-xs text-gray-300">{data.date_range}</span>
+      <div className="flex items-center justify-between px-3 py-2 bg-surface/30 rounded border border-border">
+        <span className="text-xs text-stone-400">统计周期</span>
+        <span className="text-xs text-stone-300">{data.date_range}</span>
       </div>
 
       {/* 高压力股票 */}
       {data.high_pressure_stocks.length > 0 && (
         <div>
-          <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
+          <div className="flex items-center gap-1 text-xs text-stone-500 mb-2">
             <AlertTriangle className="w-3 h-3 text-orange-400" />
             <span>高解禁压力</span>
           </div>
@@ -230,12 +230,12 @@ const JiejinContent: React.FC<{
             {data.high_pressure_stocks.slice(0, 5).map((stock) => (
               <div
                 key={`${stock.symbol}-${stock.jiejin_date}`}
-                className="flex items-center justify-between py-1.5 px-2 bg-gray-950/30 rounded hover:bg-gray-800/30 cursor-pointer transition-colors"
+                className="flex items-center justify-between py-1.5 px-2 bg-surface/30 rounded hover:bg-surface-overlay/30 cursor-pointer transition-colors"
                 onClick={() => onStockClick?.(stock.symbol)}
               >
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-white">{stock.name}</span>
-                  <span className="text-[10px] text-gray-500">
+                  <span className="text-[10px] text-stone-500">
                     {new Date(stock.jiejin_date).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
                   </span>
                 </div>
@@ -248,7 +248,7 @@ const JiejinContent: React.FC<{
                       ? 'bg-red-900/30 text-red-400'
                       : stock.pressure_level === '中'
                       ? 'bg-yellow-900/30 text-yellow-400'
-                      : 'bg-gray-800 text-gray-400'
+                      : 'bg-surface-overlay text-stone-400'
                   }`}>
                     {stock.jiejin_ratio.toFixed(1)}%
                   </span>
@@ -262,21 +262,21 @@ const JiejinContent: React.FC<{
       {/* 近期解禁日历 */}
       {data.calendar.length > 0 && (
         <div>
-          <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
-            <Calendar className="w-3 h-3 text-blue-400" />
+          <div className="flex items-center gap-1 text-xs text-stone-500 mb-2">
+            <Calendar className="w-3 h-3 text-accent" />
             <span>近期解禁日历</span>
           </div>
           <div className="space-y-1">
             {data.calendar.slice(0, 3).map((day) => (
               <div
                 key={day.date}
-                className="flex items-center justify-between py-1.5 px-2 bg-gray-950/30 rounded"
+                className="flex items-center justify-between py-1.5 px-2 bg-surface/30 rounded"
               >
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-300">
+                  <span className="text-xs text-stone-300">
                     {new Date(day.date).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}
                   </span>
-                  <span className="text-[10px] text-gray-500">{day.stock_count}只</span>
+                  <span className="text-[10px] text-stone-500">{day.stock_count}只</span>
                 </div>
                 <span className="text-xs font-mono text-orange-400">
                   {day.total_market_value.toFixed(1)}亿
@@ -307,9 +307,9 @@ const ChinaMarketPanel: React.FC<ChinaMarketPanelProps> = ({ onStockClick }) => 
   };
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+    <div className="bg-surface-raised border border-border rounded-lg overflow-hidden">
       {/* Header with Tabs */}
-      <div className="flex items-center justify-between px-2 py-2 bg-gray-950/50 border-b border-gray-800">
+      <div className="flex items-center justify-between px-2 py-2 bg-surface/50 border-b border-border">
         <div className="flex">
           {TABS.map((tab) => (
             <button
@@ -317,8 +317,8 @@ const ChinaMarketPanel: React.FC<ChinaMarketPanelProps> = ({ onStockClick }) => 
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded transition-colors ${
                 activeTab === tab.id
-                  ? 'bg-gray-800 text-white'
-                  : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800/50'
+                  ? 'bg-surface-overlay text-white'
+                  : 'text-stone-500 hover:text-stone-300 hover:bg-surface-overlay/50'
               }`}
             >
               {tab.icon}
@@ -330,10 +330,10 @@ const ChinaMarketPanel: React.FC<ChinaMarketPanelProps> = ({ onStockClick }) => 
         <button
           onClick={handleRefresh}
           disabled={isLoading}
-          className="p-1.5 hover:bg-gray-800 rounded transition-colors disabled:opacity-50"
+          className="p-1.5 hover:bg-surface-overlay rounded transition-colors disabled:opacity-50"
           title="刷新数据"
         >
-          <RefreshCw className={`w-3.5 h-3.5 text-gray-400 ${isLoading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 text-stone-400 ${isLoading ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
@@ -341,7 +341,7 @@ const ChinaMarketPanel: React.FC<ChinaMarketPanelProps> = ({ onStockClick }) => 
       <div className="p-4">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <RefreshCw className="w-6 h-6 text-gray-500 animate-spin" />
+            <RefreshCw className="w-6 h-6 text-stone-500 animate-spin" />
           </div>
         ) : (
           <>
@@ -356,13 +356,13 @@ const ChinaMarketPanel: React.FC<ChinaMarketPanelProps> = ({ onStockClick }) => 
             )}
 
             {!northData && activeTab === 'north' && (
-              <div className="text-center py-8 text-gray-500 text-sm">无法获取北向资金数据</div>
+              <div className="text-center py-8 text-stone-500 text-sm">无法获取北向资金数据</div>
             )}
             {!lhbData && activeTab === 'lhb' && (
-              <div className="text-center py-8 text-gray-500 text-sm">无法获取龙虎榜数据</div>
+              <div className="text-center py-8 text-stone-500 text-sm">无法获取龙虎榜数据</div>
             )}
             {!jiejinData && activeTab === 'jiejin' && (
-              <div className="text-center py-8 text-gray-500 text-sm">无法获取解禁数据</div>
+              <div className="text-center py-8 text-stone-500 text-sm">无法获取解禁数据</div>
             )}
           </>
         )}

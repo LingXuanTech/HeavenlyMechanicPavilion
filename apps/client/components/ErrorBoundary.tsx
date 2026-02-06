@@ -4,7 +4,7 @@
  * 捕获子组件树中的 JavaScript 错误，防止整个应用崩溃。
  * 展示友好的错误回退界面。
  */
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface ErrorBoundaryProps {
@@ -56,26 +56,26 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
       }
 
       return (
-        <div className="flex items-center justify-center min-h-screen bg-gray-950 text-white p-8">
-          <div className="max-w-md w-full bg-gray-900 border border-gray-800 rounded-xl p-8 text-center">
+        <div className="flex items-center justify-center min-h-screen bg-surface text-stone-50 p-8">
+          <div className="max-w-md w-full bg-surface-raised border border-border rounded-xl p-8 text-center">
             <div className="flex justify-center mb-4">
               <AlertTriangle className="w-12 h-12 text-amber-500" />
             </div>
             <h2 className="text-xl font-semibold mb-2">页面出现错误</h2>
-            <p className="text-gray-400 mb-6 text-sm">
+            <p className="text-stone-400 mb-6 text-sm">
               {this.state.error?.message || '发生了未知错误'}
             </p>
 
             <div className="flex gap-3 justify-center">
               <button
                 onClick={this.handleReset}
-                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm transition-colors"
+                className="px-4 py-2 bg-surface-overlay hover:bg-stone-700 rounded-lg text-sm transition-colors"
               >
                 重试
               </button>
               <button
                 onClick={this.handleReload}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-hover rounded-lg text-sm transition-colors"
               >
                 <RefreshCw className="w-4 h-4" />
                 刷新页面
@@ -85,10 +85,10 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             {/* 开发模式显示错误详情 */}
             {import.meta.env.DEV && this.state.errorInfo && (
               <details className="mt-6 text-left">
-                <summary className="text-gray-500 text-xs cursor-pointer hover:text-gray-400">
+                <summary className="text-stone-500 text-xs cursor-pointer hover:text-stone-400">
                   错误详情（开发模式）
                 </summary>
-                <pre className="mt-2 p-3 bg-gray-950 rounded text-xs text-red-400 overflow-auto max-h-48">
+                <pre className="mt-2 p-3 bg-surface rounded text-xs text-red-400 overflow-auto max-h-48">
                   {this.state.error?.stack}
                   {'\n\n'}
                   {this.state.errorInfo.componentStack}

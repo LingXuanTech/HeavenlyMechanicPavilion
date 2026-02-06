@@ -9,7 +9,7 @@
 
 import { logger } from '../utils/logger';
 
-import * as T from '../src/types/schema';
+import type * as T from '../src/types/schema';
 
 // 暂时保留旧的导入，直到全部替换完成
 
@@ -593,6 +593,11 @@ export const checkLiveness = () =>
 export const checkReadiness = () =>
   request<{ status: string; components: number }>('/health/readiness');
 
+export const resetCircuitBreaker = (provider: string) =>
+  request<{ status: string; message: string }>(`/health/reset-circuit-breaker/${provider}`, {
+    method: 'POST',
+  });
+
 // ============ 管理 API ============
 
 export const triggerDailyAnalysis = () =>
@@ -800,6 +805,67 @@ export const getJiejinToday = () =>
 
 export const getJiejinWeek = () =>
   request<T.JiejinStock[]>('/jiejin/week');
+
+// ============ 产业链知识图谱 API ============
+
+export const getChainList = () =>
+  request<Record<string, unknown>>('/supply-chain/chains');
+
+export const getChainGraph = (chainId: string) =>
+  request<Record<string, unknown>>(`/supply-chain/graph/${chainId}`);
+
+export const getStockChainPosition = (symbol: string) =>
+  request<Record<string, unknown>>(`/supply-chain/stock/${encodeURIComponent(symbol)}`);
+
+export const getSupplyChainImpact = (symbol: string) =>
+  request<Record<string, unknown>>(`/supply-chain/impact/${encodeURIComponent(symbol)}`);
+
+// ============ Vision 分析 API ============
+
+export const analyzeVisionImage = async (
+  file: File,
+  description: string = '',
+  symbol: string = ''
+) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('description', description);
+  formData.append('symbol', symbol);
+
+  const response = await fetch(`${API_BASE}/vision/analyze`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => response.statusText);
+    throw new ApiError(response.status, response.statusText, errorText);
+  }
+
+  return response.json();
+};
+
+export const getVisionHistory = (symbol?: string, limit: number = 10) => {
+  const params = new URLSearchParams();
+  if (symbol) params.append('symbol', symbol);
+  params.append('limit', String(limit));
+  return request<{ history: unknown[]; total: number }>(`/vision/history?${params.toString()}`);
+};
+
+// ============ 另类数据 API ============
+
+export const getAHPremiumList = (sortBy: string = 'premium_rate', limit: number = 50) =>
+  request<Record<string, unknown>>(`/alternative/ah-premium?sort_by=${sortBy}&limit=${limit}`);
+
+export const getAHPremiumDetail = (symbol: string) =>
+  request<Record<string, unknown>>(`/alternative/ah-premium/${encodeURIComponent(symbol)}`);
+
+export const getPatentAnalysis = (symbol: string, companyName?: string) => {
+  const params = new URLSearchParams();
+  if (companyName) params.append('company_name', companyName);
+  const query = params.toString() ? `?${params.toString()}` : '';
+  return request<Record<string, unknown>>(`/alternative/patents/${encodeURIComponent(symbol)}${query}`);
+};
 
 // ============ Prompt 配置 API ============
 

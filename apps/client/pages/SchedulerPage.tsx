@@ -73,10 +73,10 @@ function formatJobName(id: string): string {
 }
 
 function getJobIcon(id: string): { icon: React.ElementType; color: string; bgColor: string } {
-  if (id.includes('market')) return { icon: Activity, color: 'text-blue-400', bgColor: 'bg-blue-500/10' };
+  if (id.includes('market')) return { icon: Activity, color: 'text-accent', bgColor: 'bg-accent/10' };
   if (id.includes('price') || id.includes('watchlist')) return { icon: RefreshCw, color: 'text-green-400', bgColor: 'bg-green-500/10' };
   if (id.includes('analysis')) return { icon: Zap, color: 'text-amber-400', bgColor: 'bg-amber-500/10' };
-  return { icon: Timer, color: 'text-gray-400', bgColor: 'bg-gray-500/10' };
+  return { icon: Timer, color: 'text-stone-400', bgColor: 'bg-stone-500/10' };
 }
 
 // === 任务卡片组件 ===
@@ -89,7 +89,7 @@ const JobCard: React.FC<{ job: SchedulerJob }> = ({ job }) => {
   const isOverdue = nextRunText === '已过期';
 
   return (
-    <div className="flex items-center gap-4 p-4 bg-gray-800/50 border border-gray-700 rounded-xl hover:border-gray-600 transition-colors">
+    <div className="flex items-center gap-4 p-4 bg-surface-overlay/50 border border-border-strong rounded-xl hover:border-stone-600 transition-colors">
       <div className={`p-3 rounded-lg ${bgColor}`}>
         <Icon className={`w-5 h-5 ${color}`} />
       </div>
@@ -97,14 +97,14 @@ const JobCard: React.FC<{ job: SchedulerJob }> = ({ job }) => {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <span className="font-medium text-white">{jobName}</span>
-          <span className="text-xs px-2 py-0.5 bg-gray-700 text-gray-400 rounded-full">
+          <span className="text-xs px-2 py-0.5 bg-surface-muted text-stone-400 rounded-full">
             {triggerText}
           </span>
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <Clock className="w-3.5 h-3.5 text-gray-500" />
-          <span className="text-gray-500">下次执行:</span>
-          <span className={isOverdue ? 'text-red-400' : 'text-gray-300'}>
+          <Clock className="w-3.5 h-3.5 text-stone-500" />
+          <span className="text-stone-500">下次执行:</span>
+          <span className={isOverdue ? 'text-red-400' : 'text-stone-300'}>
             {nextRunText}
           </span>
         </div>
@@ -112,13 +112,13 @@ const JobCard: React.FC<{ job: SchedulerJob }> = ({ job }) => {
 
       {job.next_run_time && (
         <div className="text-right">
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-stone-500">
             {new Date(job.next_run_time).toLocaleDateString('zh-CN', {
               month: 'short',
               day: 'numeric',
             })}
           </div>
-          <div className="text-sm text-gray-400">
+          <div className="text-sm text-stone-400">
             {new Date(job.next_run_time).toLocaleTimeString('zh-CN', {
               hour: '2-digit',
               minute: '2-digit',
@@ -188,8 +188,8 @@ const SchedulerPage: React.FC = () => {
             label="分析任务"
             value={isLoading ? '...' : status?.analysis_in_progress ? '执行中' : '空闲'}
             icon={status?.analysis_in_progress ? Loader2 : Play}
-            iconColor={status?.analysis_in_progress ? 'text-amber-400' : 'text-gray-500'}
-            valueColor={status?.analysis_in_progress ? 'text-amber-400' : 'text-gray-400'}
+            iconColor={status?.analysis_in_progress ? 'text-amber-400' : 'text-stone-500'}
+            valueColor={status?.analysis_in_progress ? 'text-amber-400' : 'text-stone-400'}
             subtitle={status?.analysis_in_progress ? '正在运行 AI 分析' : undefined}
           />
 
@@ -197,8 +197,8 @@ const SchedulerPage: React.FC = () => {
             label="计划任务"
             value={isLoading ? '...' : status?.jobs_count ?? 0}
             icon={Clock}
-            iconColor="text-blue-400"
-            valueColor="text-blue-400"
+            iconColor="text-accent"
+            valueColor="text-accent"
             subtitle={`${jobs.length} 个任务已调度`}
           />
         </div>
@@ -240,7 +240,7 @@ const SchedulerPage: React.FC = () => {
                 <Zap className="w-5 h-5 text-amber-400 mt-0.5" />
                 <div>
                   <h4 className="font-medium text-white">手动触发每日分析</h4>
-                  <p className="text-sm text-gray-400 mt-1">
+                  <p className="text-sm text-stone-400 mt-1">
                     立即对关注列表中的所有股票运行 AI 分析。此操作会消耗 API 配额。
                   </p>
                 </div>
@@ -271,7 +271,7 @@ const SchedulerPage: React.FC = () => {
             </div>
 
             {/* 说明 */}
-            <div className="text-xs text-gray-500 space-y-1">
+            <div className="text-xs text-stone-500 space-y-1">
               <p>• 每日分析会分析关注列表中的所有股票</p>
               <p>• 分析结果会通过 SSE 实时推送到 Dashboard</p>
               <p>• 请确保 AI 提供商配置正确后再触发</p>

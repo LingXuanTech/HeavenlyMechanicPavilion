@@ -41,6 +41,7 @@ class AnalysisResult(SQLModel, table=True):
     # 诊断信息
     elapsed_seconds: Optional[float] = Field(default=None)
     token_usage: Optional[str] = Field(default=None)  # JSON string
+    architecture_mode: str = Field(default="monolith")  # monolith / subgraph
 
 
 class ChatHistory(SQLModel, table=True):
@@ -395,6 +396,36 @@ class BacktestResultRecord(SQLModel, table=True):
 
     # 时间戳
     created_at: datetime = Field(default_factory=datetime.now)
+
+
+# ============ 北向资金历史数据模型 ============
+
+class NorthMoneyHistoryRecord(SQLModel, table=True):
+    """北向资金历史数据记录（持久化存储）"""
+    __tablename__ = "north_money_history"
+    __table_args__ = (
+        Index("ix_north_money_date", "date"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # 日期（唯一索引，每日一条记录）
+    date: str = Field(index=True, unique=True)             # 日期 YYYY-MM-DD 格式
+
+    # 北向资金流向数据
+    north_inflow: float = Field(default=0.0)               # 北向资金净流入（亿元）
+    sh_inflow: float = Field(default=0.0)                  # 沪股通净流入（亿元）
+    sz_inflow: float = Field(default=0.0)                  # 深股通净流入（亿元）
+    cumulative_inflow: float = Field(default=0.0)          # 累计净流入（亿元）
+
+    # 市场指数数据（用于相关性计算）
+    market_index: Optional[float] = Field(default=None)    # 当日上证指数收盘价
+    hs300_index: Optional[float] = Field(default=None)     # 当日沪深300收盘价
+    cyb_index: Optional[float] = Field(default=None)       # 当日创业板指收盘价
+
+    # 时间戳
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
 
 
 def get_engine():

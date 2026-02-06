@@ -47,9 +47,9 @@ const getStatusBadge = (status: string) => {
     case 'trading':
       return <span className="text-[9px] px-1.5 py-0.5 rounded bg-green-900/30 text-green-400">LIVE</span>;
     case 'closed':
-      return <span className="text-[9px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-500">CLOSED</span>;
+      return <span className="text-[9px] px-1.5 py-0.5 rounded bg-surface-overlay text-stone-500">CLOSED</span>;
     case 'pre_market':
-      return <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-900/30 text-blue-400">PRE</span>;
+      return <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent/10 text-accent">PRE</span>;
     case 'after_hours':
       return <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-900/30 text-purple-400">AH</span>;
     default:
@@ -61,16 +61,16 @@ const IndexCard: React.FC<{ index: T.MarketIndex }> = ({ index }) => {
   const isUp = index.change_percent >= 0;
 
   return (
-    <div className="flex items-center justify-between p-3 bg-gray-950/50 rounded border border-gray-800 hover:border-gray-700 transition-colors">
+    <div className="flex items-center justify-between p-3 bg-surface/50 rounded border border-border hover:border-border-strong transition-colors">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold text-white truncate">{index.name}</span>
           {getStatusBadge(index.status)}
         </div>
         <div className="flex items-center gap-2 mt-0.5">
-          <span className="text-[10px] text-gray-500 font-mono">{index.code}</span>
-          <span className="text-[10px] text-gray-600">•</span>
-          <span className="text-[10px] text-gray-500">{index.region}</span>
+          <span className="text-[10px] text-stone-500 font-mono">{index.code}</span>
+          <span className="text-[10px] text-stone-600">•</span>
+          <span className="text-[10px] text-stone-500">{index.region}</span>
         </div>
       </div>
 
@@ -92,7 +92,7 @@ const MarketIndicesPanel: React.FC<MarketIndicesPanelProps> = ({ compact = false
   const [showFilter, setShowFilter] = useState(false);
 
   const { data: overview, isLoading: overviewLoading } = useMarketWatcherOverview();
-  const { data: sentiment } = useMarketSentiment();
+  const { data: _sentiment } = useMarketSentiment();
   const { data: indices, isLoading: indicesLoading, refetch } = useMarketIndices(
     selectedRegion === 'ALL' ? undefined : selectedRegion
   );
@@ -113,7 +113,7 @@ const MarketIndicesPanel: React.FC<MarketIndicesPanelProps> = ({ compact = false
       <div className="flex gap-4 overflow-x-auto py-2">
         {keyIndices.map((idx) => (
           <div key={idx.code} className="flex items-center gap-2 text-xs font-mono shrink-0">
-            <span className="font-semibold text-gray-400">{idx.name}</span>
+            <span className="font-semibold text-stone-400">{idx.name}</span>
             <span className="text-white">{idx.current.toLocaleString()}</span>
             <span className={idx.change_percent >= 0 ? 'text-green-400' : 'text-red-400'}>
               {idx.change_percent >= 0 ? '+' : ''}{idx.change_percent.toFixed(2)}%
@@ -125,12 +125,12 @@ const MarketIndicesPanel: React.FC<MarketIndicesPanelProps> = ({ compact = false
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+    <div className="bg-surface-raised border border-border rounded-lg overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-950/50 border-b border-gray-800">
+      <div className="flex items-center justify-between px-4 py-3 bg-surface/50 border-b border-border">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <Globe className="w-4 h-4 text-blue-400" />
+            <Globe className="w-4 h-4 text-accent" />
             <span className="text-sm font-semibold text-white">Market Indices</span>
           </div>
 
@@ -138,13 +138,13 @@ const MarketIndicesPanel: React.FC<MarketIndicesPanelProps> = ({ compact = false
           {overview && (
             <div className="hidden sm:flex items-center gap-3 ml-2">
               <div className="flex items-center gap-1">
-                <Activity className="w-3 h-3 text-gray-500" />
+                <Activity className="w-3 h-3 text-stone-500" />
                 <span className={`text-xs font-medium ${getSentimentColor(overview.global_sentiment)}`}>
                   {overview.global_sentiment}
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                <AlertTriangle className="w-3 h-3 text-gray-500" />
+                <AlertTriangle className="w-3 h-3 text-stone-500" />
                 <span className={`text-xs font-medium ${getRiskColor(overview.risk_level)}`}>
                   Risk: {overview.risk_level}
                 </span>
@@ -158,7 +158,7 @@ const MarketIndicesPanel: React.FC<MarketIndicesPanelProps> = ({ compact = false
           <div className="relative">
             <button
               onClick={() => setShowFilter(!showFilter)}
-              className="flex items-center gap-1 px-2 py-1 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded transition-colors"
+              className="flex items-center gap-1 px-2 py-1 text-xs text-stone-400 hover:text-stone-50 bg-surface-overlay hover:bg-surface-muted rounded transition-colors"
             >
               <Filter className="w-3 h-3" />
               <span>{REGIONS.find(r => r.value === selectedRegion)?.label}</span>
@@ -166,7 +166,7 @@ const MarketIndicesPanel: React.FC<MarketIndicesPanelProps> = ({ compact = false
             </button>
 
             {showFilter && (
-              <div className="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded shadow-lg z-10">
+              <div className="absolute right-0 top-full mt-1 bg-surface-overlay border border-border-strong rounded shadow-lg z-10">
                 {REGIONS.map((region) => (
                   <button
                     key={region.value}
@@ -174,8 +174,8 @@ const MarketIndicesPanel: React.FC<MarketIndicesPanelProps> = ({ compact = false
                       setSelectedRegion(region.value);
                       setShowFilter(false);
                     }}
-                    className={`block w-full text-left px-3 py-1.5 text-xs hover:bg-gray-700 transition-colors ${
-                      selectedRegion === region.value ? 'text-blue-400' : 'text-gray-300'
+                    className={`block w-full text-left px-3 py-1.5 text-xs hover:bg-surface-muted transition-colors ${
+                      selectedRegion === region.value ? 'text-accent' : 'text-stone-300'
                     }`}
                   >
                     {region.label}
@@ -188,10 +188,10 @@ const MarketIndicesPanel: React.FC<MarketIndicesPanelProps> = ({ compact = false
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="p-1.5 hover:bg-gray-800 rounded transition-colors disabled:opacity-50"
+            className="p-1.5 hover:bg-surface-overlay rounded transition-colors disabled:opacity-50"
             title="刷新指数"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 text-stone-400 ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
@@ -200,7 +200,7 @@ const MarketIndicesPanel: React.FC<MarketIndicesPanelProps> = ({ compact = false
       <div className="p-4">
         {overviewLoading || indicesLoading ? (
           <div className="flex items-center justify-center py-8">
-            <RefreshCw className="w-6 h-6 text-gray-500 animate-spin" />
+            <RefreshCw className="w-6 h-6 text-stone-500 animate-spin" />
           </div>
         ) : indices && indices.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -209,7 +209,7 @@ const MarketIndicesPanel: React.FC<MarketIndicesPanelProps> = ({ compact = false
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+          <div className="flex flex-col items-center justify-center py-8 text-stone-500">
             <Globe className="w-8 h-8 mb-2 opacity-50" />
             <p className="text-sm">No market data available</p>
           </div>
@@ -217,7 +217,7 @@ const MarketIndicesPanel: React.FC<MarketIndicesPanelProps> = ({ compact = false
 
         {/* Timestamp */}
         {overview && (
-          <div className="text-[10px] text-gray-500 text-right mt-3">
+          <div className="text-[10px] text-stone-500 text-right mt-3">
             Updated: {new Date(overview.updated_at).toLocaleTimeString()}
           </div>
         )}

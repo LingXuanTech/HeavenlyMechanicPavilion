@@ -83,27 +83,38 @@ def _get_system_prompt() -> str:
 def search_retail_sentiment(query: str, platform: str = "all") -> str:
     """搜索散户情绪数据
 
+    通过 DuckDuckGo 搜索散户讨论平台（Reddit、雪球、东方财富股吧等）的内容。
+    支持按平台筛选，返回散户讨论和情绪数据。
+
     Args:
         query: 搜索关键词（股票代码或公司名）
-        platform: 平台筛选 (reddit/twitter/stocktwits/all)
+        platform: 平台筛选 (reddit/twitter/stocktwits/xueqiu/all)
 
     Returns:
-        散户讨论和情绪数据
+        JSON 格式的散户讨论和情绪数据
     """
-    # 实际实现中会调用各平台 API
-    # 这里返回模拟数据，由 LLM 基于新闻数据推断
-    return f"Searching retail sentiment for '{query}' on {platform}..."
+    from tradingagents.dataflows.sentiment_data import search_retail_sentiment as _search
+    logger.info("Sentiment tool: searching retail sentiment", query=query, platform=platform)
+    return _search(query, platform=platform)
 
 
 @tool
-def get_fear_greed_index() -> str:
+def get_fear_greed_index(market: str = "auto") -> str:
     """获取恐惧贪婪指数
 
+    A股：通过 AkShare 获取融资余额、涨跌家数比、涨停跌停统计等指标
+    美股：通过 CNN Fear & Greed Index 获取恐惧贪婪指数及子指标
+    支持自动检测市场或手动指定。
+
+    Args:
+        market: 市场类型 (CN/US/auto)，auto 会同时获取两个市场
+
     Returns:
-        当前市场恐惧贪婪指数及历史趋势
+        JSON 格式的恐惧贪婪指数及市场情绪指标
     """
-    # 实际实现中会调用 CNN Fear & Greed Index API
-    return "Fear & Greed Index data..."
+    from tradingagents.dataflows.sentiment_data import get_fear_greed_index as _get_index
+    logger.info("Sentiment tool: fetching fear & greed index", market=market)
+    return _get_index(market=market)
 
 
 def create_sentiment_agent(llm):

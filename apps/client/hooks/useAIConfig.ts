@@ -5,7 +5,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as T from '../src/types/schema';
+import type * as T from '../src/types/schema';
 import {
   listAIProviders,
   getAIProvider,

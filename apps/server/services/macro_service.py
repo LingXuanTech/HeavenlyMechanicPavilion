@@ -8,7 +8,7 @@ from functools import lru_cache
 import asyncio
 
 from config.settings import settings
-from utils import TTLCache
+from services.cache_service import cache_service
 
 logger = structlog.get_logger()
 
@@ -58,8 +58,6 @@ class MacroAnalysisResult(BaseModel):
     opportunities: List[str]
 
 
-# 模块级缓存实例
-_macro_cache = TTLCache(default_ttl=3600)  # 1小时缓存
 
 
 class MacroDataService:
@@ -181,7 +179,7 @@ class MacroDataService:
         """获取宏观经济概览"""
 
         # 检查缓存
-        cached = _macro_cache.get("macro_overview")
+        cached = cache_service.get_sync("macro_overview")
         if cached:
             logger.debug("Using cached macro overview")
             return cached
@@ -218,7 +216,7 @@ class MacroDataService:
         overview.summary = cls._generate_summary(overview)
 
         # 缓存结果
-        _macro_cache.set("macro_overview", overview)
+        cache_service.set_sync("macro_overview", overview, ttl=3600)
 
         return overview
 
@@ -339,8 +337,7 @@ class MacroDataService:
         return "宏观数据暂不可用"
 
     @classmethod
-    def clear_cache(cls):
+    async def clear_cache(cls):
         """清除缓存"""
-        global _macro_cache
-        _macro_cache.clear()
+        await cache_service.delete("macro_overview")
         logger.info("Macro data cache cleared")

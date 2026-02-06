@@ -28,7 +28,6 @@ except ImportError:
     httpx = None
 
 from config.settings import settings
-from utils import TTLCache
 
 logger = structlog.get_logger()
 
@@ -125,7 +124,6 @@ class NewsAggregatorService:
     """
 
     _instance = None
-    _news_cache = TTLCache(default_ttl=300)  # 5 分钟缓存
     _seen_ids: Set[str] = set()
 
     def __new__(cls):
@@ -154,9 +152,6 @@ class NewsAggregatorService:
         content = f"{title}|{url}"
         return hashlib.md5(content.encode()).hexdigest()[:16]
 
-    def _is_cache_valid(self) -> bool:
-        """检查缓存是否有效"""
-        return self._news_cache.is_valid("all_news")
 
     async def _fetch_rss_feeds(self) -> List[NewsItem]:
         """从 RSS 源获取新闻"""
@@ -326,8 +321,8 @@ class NewsAggregatorService:
         Returns:
             新闻列表（按时间倒序）
         """
-        news_dict: Dict[str, NewsItem] = self._news_cache.get("all_news") or {}
-        if not force_refresh and news_dict and self._is_cache_valid():
+        news_dict: Dict[str, NewsItem] = cache_service.get_sync("all_news") or {}
+        if not force_refresh and news_dict:
             return sorted(
                 news_dict.values(),
                 key=lambda x: x.published_at,
@@ -353,7 +348,7 @@ class NewsAggregatorService:
             if v.published_at > cutoff
         }
 
-        self._news_cache.set("all_news", news_dict)
+        cache_service.set_sync("all_news", news_dict, ttl=300)
 
         logger.info("News aggregated", total=len(news_dict))
 
@@ -377,10 +372,10 @@ class NewsAggregatorService:
         # 如果缓存中没有足够的相关新闻，单独获取
         if len(cached_news) < 5:
             stock_news = await self._fetch_stock_news(symbol)
-            news_dict: Dict[str, NewsItem] = self._news_cache.get("all_news") or {}
+            news_dict: Dict[str, NewsItem] = cache_service.get_sync("all_news") or {}
             for news in stock_news:
                 news_dict[news.id] = news
-            self._news_cache.set("all_news", news_dict)
+            cache_service.set_sync("all_news", news_dict, ttl=300)
             cached_news = [n for n in news_dict.values() if symbol in n.symbols]
 
         return sorted(cached_news, key=lambda x: x.published_at, reverse=True)
@@ -404,13 +399,13 @@ class NewsAggregatorService:
 
     def get_stats(self) -> Dict[str, Any]:
         """获取服务统计"""
-        news_dict = self._news_cache.get("all_news") or {}
+        news_dict = cache_service.get_sync("all_news") or {}
         return {
             "status": "available",
             "feedparser_available": FEEDPARSER_AVAILABLE,
             "finnhub_available": FINNHUB_AVAILABLE and self._finnhub_client is not None,
             "cached_news": len(news_dict),
-            "cache_valid": self._is_cache_valid(),
+            "cache_valid": news_dict is not None,
             "enabled_feeds": [k for k, v in RSS_FEEDS.items() if v.get("enabled", True)]
         }
 

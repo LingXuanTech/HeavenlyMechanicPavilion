@@ -31,7 +31,7 @@ const getStatusColor = (status: T.HealthStatus): string => {
     case 'healthy': return 'text-green-400';
     case 'degraded': return 'text-yellow-400';
     case 'unhealthy': return 'text-red-400';
-    default: return 'text-gray-400';
+    default: return 'text-stone-400';
   }
 };
 
@@ -40,7 +40,7 @@ const getStatusIcon = (status: T.HealthStatus | 'unknown') => {
     case 'healthy': return <CheckCircle2 className="w-4 h-4 text-green-400" />;
     case 'degraded': return <AlertTriangle className="w-4 h-4 text-yellow-400" />;
     case 'unhealthy': return <XCircle className="w-4 h-4 text-red-400" />;
-    default: return <Activity className="w-4 h-4 text-gray-400" />;
+    default: return <Activity className="w-4 h-4 text-stone-400" />;
   }
 };
 
@@ -71,28 +71,28 @@ const SystemStatusPanel: React.FC<SystemStatusPanelProps> = ({ expanded = false,
     return (
       <div
         onClick={onToggle}
-        className="flex items-center gap-2 px-3 py-2 bg-gray-900 border border-gray-800 rounded-lg cursor-pointer hover:border-gray-700 transition-colors"
+        className="flex items-center gap-2 px-3 py-2 bg-surface-raised border border-border rounded-lg cursor-pointer hover:border-border-strong transition-colors"
       >
         {reportLoading ? (
-          <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" />
+          <RefreshCw className="w-4 h-4 text-stone-400 animate-spin" />
         ) : (
           getStatusIcon(report?.overall_status || 'unknown')
         )}
-        <span className="text-xs text-gray-400">System</span>
-        <ChevronDown className="w-3 h-3 text-gray-500" />
+        <span className="text-xs text-stone-400">System</span>
+        <ChevronDown className="w-3 h-3 text-stone-500" />
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+    <div className="bg-surface-raised border border-border rounded-lg overflow-hidden">
       {/* Header */}
       <div
         onClick={onToggle}
-        className="flex items-center justify-between px-4 py-3 bg-gray-950/50 border-b border-gray-800 cursor-pointer hover:bg-gray-950/70 transition-colors"
+        className="flex items-center justify-between px-4 py-3 bg-surface/50 border-b border-border cursor-pointer hover:bg-surface/70 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <Server className="w-4 h-4 text-blue-400" />
+          <Server className="w-4 h-4 text-accent" />
           <span className="text-sm font-semibold text-white">System Status</span>
           {report && (
             <span className={`text-xs font-medium ${getStatusColor(report.overall_status)}`}>
@@ -103,12 +103,12 @@ const SystemStatusPanel: React.FC<SystemStatusPanelProps> = ({ expanded = false,
         <div className="flex items-center gap-2">
           <button
             onClick={(e) => { e.stopPropagation(); handleRefresh(); }}
-            className="p-1 hover:bg-gray-800 rounded transition-colors"
+            className="p-1 hover:bg-surface-overlay rounded transition-colors"
             title="刷新状态"
           >
-            <RefreshCw className={`w-3 h-3 text-gray-400 ${reportLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3 h-3 text-stone-400 ${reportLoading ? 'animate-spin' : ''}`} />
           </button>
-          <ChevronUp className="w-4 h-4 text-gray-500" />
+          <ChevronUp className="w-4 h-4 text-stone-500" />
         </div>
       </div>
 
@@ -117,7 +117,7 @@ const SystemStatusPanel: React.FC<SystemStatusPanelProps> = ({ expanded = false,
         {/* Uptime */}
         {uptime && (
           <div className="flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2 text-gray-400">
+            <div className="flex items-center gap-2 text-stone-400">
               <Clock className="w-3 h-3" />
               <span>Uptime</span>
             </div>
@@ -131,13 +131,13 @@ const SystemStatusPanel: React.FC<SystemStatusPanelProps> = ({ expanded = false,
             {/* CPU */}
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2 text-gray-400">
+                <div className="flex items-center gap-2 text-stone-400">
                   <Cpu className="w-3 h-3" />
                   <span>CPU</span>
                 </div>
-                <span className="font-mono text-gray-300">{metrics.cpu_percent.toFixed(1)}%</span>
+                <span className="font-mono text-stone-300">{metrics.cpu_percent.toFixed(1)}%</span>
               </div>
-              <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-surface-overlay rounded-full overflow-hidden">
                 <div
                   className={`h-full ${getProgressColor(metrics.cpu_percent)} transition-all`}
                   style={{ width: `${metrics.cpu_percent}%` }}
@@ -148,15 +148,15 @@ const SystemStatusPanel: React.FC<SystemStatusPanelProps> = ({ expanded = false,
             {/* Memory */}
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2 text-gray-400">
+                <div className="flex items-center gap-2 text-stone-400">
                   <Activity className="w-3 h-3" />
                   <span>Memory</span>
                 </div>
-                <span className="font-mono text-gray-300">
+                <span className="font-mono text-stone-300">
                   {metrics.memory_used_mb.toFixed(0)} / {metrics.memory_total_mb.toFixed(0)} MB
                 </span>
               </div>
-              <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-surface-overlay rounded-full overflow-hidden">
                 <div
                   className={`h-full ${getProgressColor(metrics.memory_percent)} transition-all`}
                   style={{ width: `${metrics.memory_percent}%` }}
@@ -167,15 +167,15 @@ const SystemStatusPanel: React.FC<SystemStatusPanelProps> = ({ expanded = false,
             {/* Disk */}
             <div className="space-y-1">
               <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2 text-gray-400">
+                <div className="flex items-center gap-2 text-stone-400">
                   <HardDrive className="w-3 h-3" />
                   <span>Disk</span>
                 </div>
-                <span className="font-mono text-gray-300">
+                <span className="font-mono text-stone-300">
                   {metrics.disk_used_gb.toFixed(1)} / {metrics.disk_total_gb.toFixed(1)} GB
                 </span>
               </div>
-              <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-surface-overlay rounded-full overflow-hidden">
                 <div
                   className={`h-full ${getProgressColor(metrics.disk_percent)} transition-all`}
                   style={{ width: `${metrics.disk_percent}%` }}
@@ -188,7 +188,7 @@ const SystemStatusPanel: React.FC<SystemStatusPanelProps> = ({ expanded = false,
         {/* Components */}
         {report?.components && report.components.length > 0 && (
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs text-gray-400">
+            <div className="flex items-center gap-2 text-xs text-stone-400">
               <Database className="w-3 h-3" />
               <span>Components</span>
             </div>
@@ -196,9 +196,9 @@ const SystemStatusPanel: React.FC<SystemStatusPanelProps> = ({ expanded = false,
               {report.components.map((comp) => (
                 <div
                   key={comp.name}
-                  className="flex items-center justify-between px-2 py-1.5 bg-gray-950/50 rounded border border-gray-800"
+                  className="flex items-center justify-between px-2 py-1.5 bg-surface/50 rounded border border-border"
                 >
-                  <span className="text-xs text-gray-300 truncate">{comp.name}</span>
+                  <span className="text-xs text-stone-300 truncate">{comp.name}</span>
                   {getStatusIcon(comp.status)}
                 </div>
               ))}
@@ -210,7 +210,7 @@ const SystemStatusPanel: React.FC<SystemStatusPanelProps> = ({ expanded = false,
         {report?.recent_errors && report.recent_errors.length > 0 && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs text-gray-400">
+              <div className="flex items-center gap-2 text-xs text-stone-400">
                 <AlertTriangle className="w-3 h-3" />
                 <span>Recent Errors ({report.recent_errors.length})</span>
               </div>
@@ -229,9 +229,9 @@ const SystemStatusPanel: React.FC<SystemStatusPanelProps> = ({ expanded = false,
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-red-400 font-medium">{err.component}</span>
-                    <span className="text-gray-500 text-[10px]">x{err.count}</span>
+                    <span className="text-stone-500 text-[10px]">x{err.count}</span>
                   </div>
-                  <p className="text-gray-400 truncate mt-0.5">{err.message}</p>
+                  <p className="text-stone-400 truncate mt-0.5">{err.message}</p>
                 </div>
               ))}
             </div>
@@ -240,7 +240,7 @@ const SystemStatusPanel: React.FC<SystemStatusPanelProps> = ({ expanded = false,
 
         {/* Timestamp */}
         {report && (
-          <div className="text-[10px] text-gray-500 text-right">
+          <div className="text-[10px] text-stone-500 text-right">
             Last checked: {new Date(report.timestamp).toLocaleTimeString()}
           </div>
         )}

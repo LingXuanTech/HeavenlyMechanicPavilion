@@ -1,5 +1,5 @@
 import React, { useState, useCallback, memo } from 'react';
-import * as T from '../src/types/schema';
+import type * as T from '../src/types/schema';
 import { AnalysisProgressBar } from './AnalysisProgressBar';
 import { ArrowUp, ArrowDown, RefreshCw, Target, TrendingUp, TrendingDown, Minus, Maximize2, Zap, BrainCircuit, ChevronDown } from 'lucide-react';
 import type { AnalysisOptions } from '../services/api';
@@ -65,11 +65,11 @@ const StockCardComponent: React.FC<StockCardProps> = ({ stock, priceData, analys
   return (
     <div
       onClick={handleCardClick}
-      className="bg-gray-900 border border-gray-800 rounded-lg p-4 flex flex-col gap-4 hover:border-blue-500/50 hover:bg-gray-900/80 transition-all shadow-lg relative group cursor-pointer"
+      className="bg-surface-raised border border-border rounded-lg p-4 flex flex-col gap-4 hover:border-accent/50 hover:bg-surface-raised/80 transition-all shadow-lg relative group cursor-pointer"
     >
       {/* Hover Expand Icon */}
       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Maximize2 className="w-4 h-4 text-gray-500" />
+        <Maximize2 className="w-4 h-4 text-stone-500" />
       </div>
 
       {/* Header */}
@@ -77,11 +77,11 @@ const StockCardComponent: React.FC<StockCardProps> = ({ stock, priceData, analys
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-xl font-bold text-white tracking-wider">{stock.symbol}</h3>
-            <span className="text-xs font-mono text-gray-400 bg-gray-800 px-1.5 py-0.5 rounded">
+            <span className="text-xs font-mono text-stone-400 bg-surface-overlay px-1.5 py-0.5 rounded">
               {priceData?.market || 'N/A'}
             </span>
           </div>
-          <p className="text-xs text-gray-500 truncate max-w-[150px]">{stock.name}</p>
+          <p className="text-xs text-stone-500 truncate max-w-[150px]">{stock.name}</p>
         </div>
 
         <div className="text-right pr-6">
@@ -99,29 +99,29 @@ const StockCardComponent: React.FC<StockCardProps> = ({ stock, priceData, analys
               </div>
             </>
           ) : (
-            <div className="animate-pulse h-8 w-16 bg-gray-800 rounded"></div>
+            <div className="animate-pulse h-8 w-16 bg-surface-overlay rounded"></div>
           )}
         </div>
       </div>
 
       {/* Chart Placeholder */}
       <div className="h-16 -mx-2 pointer-events-none">
-        {priceData && <div className="h-full w-full bg-gray-800/20 rounded" />}
+        {priceData && <div className="h-full w-full bg-surface-overlay/20 rounded" />}
       </div>
 
       {/* Agent Analysis Section */}
-      <div className="flex-1 bg-gray-950/50 rounded p-3 border border-gray-800/50 flex flex-col gap-2">
+      <div className="flex-1 bg-surface/50 rounded p-3 border border-border/50 flex flex-col gap-2">
         <div className="flex justify-between items-center">
-          <span className="text-xs text-gray-400 uppercase font-semibold flex items-center gap-1">
+          <span className="text-xs text-stone-400 uppercase font-semibold flex items-center gap-1">
             <Target className="w-3 h-3" /> Agent Signal
           </span>
-          {analysis && <span className="text-xs text-gray-500">{analysis.created_at}</span>}
+          {analysis && <span className="text-xs text-stone-500">{analysis.created_at}</span>}
         </div>
 
         {isAnalyzing && !analysis ? (
           <div className="flex flex-col gap-2 py-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-blue-400 font-medium flex items-center gap-1.5">
+              <span className="text-accent font-medium flex items-center gap-1.5">
                 <RefreshCw className="w-3 h-3 animate-spin" />
                 分析中
               </span>
@@ -133,35 +133,35 @@ const StockCardComponent: React.FC<StockCardProps> = ({ stock, priceData, analys
             <div
               className={`flex items-center justify-between border-l-4 pl-2 py-1 ${getSignalColor(
                 analysis.full_report.signal
-              )} bg-gray-900/50`}
+              )} bg-surface-raised/50`}
             >
               <span className="font-bold text-lg">{analysis.full_report.signal}</span>
-              <span className="text-xs font-mono bg-gray-800 px-2 py-1 rounded text-white">
+              <span className="text-xs font-mono bg-surface-overlay px-2 py-1 rounded text-white">
                 {analysis.full_report.confidence}% Conf.
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs mt-1">
               <div className="flex flex-col">
-                <span className="text-gray-500">Signal</span>
+                <span className="text-stone-500">Signal</span>
                 <span className="text-green-400 font-mono">{analysis.signal}</span>
               </div>
               <div className="flex flex-col text-right">
-                <span className="text-gray-500">Confidence</span>
-                <span className="text-blue-400 font-mono">{analysis.confidence}%</span>
+                <span className="text-stone-500">Confidence</span>
+                <span className="text-accent font-mono">{analysis.confidence}%</span>
               </div>
             </div>
 
-            <div className="mt-2 pt-2 border-t border-gray-800">
+            <div className="mt-2 pt-2 border-t border-border">
               <div className="flex gap-2 items-center mb-1">
-                <span className="text-xs text-gray-400">Indicators:</span>
+                <span className="text-xs text-stone-400">Indicators:</span>
                 <div className="flex gap-2">
                   {analysis.full_report.technical_indicators && (
                     <>
-                      <span className="text-[10px] bg-gray-800 px-1 rounded text-gray-300">
+                      <span className="text-[10px] bg-surface-overlay px-1 rounded text-stone-300">
                         RSI: {analysis.full_report.technical_indicators.rsi}
                       </span>
-                      <span className="text-[10px] bg-gray-800 px-1 rounded text-gray-300 flex items-center gap-1">
+                      <span className="text-[10px] bg-surface-overlay px-1 rounded text-stone-300 flex items-center gap-1">
                         Trend: {getTrendIcon(analysis.full_report.technical_indicators.trend)}
                       </span>
                     </>
@@ -170,7 +170,7 @@ const StockCardComponent: React.FC<StockCardProps> = ({ stock, priceData, analys
               </div>
 
               {/* Use structured news if available */}
-              <p className="text-xs text-gray-400 line-clamp-2 leading-relaxed opacity-80">
+              <p className="text-xs text-stone-400 line-clamp-2 leading-relaxed opacity-80">
                 {analysis.full_report.news_analysis && analysis.full_report.news_analysis.length > 0
                   ? analysis.full_report.news_analysis[0].headline
                   : 'No news available'}
@@ -178,7 +178,7 @@ const StockCardComponent: React.FC<StockCardProps> = ({ stock, priceData, analys
             </div>
           </>
         ) : (
-          <div className="text-center py-4 text-xs text-gray-600">
+          <div className="text-center py-4 text-xs text-stone-600">
             Waiting for agent analysis...
           </div>
         )}
@@ -193,7 +193,7 @@ const StockCardComponent: React.FC<StockCardProps> = ({ stock, priceData, analys
             <button
               onClick={(e) => handleRefresh(e, 'L2')}
               disabled={isAnalyzing}
-              className="flex-1 bg-gray-800 hover:bg-gray-700 text-white text-xs py-2 rounded-l flex items-center justify-center gap-2 transition-colors disabled:opacity-50 z-10"
+              className="flex-1 bg-surface-overlay hover:bg-surface-muted text-white text-xs py-2 rounded-l flex items-center justify-center gap-2 transition-colors disabled:opacity-50 z-10"
             >
               <RefreshCw className={`w-3 h-3 ${isAnalyzing ? 'animate-spin' : ''}`} />
               {isAnalyzing ? 'Running...' : 'Run Agent'}
@@ -203,7 +203,7 @@ const StockCardComponent: React.FC<StockCardProps> = ({ stock, priceData, analys
             <button
               onClick={handleToggleLevelMenu}
               disabled={isAnalyzing}
-              className="px-2 bg-gray-800 hover:bg-gray-700 text-gray-400 border-l border-gray-700 rounded-r transition-colors disabled:opacity-50 z-10"
+              className="px-2 bg-surface-overlay hover:bg-surface-muted text-stone-400 border-l border-border-strong rounded-r transition-colors disabled:opacity-50 z-10"
               title="选择分析级别"
             >
               <ChevronDown className={`w-3 h-3 transition-transform ${showLevelMenu ? 'rotate-180' : ''}`} />
@@ -212,25 +212,25 @@ const StockCardComponent: React.FC<StockCardProps> = ({ stock, priceData, analys
 
           {/* Dropdown menu */}
           {showLevelMenu && !isAnalyzing && (
-            <div className="absolute bottom-full left-0 right-8 mb-1 bg-gray-900 border border-gray-700 rounded-lg shadow-xl overflow-hidden z-20 animate-in fade-in slide-in-from-bottom-1 duration-150">
+            <div className="absolute bottom-full left-0 right-8 mb-1 bg-surface-raised border border-border-strong rounded-lg shadow-xl overflow-hidden z-20 animate-in fade-in slide-in-from-bottom-1 duration-150">
               <button
                 onClick={(e) => handleRefresh(e, 'L1')}
-                className="w-full px-3 py-2 text-left hover:bg-gray-800 transition-colors flex items-center gap-2"
+                className="w-full px-3 py-2 text-left hover:bg-surface-overlay transition-colors flex items-center gap-2"
               >
                 <Zap className="w-4 h-4 text-yellow-400" />
                 <div className="flex-1">
                   <div className="text-xs font-medium text-white">快速扫描 (L1)</div>
-                  <div className="text-[10px] text-gray-500">Market + News + Macro，~15秒</div>
+                  <div className="text-[10px] text-stone-500">Market + News + Macro，~15秒</div>
                 </div>
               </button>
               <button
                 onClick={(e) => handleRefresh(e, 'L2')}
-                className="w-full px-3 py-2 text-left hover:bg-gray-800 transition-colors flex items-center gap-2 border-t border-gray-700"
+                className="w-full px-3 py-2 text-left hover:bg-surface-overlay transition-colors flex items-center gap-2 border-t border-border-strong"
               >
-                <BrainCircuit className="w-4 h-4 text-blue-400" />
+                <BrainCircuit className="w-4 h-4 text-accent" />
                 <div className="flex-1">
                   <div className="text-xs font-medium text-white">完整分析 (L2)</div>
-                  <div className="text-[10px] text-gray-500">全部分析师 + 辩论，~60秒</div>
+                  <div className="text-[10px] text-stone-500">全部分析师 + 辩论，~60秒</div>
                 </div>
               </button>
             </div>
@@ -239,7 +239,7 @@ const StockCardComponent: React.FC<StockCardProps> = ({ stock, priceData, analys
 
         <button
           onClick={handleDelete}
-          className="px-3 bg-gray-800 hover:bg-red-900/30 text-gray-400 hover:text-red-400 rounded transition-colors z-10"
+          className="px-3 bg-surface-overlay hover:bg-red-900/30 text-stone-400 hover:text-red-400 rounded transition-colors z-10"
         >
           <Minus className="w-3 h-3" />
         </button>

@@ -32,6 +32,7 @@ from config.settings import settings
 from db.models import AnalysisResult, engine, get_session
 from services.accuracy_tracker import accuracy_tracker
 from services.task_queue import task_queue
+from services.rollout_manager import should_use_subgraph
 
 router = APIRouter(prefix="/analyze", tags=["Analysis"])
 logger = structlog.get_logger()
@@ -72,6 +73,8 @@ async def run_analysis_task(
     exclude_analysts: Optional[list] = None,
     analysis_level: Literal["L1", "L2"] = "L2",
     use_planner: bool = True,
+    use_subgraphs: Optional[bool] = None,
+    user_id: Optional[str] = None,
 ):
     """执行分析任务并将结果保存到数据库
 
@@ -124,6 +127,16 @@ async def run_analysis_task(
         config = DEFAULT_CONFIG.copy()
         config["analysis_level"] = analysis_level
         config["use_planner"] = use_planner
+        
+        # 灰度路由逻辑
+        effective_use_subgraphs = should_use_subgraph(
+            user_id=user_id,
+            request_id=task_id,
+            force_param=use_subgraphs
+        )
+        config["use_subgraphs"] = effective_use_subgraphs
+        architecture_mode = "subgraph" if effective_use_subgraphs else "monolith"
+        
         market = MarketRouter.get_market(symbol)
 
         # 使用智能路由器选择分析师
@@ -264,6 +277,7 @@ async def run_analysis_task(
                 task_id=task_id,
                 status="completed",
                 elapsed_seconds=elapsed_seconds,
+                architecture_mode=architecture_mode,
             )
             session.add(analysis_result)
             session.commit()
@@ -320,6 +334,7 @@ async def run_analysis_task(
                 "task_id": task_id,
                 "elapsed_seconds": elapsed_seconds,
                 "analysts_used": selected_analysts,
+                "architecture_mode": architecture_mode,
             }
 
         await cache_service.push_sse_event(task_id, "stage_final", final_json)
@@ -343,6 +358,7 @@ async def run_analysis_task(
                 status="failed",
                 error_message=str(e),
                 elapsed_seconds=elapsed_seconds,
+                architecture_mode=architecture_mode if 'architecture_mode' in locals() else "unknown",
             )
             session.add(analysis_result)
             session.commit()
@@ -364,6 +380,10 @@ class AnalyzeRequest(BaseModel):
     use_planner: bool = Field(
         True,
         description="是否使用 Planner 动态选择分析师"
+    )
+    use_subgraphs: Optional[bool] = Field(
+        None,
+        description="是否强制启用 SubGraph 架构 (灰度测试用)"
     )
 
 
@@ -409,6 +429,8 @@ async def trigger_analysis(symbol: str, background_tasks: BackgroundTasks, body:
             use_planner=body.use_planner,
             override_analysts=body.analysts,
             exclude_analysts=body.exclude_analysts,
+            use_subgraphs=body.use_subgraphs,
+            user_id=None, # TODO: 从 Auth 中获取当前用户 ID
         )
         logger.info("Task enqueued", task_id=task_id, symbol=symbol, mode="queue")
     else:
@@ -422,6 +444,8 @@ async def trigger_analysis(symbol: str, background_tasks: BackgroundTasks, body:
             exclude_analysts=body.exclude_analysts,
             analysis_level=body.analysis_level,
             use_planner=body.use_planner,
+            use_subgraphs=body.use_subgraphs,
+            user_id=None, # TODO: 从 Auth 中获取当前用户 ID
         )
         logger.info("Task scheduled", task_id=task_id, symbol=symbol, mode="background")
 

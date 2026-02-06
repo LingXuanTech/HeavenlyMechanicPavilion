@@ -97,7 +97,7 @@ function getColorClasses(color: string, variant: 'bg' | 'text' | 'border') {
     orange: { bg: 'bg-orange-500', text: 'text-orange-400', border: 'border-orange-500' },
     green: { bg: 'bg-green-500', text: 'text-green-400', border: 'border-green-500' },
   };
-  return colorMap[color]?.[variant] || 'bg-gray-500';
+  return colorMap[color]?.[variant] || 'bg-stone-500';
 }
 
 interface AnalysisProgressBarProps {
@@ -148,7 +148,7 @@ const AnalysisProgressBarComponent: React.FC<AnalysisProgressBarProps> = ({
     return (
       <div className="space-y-1.5">
         {/* 进度条 */}
-        <div className="relative h-1 bg-gray-800 rounded-full overflow-hidden">
+        <div className="relative h-1 bg-surface-overlay rounded-full overflow-hidden">
           <div
             className={`absolute inset-y-0 left-0 transition-all duration-500 ease-out rounded-full ${
               isCompleted ? 'bg-green-500' : getColorClasses(currentConfig.color, 'bg')
@@ -175,11 +175,11 @@ const AnalysisProgressBarComponent: React.FC<AnalysisProgressBarProps> = ({
             ) : (
               <Icon className={`w-3 h-3 ${getColorClasses(currentConfig.color, 'text')} animate-pulse`} />
             )}
-            <span className={isCompleted ? 'text-green-400' : 'text-gray-400'}>
+            <span className={isCompleted ? 'text-green-400' : 'text-stone-400'}>
               {currentConfig.shortLabel}
             </span>
           </div>
-          <span className="text-gray-500 tabular-nums">{Math.round(progressPercent)}%</span>
+          <span className="text-stone-500 tabular-nums">{Math.round(progressPercent)}%</span>
         </div>
       </div>
     );
@@ -191,7 +191,7 @@ const AnalysisProgressBarComponent: React.FC<AnalysisProgressBarProps> = ({
       {/* 阶段指示器 */}
       <div className="flex items-center justify-between relative">
         {/* 连接线（背景） */}
-        <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-gray-800 -translate-y-1/2 z-0" />
+        <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-surface-overlay -translate-y-1/2 z-0" />
 
         {/* 进度线（前景） */}
         <div
@@ -224,11 +224,11 @@ const AnalysisProgressBarComponent: React.FC<AnalysisProgressBarProps> = ({
                       ? `${getColorClasses(stage.color, 'bg')}/20 ${getColorClasses(
                           stage.color,
                           'border'
-                        )} ring-2 ring-offset-2 ring-offset-gray-900 ${getColorClasses(
+                        )} ring-2 ring-offset-2 ring-offset-surface-raised ${getColorClasses(
                           stage.color,
                           'border'
                         ).replace('border-', 'ring-')}/30`
-                      : 'bg-gray-900 border-gray-700'
+                      : 'bg-surface-raised border-border-strong'
                   }
                 `}
               >
@@ -239,7 +239,7 @@ const AnalysisProgressBarComponent: React.FC<AnalysisProgressBarProps> = ({
                 ) : isCompleted ? (
                   <CheckCircle2 className="w-4 h-4 text-green-400" />
                 ) : (
-                  <Icon className={`w-4 h-4 ${isPending ? 'text-gray-600' : getColorClasses(stage.color, 'text')}`} />
+                  <Icon className={`w-4 h-4 ${isPending ? 'text-stone-600' : getColorClasses(stage.color, 'text')}`} />
                 )}
               </div>
 
@@ -253,7 +253,7 @@ const AnalysisProgressBarComponent: React.FC<AnalysisProgressBarProps> = ({
                         ? 'text-green-400'
                         : isActive
                         ? getColorClasses(stage.color, 'text')
-                        : 'text-gray-600'
+                        : 'text-stone-600'
                     }
                   `}
                 >
@@ -267,7 +267,7 @@ const AnalysisProgressBarComponent: React.FC<AnalysisProgressBarProps> = ({
 
       {/* 当前阶段描述 */}
       <div className="text-center">
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-stone-400">
           {STAGES[currentIndex]?.description || '准备中...'}
         </p>
       </div>

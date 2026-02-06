@@ -55,7 +55,7 @@ const formatMoney = (value: number): string => {
 const getTrendColor = (trend: string): string => {
   if (trend === 'Inflow') return 'text-red-400';
   if (trend === 'Outflow') return 'text-green-400';
-  return 'text-gray-400';
+  return 'text-stone-400';
 };
 
 const getTrendIcon = (trend: string) => {
@@ -65,7 +65,7 @@ const getTrendIcon = (trend: string) => {
   if (trend === 'Outflow') {
     return <ArrowDownCircle className="w-4 h-4 text-green-400" />;
   }
-  return <BarChart3 className="w-4 h-4 text-gray-400" />;
+  return <BarChart3 className="w-4 h-4 text-stone-400" />;
 };
 
 const getSeverityColor = (severity: string) => {
@@ -73,14 +73,14 @@ const getSeverityColor = (severity: string) => {
     case 'critical': return 'bg-red-500/20 border-red-500/50 text-red-400';
     case 'high': return 'bg-orange-500/20 border-orange-500/50 text-orange-400';
     case 'medium': return 'bg-yellow-500/20 border-yellow-500/50 text-yellow-400';
-    default: return 'bg-blue-500/20 border-blue-500/50 text-blue-400';
+    default: return 'bg-accent/10 border-accent/50 text-accent';
   }
 };
 
 const getRotationPatternInfo = (pattern: string) => {
   switch (pattern) {
     case 'defensive':
-      return { label: '防御型', color: 'text-blue-400', icon: Shield };
+      return { label: '防御型', color: 'text-accent', icon: Shield };
     case 'aggressive':
       return { label: '进攻型', color: 'text-red-400', icon: Zap };
     case 'broad_inflow':
@@ -90,7 +90,7 @@ const getRotationPatternInfo = (pattern: string) => {
     case 'mixed':
       return { label: '分化', color: 'text-yellow-400', icon: Activity };
     default:
-      return { label: '不明确', color: 'text-gray-400', icon: BarChart3 };
+      return { label: '不明确', color: 'text-stone-400', icon: BarChart3 };
   }
 };
 
@@ -106,13 +106,13 @@ const FlowCard: React.FC<{
   const isPositive = value >= 0;
 
   return (
-    <div className="bg-gray-950/50 rounded border border-gray-800 p-3">
-      <div className="text-xs text-gray-500 mb-1">{title}</div>
+    <div className="bg-surface/50 rounded border border-border p-3">
+      <div className="text-xs text-stone-500 mb-1">{title}</div>
       <div className={`text-lg font-mono font-bold ${isPositive ? 'text-red-400' : 'text-green-400'}`}>
         {formatMoney(value)}
       </div>
       {subTitle && subValue !== undefined && (
-        <div className="text-[10px] text-gray-500 mt-1">
+        <div className="text-[10px] text-stone-500 mt-1">
           {subTitle}: <span className={subValue >= 0 ? 'text-red-400' : 'text-green-400'}>
             {formatMoney(subValue)}
           </span>
@@ -131,15 +131,15 @@ const TopStockRow: React.FC<{
 
   return (
     <div
-      className="flex items-center justify-between py-2 px-3 hover:bg-gray-800/30 cursor-pointer transition-colors border-b border-gray-800/50 last:border-b-0"
+      className="flex items-center justify-between py-2 px-3 hover:bg-surface-overlay/30 cursor-pointer transition-colors border-b border-border/50 last:border-b-0"
       onClick={onClick}
     >
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-white truncate">{stock.name}</span>
-          <span className="text-[10px] text-gray-500 font-mono">{stock.symbol}</span>
+          <span className="text-[10px] text-stone-500 font-mono">{stock.symbol}</span>
         </div>
-        <div className="text-[10px] text-gray-500">
+        <div className="text-[10px] text-stone-500">
           持股比例: {stock.holding_ratio.toFixed(2)}%
         </div>
       </div>
@@ -191,7 +191,7 @@ const IntradayChart: React.FC<{ data: T.IntradayFlowSummary }> = memo(({ data })
   const points = data.flow_points;
   if (!points || points.length === 0) {
     return (
-      <div className="text-center py-4 text-gray-500 text-xs">
+      <div className="text-center py-4 text-stone-500 text-xs">
         暂无盘中数据
       </div>
     );
@@ -222,14 +222,14 @@ const IntradayChart: React.FC<{ data: T.IntradayFlowSummary }> = memo(({ data })
   const isPositive = currentTotal >= 0;
 
   return (
-    <div className="bg-gray-950/50 rounded border border-gray-800 p-3">
+    <div className="bg-surface/50 rounded border border-border p-3">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          <Activity className="w-3 h-3 text-blue-400" />
-          <span className="text-xs text-gray-400">盘中分时</span>
+          <Activity className="w-3 h-3 text-accent" />
+          <span className="text-xs text-stone-400">盘中分时</span>
         </div>
         <div className="flex items-center gap-2 text-[10px]">
-          <span className="text-gray-500">{data.last_update}</span>
+          <span className="text-stone-500">{data.last_update}</span>
           <span className={`font-mono font-bold ${isPositive ? 'text-red-400' : 'text-green-400'}`}>
             {formatMoney(currentTotal)}
           </span>
@@ -263,20 +263,20 @@ const IntradayChart: React.FC<{ data: T.IntradayFlowSummary }> = memo(({ data })
         />
 
         {/* Y轴刻度 */}
-        <text x={padding.left - 5} y={padding.top + 4} textAnchor="end" className="fill-gray-500 text-[8px]">
+        <text x={padding.left - 5} y={padding.top + 4} textAnchor="end" className="fill-stone-500 text-[8px]">
           +{maxVal.toFixed(0)}
         </text>
-        <text x={padding.left - 5} y={padding.top + chartHeight} textAnchor="end" className="fill-gray-500 text-[8px]">
+        <text x={padding.left - 5} y={padding.top + chartHeight} textAnchor="end" className="fill-stone-500 text-[8px]">
           -{maxVal.toFixed(0)}
         </text>
 
         {/* X轴时间标签 */}
         {points.length > 0 && (
           <>
-            <text x={padding.left} y={height - 5} textAnchor="start" className="fill-gray-500 text-[8px]">
+            <text x={padding.left} y={height - 5} textAnchor="start" className="fill-stone-500 text-[8px]">
               {points[0].time}
             </text>
-            <text x={width - padding.right} y={height - 5} textAnchor="end" className="fill-gray-500 text-[8px]">
+            <text x={width - padding.right} y={height - 5} textAnchor="end" className="fill-stone-500 text-[8px]">
               {points[points.length - 1].time}
             </text>
           </>
@@ -286,19 +286,19 @@ const IntradayChart: React.FC<{ data: T.IntradayFlowSummary }> = memo(({ data })
       {/* 统计指标 */}
       <div className="flex justify-between mt-2 text-[10px]">
         <div>
-          <span className="text-gray-500">峰值流入:</span>
+          <span className="text-stone-500">峰值流入:</span>
           <span className="text-red-400 ml-1 font-mono">{formatMoney(data.peak_inflow)}</span>
         </div>
         <div>
-          <span className="text-gray-500">峰值流出:</span>
+          <span className="text-stone-500">峰值流出:</span>
           <span className="text-green-400 ml-1 font-mono">{formatMoney(data.peak_outflow)}</span>
         </div>
         <div>
-          <span className="text-gray-500">动量:</span>
+          <span className="text-stone-500">动量:</span>
           <span className={`ml-1 ${
             data.momentum === 'accelerating' ? 'text-red-400' :
             data.momentum === 'decelerating' ? 'text-green-400' :
-            'text-gray-400'
+            'text-stone-400'
           }`}>
             {data.momentum === 'accelerating' ? '加速流入' :
              data.momentum === 'decelerating' ? '加速流出' : '平稳'}
@@ -369,23 +369,23 @@ const SectorRotationPanel: React.FC<{
     <div className="space-y-3">
       {/* 轮动信号 */}
       {rotationSignal && (
-        <div className="bg-gray-950/50 rounded border border-gray-800 p-3">
+        <div className="bg-surface/50 rounded border border-border p-3">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Layers className="w-3 h-3 text-purple-400" />
-              <span className="text-xs text-gray-400">轮动信号</span>
+              <span className="text-xs text-stone-400">轮动信号</span>
             </div>
             <div className="flex items-center gap-2">
               <PatternIcon className={`w-4 h-4 ${patternInfo?.color}`} />
               <span className={`text-sm font-bold ${patternInfo?.color}`}>
                 {patternInfo?.label}
               </span>
-              <span className="text-[10px] text-gray-500">
+              <span className="text-[10px] text-stone-500">
                 强度 {rotationSignal.signal_strength}%
               </span>
             </div>
           </div>
-          <p className="text-xs text-gray-300 leading-relaxed">
+          <p className="text-xs text-stone-300 leading-relaxed">
             {rotationSignal.interpretation}
           </p>
         </div>
@@ -394,43 +394,43 @@ const SectorRotationPanel: React.FC<{
       {/* 板块流向 */}
       <div className="grid grid-cols-2 gap-3">
         {/* 流入板块 */}
-        <div className="bg-gray-950/50 rounded border border-gray-800 p-2">
+        <div className="bg-surface/50 rounded border border-border p-2">
           <div className="flex items-center gap-1 mb-2 px-1">
             <TrendingUp className="w-3 h-3 text-red-400" />
             <span className="text-[10px] text-red-400 font-bold">资金流入</span>
           </div>
           <div className="space-y-1">
             {inflowSectors.map((sector, idx) => (
-              <div key={idx} className="flex items-center justify-between px-2 py-1.5 hover:bg-gray-800/30 rounded text-xs">
-                <span className="text-gray-300 truncate">{sector.sector}</span>
+              <div key={idx} className="flex items-center justify-between px-2 py-1.5 hover:bg-surface-overlay/30 rounded text-xs">
+                <span className="text-stone-300 truncate">{sector.sector}</span>
                 <span className="text-red-400 font-mono shrink-0 ml-2">
                   {formatMoney(sector.net_buy)}
                 </span>
               </div>
             ))}
             {inflowSectors.length === 0 && (
-              <div className="text-center py-2 text-gray-500 text-[10px]">暂无</div>
+              <div className="text-center py-2 text-stone-500 text-[10px]">暂无</div>
             )}
           </div>
         </div>
 
         {/* 流出板块 */}
-        <div className="bg-gray-950/50 rounded border border-gray-800 p-2">
+        <div className="bg-surface/50 rounded border border-border p-2">
           <div className="flex items-center gap-1 mb-2 px-1">
             <TrendingDown className="w-3 h-3 text-green-400" />
             <span className="text-[10px] text-green-400 font-bold">资金流出</span>
           </div>
           <div className="space-y-1">
             {outflowSectors.map((sector, idx) => (
-              <div key={idx} className="flex items-center justify-between px-2 py-1.5 hover:bg-gray-800/30 rounded text-xs">
-                <span className="text-gray-300 truncate">{sector.sector}</span>
+              <div key={idx} className="flex items-center justify-between px-2 py-1.5 hover:bg-surface-overlay/30 rounded text-xs">
+                <span className="text-stone-300 truncate">{sector.sector}</span>
                 <span className="text-green-400 font-mono shrink-0 ml-2">
                   {formatMoney(sector.net_buy)}
                 </span>
               </div>
             ))}
             {outflowSectors.length === 0 && (
-              <div className="text-center py-2 text-gray-500 text-[10px]">暂无</div>
+              <div className="text-center py-2 text-stone-500 text-[10px]">暂无</div>
             )}
           </div>
         </div>
@@ -441,7 +441,7 @@ const SectorRotationPanel: React.FC<{
         sectorFlow.filter(s => s.flow_direction === 'outflow').length > 5) && (
         <button
           onClick={() => setShowAll(!showAll)}
-          className="w-full text-center text-[10px] text-gray-500 hover:text-gray-300 py-1"
+          className="w-full text-center text-[10px] text-stone-500 hover:text-stone-300 py-1"
         >
           {showAll ? '收起' : '查看更多板块'} <ChevronRight className={`w-3 h-3 inline transition-transform ${showAll ? 'rotate-90' : ''}`} />
         </button>
@@ -483,15 +483,15 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
     const hasAnomaly = anomalies && anomalies.length > 0;
 
     return (
-      <div className="flex items-center gap-4 px-3 py-2 bg-gray-900/50 rounded border border-gray-800">
+      <div className="flex items-center gap-4 px-3 py-2 bg-surface-raised/50 rounded border border-border">
         <div className="flex items-center gap-2">
           <DollarSign className="w-4 h-4 text-yellow-500" />
-          <span className="text-xs text-gray-400">北向资金</span>
+          <span className="text-xs text-stone-400">北向资金</span>
         </div>
         <div className={`text-sm font-mono font-semibold ${isInflow ? 'text-red-400' : 'text-green-400'}`}>
           {formatMoney(summary.today.total)}
         </div>
-        <div className="text-[10px] text-gray-500">
+        <div className="text-[10px] text-stone-500">
           近期趋势: {isInflow ? '流入' : '流出'}
         </div>
         {hasAnomaly && (
@@ -504,9 +504,9 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
   }
 
   return (
-    <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+    <div className="bg-surface-raised border border-border rounded-lg overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-950/50 border-b border-gray-800">
+      <div className="flex items-center justify-between px-4 py-3 bg-surface/50 border-b border-border">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-yellow-500" />
@@ -534,31 +534,31 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowInfo(!showInfo)}
-            className="p-1.5 hover:bg-gray-800 rounded transition-colors"
+            className="p-1.5 hover:bg-surface-overlay rounded transition-colors"
             title="数据说明"
           >
-            <Info className="w-3.5 h-3.5 text-gray-400" />
+            <Info className="w-3.5 h-3.5 text-stone-400" />
           </button>
           <button
             onClick={handleRefresh}
             disabled={isRefetching}
-            className="p-1.5 hover:bg-gray-800 rounded transition-colors disabled:opacity-50"
+            className="p-1.5 hover:bg-surface-overlay rounded transition-colors disabled:opacity-50"
             title="刷新数据"
           >
-            <RefreshCw className={`w-3.5 h-3.5 text-gray-400 ${isRefetching ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 text-stone-400 ${isRefetching ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
       {/* Info Tooltip */}
       {showInfo && (
-        <div className="px-4 py-2 bg-gray-800/50 text-xs text-gray-400 border-b border-gray-800">
+        <div className="px-4 py-2 bg-surface-overlay/50 text-xs text-stone-400 border-b border-border">
           北向资金指通过沪港通、深港通渠道流入A股的境外资金。红色表示净流入（买入），绿色表示净流出（卖出）。
         </div>
       )}
 
       {/* Tabs */}
-      <div className="flex border-b border-gray-800 bg-gray-950/30">
+      <div className="flex border-b border-border bg-surface/30">
         {[
           { key: 'overview', label: '概览', icon: BarChart3 },
           { key: 'realtime', label: '实时', icon: Activity },
@@ -570,8 +570,8 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
             onClick={() => setActiveTab(key as typeof activeTab)}
             className={`flex-1 py-2.5 text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
               activeTab === key
-                ? 'text-blue-400 border-b-2 border-blue-400 bg-blue-500/5'
-                : 'text-gray-500 hover:text-gray-300'
+                ? 'text-accent border-b-2 border-accent bg-accent/5'
+                : 'text-stone-500 hover:text-stone-300'
             }`}
           >
             <Icon className="w-3 h-3" />
@@ -584,7 +584,7 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
       <div className="p-4">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <RefreshCw className="w-6 h-6 text-gray-500 animate-spin" />
+            <RefreshCw className="w-6 h-6 text-stone-500 animate-spin" />
           </div>
         ) : summary ? (
           <>
@@ -613,10 +613,10 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
 
                 {/* Mini Chart */}
                 {history && history.length > 0 && (
-                  <div className="p-3 bg-gray-950/50 rounded border border-gray-800">
+                  <div className="p-3 bg-surface/50 rounded border border-border">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-gray-500">近期走势</span>
-                      <span className="text-[10px] text-gray-500">
+                      <span className="text-xs text-stone-500">近期走势</span>
+                      <span className="text-[10px] text-stone-500">
                         累计: <span className={summary.week_total >= 0 ? 'text-red-400' : 'text-green-400'}>
                           {formatMoney(summary.week_total)}
                         </span>
@@ -627,7 +627,7 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
                 )}
 
                 {/* Timestamp */}
-                <div className="text-[10px] text-gray-500 text-right mt-3">
+                <div className="text-[10px] text-stone-500 text-right mt-3">
                   数据日期: {summary.today.date}
                 </div>
               </>
@@ -640,7 +640,7 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
                 {intraday ? (
                   <IntradayChart data={intraday} />
                 ) : (
-                  <div className="bg-gray-950/50 rounded border border-gray-800 p-4 text-center text-gray-500 text-xs">
+                  <div className="bg-surface/50 rounded border border-border p-4 text-center text-stone-500 text-xs">
                     <Clock className="w-6 h-6 mx-auto mb-2 opacity-50" />
                     <p>非交易时段，暂无盘中数据</p>
                     <p className="text-[10px] mt-1">交易时段：9:30-11:30, 13:00-15:00</p>
@@ -652,14 +652,14 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
                   <div>
                     <div className="flex items-center gap-2 mb-2">
                       <AlertTriangle className="w-3 h-3 text-yellow-500" />
-                      <span className="text-xs text-gray-400">异常信号 ({anomalies.length})</span>
+                      <span className="text-xs text-stone-400">异常信号 ({anomalies.length})</span>
                     </div>
                     <AnomalyAlerts anomalies={anomalies} />
                   </div>
                 )}
 
                 {!intraday && (!anomalies || anomalies.length === 0) && (
-                  <div className="text-center py-4 text-gray-500 text-xs">
+                  <div className="text-center py-4 text-stone-500 text-xs">
                     暂无实时数据
                   </div>
                 )}
@@ -678,13 +678,13 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
             {activeTab === 'stocks' && (
               <>
                 {/* Sub Tabs */}
-                <div className="flex border-b border-gray-800 mb-3">
+                <div className="flex border-b border-border mb-3">
                   <button
                     onClick={() => setStockTab('buys')}
                     className={`flex-1 py-2 text-xs font-medium transition-colors ${
                       stockTab === 'buys'
                         ? 'text-red-400 border-b-2 border-red-400'
-                        : 'text-gray-500 hover:text-gray-300'
+                        : 'text-stone-500 hover:text-stone-300'
                     }`}
                   >
                     <div className="flex items-center justify-center gap-1">
@@ -697,7 +697,7 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
                     className={`flex-1 py-2 text-xs font-medium transition-colors ${
                       stockTab === 'sells'
                         ? 'text-green-400 border-b-2 border-green-400'
-                        : 'text-gray-500 hover:text-gray-300'
+                        : 'text-stone-500 hover:text-stone-300'
                     }`}
                   >
                     <div className="flex items-center justify-center gap-1">
@@ -719,7 +719,7 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
                         />
                       ))
                     ) : (
-                      <div className="text-center py-4 text-gray-500 text-sm">暂无数据</div>
+                      <div className="text-center py-4 text-stone-500 text-sm">暂无数据</div>
                     )
                   ) : (
                     summary.top_sells.length > 0 ? (
@@ -731,7 +731,7 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
                         />
                       ))
                     ) : (
-                      <div className="text-center py-4 text-gray-500 text-sm">暂无数据</div>
+                      <div className="text-center py-4 text-stone-500 text-sm">暂无数据</div>
                     )
                   )}
                 </div>
@@ -739,7 +739,7 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
             )}
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+          <div className="flex flex-col items-center justify-center py-8 text-stone-500">
             <DollarSign className="w-8 h-8 mb-2 opacity-50" />
             <p className="text-sm">无法获取北向资金数据</p>
           </div>

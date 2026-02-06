@@ -53,7 +53,7 @@ export const TypewriterText: React.FC<TypewriterTextProps> = memo(({
   showControls = false,
   showProgress = false,
   cursorChar = '▌',
-  cursorClassName = 'animate-pulse text-blue-400',
+  cursorClassName = 'animate-pulse text-accent',
   renderText,
   ...options
 }) => {
@@ -72,9 +72,9 @@ export const TypewriterText: React.FC<TypewriterTextProps> = memo(({
     <div className={`relative ${className}`}>
       {/* 进度条 */}
       {showProgress && !isComplete && (
-        <div className="absolute -top-2 left-0 right-0 h-0.5 bg-gray-700 rounded-full overflow-hidden">
+        <div className="absolute -top-2 left-0 right-0 h-0.5 bg-border-strong rounded-full overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-100"
+            className="h-full bg-gradient-to-r from-accent to-purple-500 transition-all duration-100"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -100,7 +100,7 @@ export const TypewriterText: React.FC<TypewriterTextProps> = memo(({
           {isTyping ? (
             <button
               onClick={pause}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-md transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-300 bg-surface-overlay hover:bg-surface-muted rounded-md transition-colors"
             >
               <Pause className="w-3 h-3" />
               暂停
@@ -108,7 +108,7 @@ export const TypewriterText: React.FC<TypewriterTextProps> = memo(({
           ) : isPaused ? (
             <button
               onClick={resume}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-300 bg-gray-800 hover:bg-gray-700 rounded-md transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-300 bg-surface-overlay hover:bg-surface-muted rounded-md transition-colors"
             >
               <Play className="w-3 h-3" />
               继续
@@ -117,14 +117,14 @@ export const TypewriterText: React.FC<TypewriterTextProps> = memo(({
 
           <button
             onClick={skip}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-400 hover:text-gray-200 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-stone-400 hover:text-stone-200 transition-colors"
           >
             <SkipForward className="w-3 h-3" />
             跳过
           </button>
 
           {showProgress && (
-            <span className="text-xs text-gray-500 ml-2">{progress}%</span>
+            <span className="text-xs text-stone-500 ml-2">{progress}%</span>
           )}
         </div>
       )}
@@ -171,9 +171,9 @@ export const AnalysisTypewriter: React.FC<AnalysisTypewriterProps> = memo(({
   // 如果禁用打字机效果，直接显示完整文本
   if (!enabled) {
     return (
-      <div className="prose prose-invert prose-sm max-w-none bg-gray-900/50 p-4 rounded-lg border border-gray-800 shadow-inner">
+      <div className="prose prose-invert prose-sm max-w-none bg-surface-raised/50 p-4 rounded-lg border border-border shadow-inner">
         {reasoning.split('\n').map((line, i) => (
-          <p key={i} className={`mb-2 ${line.startsWith('#') ? 'font-bold text-lg text-blue-200' : ''}`}>
+          <p key={i} className={`mb-2 ${line.startsWith('#') ? 'font-bold text-lg text-amber-200' : ''}`}>
             {line.replace(/\*\*/g, '')}
           </p>
         ))}
@@ -185,19 +185,19 @@ export const AnalysisTypewriter: React.FC<AnalysisTypewriterProps> = memo(({
   const lines = displayedText.split('\n');
 
   return (
-    <div className="prose prose-invert prose-sm max-w-none bg-gray-900/50 p-4 rounded-lg border border-gray-800 shadow-inner relative">
+    <div className="prose prose-invert prose-sm max-w-none bg-surface-raised/50 p-4 rounded-lg border border-border shadow-inner relative">
       {/* 进度指示器 */}
       {isTyping && (
         <div className="absolute top-2 right-2 flex items-center gap-2">
-          <div className="w-16 h-1 bg-gray-700 rounded-full overflow-hidden">
+          <div className="w-16 h-1 bg-border-strong rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-100"
+              className="h-full bg-gradient-to-r from-accent to-purple-500 transition-all duration-100"
               style={{ width: `${progress}%` }}
             />
           </div>
           <button
             onClick={skip}
-            className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            className="text-xs text-stone-500 hover:text-stone-300 transition-colors"
             title="跳过动画"
           >
             <SkipForward className="w-3 h-3" />
@@ -207,11 +207,11 @@ export const AnalysisTypewriter: React.FC<AnalysisTypewriterProps> = memo(({
 
       {/* 文本内容 */}
       {lines.map((line, i) => (
-        <p key={i} className={`mb-2 ${line.startsWith('#') ? 'font-bold text-lg text-blue-200' : ''}`}>
+        <p key={i} className={`mb-2 ${line.startsWith('#') ? 'font-bold text-lg text-amber-200' : ''}`}>
           {line.replace(/\*\*/g, '')}
           {/* 光标显示在最后一行末尾 */}
           {isTyping && i === lines.length - 1 && (
-            <span className="animate-pulse text-blue-400 ml-0.5">▌</span>
+            <span className="animate-pulse text-accent ml-0.5">▌</span>
           )}
         </p>
       ))}

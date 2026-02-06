@@ -45,6 +45,19 @@ class TestMemoryCacheBackend:
         assert result == "value1"
 
     @pytest.mark.asyncio
+    async def test_stats(self, backend):
+        """测试统计信息"""
+        await backend.set("key1", "value1")
+        await backend.get("key1")  # hit
+        await backend.get("key2")  # miss
+        
+        stats = backend.get_stats()
+        assert stats["hits"] == 1
+        assert stats["misses"] == 1
+        assert stats["total"] == 2
+        assert stats["hit_rate"] == "50.00%"
+
+    @pytest.mark.asyncio
     async def test_get_nonexistent(self, backend):
         """获取不存在的键返回 None"""
         result = await backend.get("nonexistent")
@@ -177,6 +190,22 @@ class TestRedisCacheBackend:
             result = await backend.get("key")
 
         assert result == "cached_value"
+
+    @pytest.mark.asyncio
+    async def test_stats(self, backend):
+        """测试统计信息"""
+        mock_client = AsyncMock()
+        mock_client.get.side_effect = ["value1", None]
+
+        with patch.object(backend, '_get_client', return_value=mock_client):
+            await backend.get("key1")  # hit
+            await backend.get("key2")  # miss
+
+        stats = backend.get_stats()
+        assert stats["hits"] == 1
+        assert stats["misses"] == 1
+        assert stats["total"] == 2
+        assert stats["hit_rate"] == "50.00%"
 
     @pytest.mark.asyncio
     async def test_get_error_returns_none(self, backend):

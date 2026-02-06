@@ -35,6 +35,20 @@ class SystemMetrics(BaseModel):
     disk_total_gb: float
 
 
+class ProviderStatus(BaseModel):
+    """数据源状态"""
+    available: bool
+    failure_count: int
+    threshold: int
+    last_failure: Optional[datetime] = None
+    cooldown_seconds: float
+    total_requests: int
+    successful_requests: int
+    failed_requests: int
+    avg_latency_ms: float
+    last_error: Optional[str] = None
+
+
 class HealthReport(BaseModel):
     """完整健康报告"""
     overall_status: HealthStatus
@@ -42,6 +56,7 @@ class HealthReport(BaseModel):
     uptime_formatted: str
     components: List[ComponentHealth]
     metrics: SystemMetrics
+    data_providers: Dict[str, ProviderStatus]
     recent_errors: List[ErrorRecord]
     timestamp: datetime
 

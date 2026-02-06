@@ -19,8 +19,6 @@ export const WATCHLIST_KEY = ['watchlist'];
  * - 初次加载时自动填充初始数据
  */
 export function useWatchlist() {
-  const queryClient = useQueryClient();
-
   return useQuery({
     queryKey: WATCHLIST_KEY,
     queryFn: async () => {

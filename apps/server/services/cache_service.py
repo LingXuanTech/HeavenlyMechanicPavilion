@@ -25,6 +25,10 @@ logger = structlog.get_logger()
 class CacheBackend(ABC):
     """缓存后端抽象基类"""
 
+    def __init__(self):
+        self.hits = 0
+        self.misses = 0
+
     @abstractmethod
     async def get(self, key: str) -> Optional[str]:
         """获取缓存值"""
@@ -55,6 +59,17 @@ class CacheBackend(ABC):
         """关闭连接"""
         pass
 
+    def get_stats(self) -> Dict[str, Any]:
+        """获取命中率统计"""
+        total = self.hits + self.misses
+        hit_rate = (self.hits / total * 100) if total > 0 else 0
+        return {
+            "hits": self.hits,
+            "misses": self.misses,
+            "total": total,
+            "hit_rate": f"{hit_rate:.2f}%"
+        }
+
 
 class MemoryCacheBackend(CacheBackend):
     """
@@ -64,17 +79,21 @@ class MemoryCacheBackend(CacheBackend):
     """
 
     def __init__(self):
+        super().__init__()
         self._cache: Dict[str, tuple[str, Optional[datetime]]] = {}
         self._lock = asyncio.Lock()
 
     async def get(self, key: str) -> Optional[str]:
         async with self._lock:
             if key not in self._cache:
+                self.misses += 1
                 return None
             value, expires_at = self._cache[key]
             if expires_at and datetime.now() > expires_at:
                 del self._cache[key]
+                self.misses += 1
                 return None
+            self.hits += 1
             return value
 
     async def set(self, key: str, value: str, ttl: Optional[int] = None) -> bool:
@@ -121,6 +140,7 @@ class RedisCacheBackend(CacheBackend):
     """
 
     def __init__(self, redis_url: str):
+        super().__init__()
         self._redis_url = redis_url
         self._client: Optional[Any] = None
 
@@ -146,7 +166,12 @@ class RedisCacheBackend(CacheBackend):
     async def get(self, key: str) -> Optional[str]:
         try:
             client = await self._get_client()
-            return await client.get(key)
+            value = await client.get(key)
+            if value is not None:
+                self.hits += 1
+            else:
+                self.misses += 1
+            return value
         except Exception as e:
             logger.warning("Redis get failed", key=key, error=str(e))
             return None
@@ -234,6 +259,30 @@ class CacheService:
         await self._ensure_initialized()
         return await self._backend.get(key)
 
+    def get_sync(self, key: str) -> Optional[str]:
+        """
+        同步获取缓存（仅限内存后端）
+        警告：如果当前后端是 Redis，此方法将返回 None 并记录警告
+        """
+        if not self._initialized or not isinstance(self._backend, MemoryCacheBackend):
+            if self._initialized:
+                logger.warning("get_sync called but backend is not MemoryCacheBackend")
+            return None
+        
+        # MemoryCacheBackend.get 是异步的，但我们可以尝试直接访问其内部字典
+        # 注意：这破坏了封装，但在迁移 TTLCache 时是必要的权宜之计
+        # 更好的做法是让所有调用者都变成异步
+        try:
+            # 这是一个 hack，因为 MemoryCacheBackend 使用了 asyncio.Lock
+            # 在同步上下文中，我们只能祈祷没有竞争，或者只在初始化时使用
+            value, expires_at = self._backend._cache.get(key, (None, None))
+            if value and expires_at and datetime.now() > expires_at:
+                del self._backend._cache[key]
+                return None
+            return value
+        except Exception:
+            return None
+
     async def get_json(self, key: str) -> Optional[Any]:
         """获取 JSON 缓存"""
         value = await self.get(key)
@@ -248,6 +297,17 @@ class CacheService:
         """设置缓存"""
         await self._ensure_initialized()
         return await self._backend.set(key, value, ttl)
+
+    def set_sync(self, key: str, value: str, ttl: Optional[int] = None) -> bool:
+        """
+        同步设置缓存（仅限内存后端）
+        """
+        if not self._initialized or not isinstance(self._backend, MemoryCacheBackend):
+            return False
+        
+        expires_at = datetime.now() + timedelta(seconds=ttl) if ttl else None
+        self._backend._cache[key] = (value, expires_at)
+        return True
 
     async def set_json(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
         """设置 JSON 缓存"""
@@ -274,6 +334,12 @@ class CacheService:
             await self._backend.close()
             self._backend = None
             self._initialized = False
+
+    def get_stats(self) -> Dict[str, Any]:
+        """获取缓存统计信息"""
+        if not self._backend:
+            return {"hits": 0, "misses": 0, "total": 0, "hit_rate": "0.00%"}
+        return self._backend.get_stats()
 
     # =========================================================================
     # 任务状态管理（专用方法）

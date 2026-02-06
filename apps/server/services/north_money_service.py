@@ -7,6 +7,8 @@
 - 净买入/卖出 TOP 榜单
 - 板块轮动信号
 - 异常流动检测
+- 历史数据持久化存储
+- 北向资金与指数相关性分析
 """
 from datetime import datetime, date as DateType, time as TimeType
 from typing import List, Optional, Dict, Any, Tuple
@@ -14,11 +16,14 @@ from pydantic import BaseModel, Field
 import structlog
 import akshare as ak
 import pandas as pd
+import numpy as np
 from functools import lru_cache
 import asyncio
 import statistics
 
-from utils import TTLCache
+from sqlmodel import Session, select
+from db.models import NorthMoneyHistoryRecord, engine
+from services.cache_service import cache_service
 
 logger = structlog.get_logger(__name__)
 
@@ -142,18 +147,59 @@ class NorthMoneyRealtime(BaseModel):
     is_trading_hours: bool = Field(default=False, description="是否交易时段")
 
 
+# ============ 历史数据和相关性分析模型 ============
+
+class NorthMoneyHistoryData(BaseModel):
+    """北向资金历史数据（从数据库查询）"""
+    date: str = Field(description="日期 YYYY-MM-DD")
+    north_inflow: float = Field(description="北向资金净流入（亿元）")
+    sh_inflow: float = Field(description="沪股通净流入（亿元）")
+    sz_inflow: float = Field(description="深股通净流入（亿元）")
+    cumulative_inflow: float = Field(description="累计净流入（亿元）")
+    market_index: Optional[float] = Field(default=None, description="上证指数收盘价")
+    hs300_index: Optional[float] = Field(default=None, description="沪深300收盘价")
+    cyb_index: Optional[float] = Field(default=None, description="创业板指收盘价")
+
+
+class CorrelationResult(BaseModel):
+    """相关性计算结果"""
+    index_name: str = Field(description="指数名称")
+    window: int = Field(description="计算窗口（天数）")
+    correlation: float = Field(description="相关系数 (-1 到 1)")
+    p_value: Optional[float] = Field(default=None, description="P值（统计显著性）")
+    sample_size: int = Field(description="样本数量")
+    interpretation: str = Field(description="相关性解读")
+
+
+class CorrelationAnalysis(BaseModel):
+    """北向资金与指数相关性分析"""
+    analysis_date: str = Field(description="分析日期")
+    correlations: List[CorrelationResult] = Field(description="各指数相关性结果")
+    summary: str = Field(description="综合分析结论")
+    data_range: str = Field(description="数据范围")
+
+
+class HistoryQueryResult(BaseModel):
+    """历史数据查询结果"""
+    data: List[NorthMoneyHistoryData] = Field(description="历史数据列表")
+    total_count: int = Field(description="总记录数")
+    start_date: str = Field(description="起始日期")
+    end_date: str = Field(description="结束日期")
+    statistics: Dict[str, float] = Field(description="统计信息")
+
+
 # ============ 服务类 ============
 
 class NorthMoneyService:
     """北向资金监控服务"""
 
     def __init__(self):
-        self._cache = TTLCache(default_ttl=300)  # 5 分钟缓存
+        pass
 
     async def get_north_money_flow(self) -> NorthMoneyFlow:
         """获取当日北向资金流向"""
         cache_key = "north_money_flow"
-        cached = self._cache.get(cache_key)
+        cached = cache_service.get_sync(cache_key)
         if cached:
             return cached
 
@@ -186,7 +232,7 @@ class NorthMoneyService:
                 market_sentiment=sentiment,
             )
 
-            self._cache.set(cache_key, flow)
+            cache_service.set_sync(cache_key, flow, ttl=300)
             logger.info("Fetched north money flow", total=total, sentiment=sentiment)
             return flow
 
@@ -204,7 +250,7 @@ class NorthMoneyService:
     async def get_north_money_history(self, days: int = 30) -> List[NorthMoneyHistory]:
         """获取北向资金历史数据"""
         cache_key = f"north_money_history_{days}"
-        cached = self._cache.get(cache_key)
+        cached = cache_service.get_sync(cache_key)
         if cached:
             return cached
 
@@ -229,7 +275,7 @@ class NorthMoneyService:
                 except Exception:
                     continue
 
-            self._cache.set(cache_key, history)
+            cache_service.set_sync(cache_key, history, ttl=300)
             return history
 
         except Exception as e:
@@ -282,7 +328,7 @@ class NorthMoneyService:
     async def get_top_north_buys(self, limit: int = 20) -> List[NorthMoneyTopStock]:
         """获取北向资金净买入 TOP"""
         cache_key = f"top_north_buys_{limit}"
-        cached = self._cache.get(cache_key)
+        cached = cache_service.get_sync(cache_key)
         if cached:
             return cached
 
@@ -318,7 +364,7 @@ class NorthMoneyService:
                 except Exception:
                     continue
 
-            self._cache.set(cache_key, result)
+            cache_service.set_sync(cache_key, result, ttl=300)
             return result
 
         except Exception as e:
@@ -328,7 +374,7 @@ class NorthMoneyService:
     async def get_top_north_sells(self, limit: int = 20) -> List[NorthMoneyTopStock]:
         """获取北向资金净卖出 TOP"""
         cache_key = f"top_north_sells_{limit}"
-        cached = self._cache.get(cache_key)
+        cached = cache_service.get_sync(cache_key)
         if cached:
             return cached
 
@@ -368,7 +414,7 @@ class NorthMoneyService:
                 except Exception:
                     continue
 
-            self._cache.set(cache_key, result)
+            cache_service.set_sync(cache_key, result, ttl=300)
             return result
 
         except Exception as e:
@@ -441,7 +487,7 @@ class NorthMoneyService:
         基于个股北向持仓变化，聚合到板块级别。
         """
         cache_key = "sector_flow"
-        cached = self._cache.get(cache_key)
+        cached = cache_service.get_sync(cache_key)
         if cached:
             return cached
 
@@ -503,7 +549,7 @@ class NorthMoneyService:
             # 按净买入排序
             result.sort(key=lambda x: x.net_buy, reverse=True)
 
-            self._cache.set(cache_key, result)
+            cache_service.set_sync(cache_key, result, ttl=300)
             logger.info("Calculated sector flow", sectors=len(result))
             return result
 
@@ -600,14 +646,207 @@ class NorthMoneyService:
             interpretation=interpretation,
         )
 
-    async def get_sector_flow_history(self, days: int = 5) -> Dict[str, List[float]]:
-        """获取板块资金流向历史（简化版，用于趋势分析）
+    async def save_daily_data(self, target_date: Optional[DateType] = None) -> bool:
+        """将每日北向资金和指数数据保存到数据库"""
+        try:
+            date_str = (target_date or datetime.now().date()).strftime("%Y-%m-%d")
+            
+            # 1. 获取北向资金数据
+            df_north = await asyncio.to_thread(ak.stock_hsgt_north_net_flow_in_em)
+            if df_north.empty:
+                logger.warning("No north money data from AkShare")
+                return False
+            
+            # 匹配日期
+            df_north['日期'] = pd.to_datetime(df_north['日期']).dt.strftime("%Y-%m-%d")
+            day_data = df_north[df_north['日期'] == date_str]
+            
+            if day_data.empty:
+                logger.info("No north money data for date", date=date_str)
+                return False
+            
+            row = day_data.iloc[0]
+            
+            # 2. 获取指数数据
+            # 上证指数
+            df_sh = await asyncio.to_thread(ak.stock_zh_index_daily, symbol="sh000001")
+            df_sh.index = pd.to_datetime(df_sh.index).strftime("%Y-%m-%d")
+            sh_price = float(df_sh.loc[date_str, 'close']) if date_str in df_sh.index else None
+            
+            # 沪深300
+            df_hs300 = await asyncio.to_thread(ak.stock_zh_index_daily, symbol="sh000300")
+            df_hs300.index = pd.to_datetime(df_hs300.index).strftime("%Y-%m-%d")
+            hs300_price = float(df_hs300.loc[date_str, 'close']) if date_str in df_hs300.index else None
+            
+            # 创业板
+            df_cyb = await asyncio.to_thread(ak.stock_zh_index_daily, symbol="sz399006")
+            df_cyb.index = pd.to_datetime(df_cyb.index).strftime("%Y-%m-%d")
+            cyb_price = float(df_cyb.loc[date_str, 'close']) if date_str in df_cyb.index else None
+            
+            # 3. 保存到数据库
+            with Session(engine) as session:
+                # 检查是否已存在
+                existing = session.exec(
+                    select(NorthMoneyHistoryRecord).where(NorthMoneyHistoryRecord.date == date_str)
+                ).first()
+                
+                if existing:
+                    record = existing
+                    record.updated_at = datetime.now()
+                else:
+                    record = NorthMoneyHistoryRecord(date=date_str)
+                
+                record.north_inflow = float(row.get('北向资金', 0) or row.get('合计', 0))
+                record.sh_inflow = float(row.get('沪股通', 0) or 0)
+                record.sz_inflow = float(row.get('深股通', 0) or 0)
+                record.cumulative_inflow = float(row.get('累计净流入', 0) or 0)
+                record.market_index = sh_price
+                record.hs300_index = hs300_price
+                record.cyb_index = cyb_price
+                
+                session.add(record)
+                session.commit()
+                logger.info("Saved daily north money data", date=date_str)
+                return True
+                
+        except Exception as e:
+            logger.error("Failed to save daily data", error=str(e))
+            return False
 
-        注意：由于 AkShare 不提供历史板块流向，此方法返回模拟数据或需要自行存储。
-        实际生产中应接入专业数据源或自建历史数据库。
-        """
-        # TODO: 实现历史数据存储和查询
-        # 当前返回空数据，后续迭代可接入数据库
+    async def get_history(
+        self,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        limit: int = 100
+    ) -> HistoryQueryResult:
+        """从数据库查询历史数据"""
+        try:
+            with Session(engine) as session:
+                statement = select(NorthMoneyHistoryRecord).order_by(NorthMoneyHistoryRecord.date.desc())
+                
+                if start_date:
+                    statement = statement.where(NorthMoneyHistoryRecord.date >= start_date)
+                if end_date:
+                    statement = statement.where(NorthMoneyHistoryRecord.date <= end_date)
+                
+                statement = statement.limit(limit)
+                results = session.exec(statement).all()
+                
+                data = [
+                    NorthMoneyHistoryData(
+                        date=r.date,
+                        north_inflow=r.north_inflow,
+                        sh_inflow=r.sh_inflow,
+                        sz_inflow=r.sz_inflow,
+                        cumulative_inflow=r.cumulative_inflow,
+                        market_index=r.market_index,
+                        hs300_index=r.hs300_index,
+                        cyb_index=r.cyb_index
+                    ) for r in results
+                ]
+                
+                # 计算简单统计
+                stats = {}
+                if data:
+                    inflows = [d.north_inflow for d in data]
+                    stats = {
+                        "avg_inflow": round(statistics.mean(inflows), 2),
+                        "max_inflow": round(max(inflows), 2),
+                        "min_inflow": round(min(inflows), 2),
+                        "total_inflow": round(sum(inflows), 2)
+                    }
+                
+                return HistoryQueryResult(
+                    data=data,
+                    total_count=len(data),
+                    start_date=data[-1].date if data else "",
+                    end_date=data[0].date if data else "",
+                    statistics=stats
+                )
+        except Exception as e:
+            logger.error("Failed to query history from DB", error=str(e))
+            return HistoryQueryResult(data=[], total_count=0, start_date="", end_date="", statistics={})
+
+    async def calculate_correlation(self, days: int = 20) -> CorrelationAnalysis:
+        """计算北向资金与指数的相关性"""
+        try:
+            # 获取历史数据
+            history = await self.get_history(limit=days + 1)
+            if len(history.data) < 5:
+                return CorrelationAnalysis(
+                    analysis_date=datetime.now().strftime("%Y-%m-%d"),
+                    correlations=[],
+                    summary="数据不足，无法计算相关性",
+                    data_range=""
+                )
+            
+            # 转换为 DataFrame
+            df = pd.DataFrame([d.model_dump() for d in history.data])
+            df = df.sort_values('date')
+            
+            results = []
+            indices = [
+                ("上证指数", "market_index"),
+                ("沪深300", "hs300_index"),
+                ("创业板指", "cyb_index")
+            ]
+            
+            for name, col in indices:
+                if col in df.columns and not df[col].isnull().all():
+                    # 计算收益率或直接计算价格相关性？通常计算资金流入与指数涨跌的相关性
+                    # 这里按照要求计算 north_inflow 与 market_index 的相关性
+                    valid_df = df[['north_inflow', col]].dropna()
+                    if len(valid_df) >= 5:
+                        corr = valid_df['north_inflow'].corr(valid_df[col])
+                        
+                        if abs(corr) > 0.8:
+                            interp = "极强相关"
+                        elif abs(corr) > 0.6:
+                            interp = "强相关"
+                        elif abs(corr) > 0.4:
+                            interp = "中等相关"
+                        else:
+                            interp = "弱相关或不相关"
+                            
+                        results.append(CorrelationResult(
+                            index_name=name,
+                            window=len(valid_df),
+                            correlation=round(corr, 4),
+                            sample_size=len(valid_df),
+                            interpretation=interp
+                        ))
+            
+            # 生成总结
+            if results:
+                main_corr = results[0].correlation
+                if main_corr > 0.5:
+                    summary = f"北向资金与主要指数呈现显著正相关({main_corr})，资金流入对市场有较强带动作用。"
+                elif main_corr < -0.5:
+                    summary = f"北向资金与主要指数呈现显著负相关({main_corr})，可能存在背离或对冲行为。"
+                else:
+                    summary = "北向资金与主要指数相关性不明显，市场走势受多重因素影响。"
+            else:
+                summary = "无法计算有效相关性"
+
+            return CorrelationAnalysis(
+                analysis_date=datetime.now().strftime("%Y-%m-%d"),
+                correlations=results,
+                summary=summary,
+                data_range=f"{history.start_date} 至 {history.end_date}"
+            )
+            
+        except Exception as e:
+            logger.error("Failed to calculate correlation", error=str(e))
+            return CorrelationAnalysis(
+                analysis_date=datetime.now().strftime("%Y-%m-%d"),
+                correlations=[],
+                summary=f"计算出错: {str(e)}",
+                data_range=""
+            )
+
+    async def get_sector_flow_history(self, days: int = 5) -> Dict[str, List[float]]:
+        """获取板块资金流向历史（简化版，用于趋势分析）"""
+        # 暂时保留，因为任务主要关注整体北向资金持久化
         logger.debug("Sector flow history not implemented, returning empty")
         return {}
 
@@ -639,12 +878,9 @@ class NorthMoneyService:
         """
         cache_key = "intraday_flow"
         # 盘中数据缓存时间较短（1分钟）
-        if cache_key in self._cache_time:
-            elapsed = (datetime.now() - self._cache_time[cache_key]).total_seconds()
-            if elapsed < 60:
-                cached = self._cache.get(cache_key)
-                if cached:
-                    return cached
+        cached = cache_service.get_sync(cache_key)
+        if cached:
+            return cached
 
         try:
             # 尝试获取分时数据
@@ -709,7 +945,7 @@ class NorthMoneyService:
                 momentum=momentum,
             )
 
-            self._cache.set(cache_key, result)
+            cache_service.set_sync(cache_key, result, ttl=60)
             return result
 
         except Exception as e:
@@ -844,13 +1080,12 @@ class NorthMoneyService:
         try:
             history = await self.get_north_money_history(days=20)
             if len(history) >= 10:
-                # TODO: 接入指数数据计算相关性
-                # 当前返回占位数据
-                index_correlation = {
-                    "上证指数": 0.75,
-                    "沪深300": 0.82,
-                    "创业板指": 0.68,
-                }
+                # 接入指数数据计算相关性
+                corr_analysis = await self.calculate_correlation(days=20)
+                if corr_analysis.correlations:
+                    index_correlation = {
+                        c.index_name: c.correlation for c in corr_analysis.correlations
+                    }
         except Exception:
             pass
 

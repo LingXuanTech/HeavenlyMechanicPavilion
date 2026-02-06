@@ -19,6 +19,8 @@ from services.north_money_service import (
     IntradayFlowSummary,
     NorthMoneyAnomaly,
     NorthMoneyRealtime,
+    HistoryQueryResult,
+    CorrelationAnalysis,
 )
 
 logger = structlog.get_logger(__name__)
@@ -237,4 +239,54 @@ async def get_realtime_panorama():
         return await north_money_service.get_realtime_panorama()
     except Exception as e:
         logger.error("Failed to get realtime panorama", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/history-db", response_model=HistoryQueryResult)
+async def get_north_money_history_db(
+    start_date: Optional[str] = Query(None, description="开始日期 (YYYY-MM-DD)"),
+    end_date: Optional[str] = Query(None, description="结束日期 (YYYY-MM-DD)"),
+    limit: int = Query(100, ge=1, le=1000, description="返回记录数")
+):
+    """
+    从数据库查询北向资金历史数据
+    """
+    try:
+        return await north_money_service.get_history(start_date, end_date, limit)
+    except Exception as e:
+        logger.error("Failed to get north money history from DB", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/correlation", response_model=CorrelationAnalysis)
+async def get_north_money_correlation(
+    days: int = Query(20, ge=5, le=250, description="计算窗口天数")
+):
+    """
+    获取北向资金与指数的相关性分析
+    """
+    try:
+        return await north_money_service.calculate_correlation(days)
+    except Exception as e:
+        logger.error("Failed to get north money correlation", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/sync", status_code=201)
+async def sync_north_money_data(
+    date: Optional[str] = Query(None, description="同步日期 (YYYY-MM-DD)，默认为今日")
+):
+    """
+    手动触发北向资金数据同步到数据库
+    """
+    try:
+        target_date = datetime.strptime(date, "%Y-%m-%d").date() if date else None
+        success = await north_money_service.save_daily_data(target_date)
+        if not success:
+            raise HTTPException(status_code=400, detail="Data sync failed or no data available for the date")
+        return {"status": "success", "date": date or datetime.now().strftime("%Y-%m-%d")}
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format, use YYYY-MM-DD")
+    except Exception as e:
+        logger.error("Failed to sync north money data", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))

@@ -221,6 +221,7 @@ class AnalysisDiagnostics(BaseModel):
     elapsed_seconds: Optional[float] = Field(None, description="耗时（秒）")
     analysts_used: Optional[List[str]] = Field(None, description="使用的分析师列表")
     planner_decision: Optional[str] = Field(None, description="Planner 决策说明")
+    architecture_mode: Optional[str] = Field(None, description="架构模式 (monolith / subgraph)")
 
 
 # ============ 完整报告 ============

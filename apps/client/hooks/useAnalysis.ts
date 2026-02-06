@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useCallback, useRef } from 'react';
 import * as api from '../services/api';
 import type { SSEConnectionState, SSEAnalysisController, AnalysisOptions } from '../services/api';
-import * as T from '../src/types/schema';
+import type * as T from '../src/types/schema';
 import { logger } from '../utils/logger';
 
 export const ANALYSIS_KEY = (symbol: string) => ['analysis', symbol];

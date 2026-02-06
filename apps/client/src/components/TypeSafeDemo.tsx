@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { components } from '../types/api'; // 导入生成的类型
+import { components } from '../types/generated'; // 导入生成的类型
 
 // 定义从 OpenAPI 架构中提取的类型别名，方便使用
 type Watchlist = components['schemas']['Watchlist'];
@@ -36,7 +36,7 @@ export const TypeSafeComponent: React.FC = () => {
           <li key={stock.symbol} className="border p-2 rounded shadow-sm">
             <span className="font-mono font-bold">{stock.symbol}</span>
             {/* 这里的 stock.name 会有完美的 IDE 补全和类型检查 */}
-            <span className="ml-2 text-gray-600">{stock.name}</span>
+            <span className="ml-2 text-stone-600">{stock.name}</span>
           </li>
         ))}
       </ul>

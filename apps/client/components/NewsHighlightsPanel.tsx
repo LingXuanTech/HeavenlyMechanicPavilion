@@ -26,7 +26,7 @@ const SentimentIcon: React.FC<{ sentiment: T.NewsSentiment }> = ({ sentiment }) 
     case 'negative':
       return <TrendingDown className="w-3.5 h-3.5 text-red-400" />;
     default:
-      return <Minus className="w-3.5 h-3.5 text-gray-400" />;
+      return <Minus className="w-3.5 h-3.5 text-stone-400" />;
   }
 };
 
@@ -43,7 +43,7 @@ const TimeAgo: React.FC<{ timestamp: string }> = ({ timestamp }) => {
   };
 
   return (
-    <span className="text-[10px] text-gray-500 flex items-center gap-0.5">
+    <span className="text-[10px] text-stone-500 flex items-center gap-0.5">
       <Clock className="w-2.5 h-2.5" />
       {getTimeAgo(timestamp)}
     </span>
@@ -55,20 +55,20 @@ const NewsItem: React.FC<{ news: T.AggregatedNewsItem }> = ({ news }) => (
     href={news.url}
     target="_blank"
     rel="noopener noreferrer"
-    className="block p-2.5 hover:bg-gray-800/50 rounded-lg transition-colors group"
+    className="block p-2.5 hover:bg-surface-overlay/50 rounded-lg transition-colors group"
   >
     <div className="flex items-start gap-2">
       <SentimentIcon sentiment={news.sentiment} />
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-gray-200 group-hover:text-white line-clamp-2 leading-relaxed">
+        <p className="text-xs text-stone-200 group-hover:text-white line-clamp-2 leading-relaxed">
           {news.title}
         </p>
         <div className="flex items-center gap-2 mt-1.5">
-          <span className="text-[10px] text-gray-500">{news.source}</span>
+          <span className="text-[10px] text-stone-500">{news.source}</span>
           <TimeAgo timestamp={news.published_at} />
         </div>
       </div>
-      <ExternalLink className="w-3 h-3 text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+      <ExternalLink className="w-3 h-3 text-stone-600 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
     </div>
   </a>
 );
@@ -89,9 +89,9 @@ const NewsHighlightsPanel: React.FC<NewsHighlightsPanelProps> = ({ className = '
   };
 
   return (
-    <div className={`bg-gray-900/50 border border-gray-800 rounded-xl overflow-hidden ${className}`}>
+    <div className={`bg-surface-raised/50 border border-border rounded-xl overflow-hidden ${className}`}>
       {/* Header */}
-      <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Newspaper className="w-4 h-4 text-orange-400" />
           <h3 className="text-sm font-medium text-white">最新资讯</h3>
@@ -100,18 +100,18 @@ const NewsHighlightsPanel: React.FC<NewsHighlightsPanelProps> = ({ className = '
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="p-1 hover:bg-gray-800 rounded transition-colors disabled:opacity-50"
+            className="p-1 hover:bg-surface-overlay rounded transition-colors disabled:opacity-50"
             title="刷新"
           >
             {isRefreshing ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-400" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-stone-400" />
             ) : (
-              <RefreshCw className="w-3.5 h-3.5 text-gray-400" />
+              <RefreshCw className="w-3.5 h-3.5 text-stone-400" />
             )}
           </button>
           <Link
             to="/news"
-            className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-0.5"
+            className="text-xs text-accent hover:text-accent-hover flex items-center gap-0.5"
           >
             更多
             <ChevronRight className="w-3.5 h-3.5" />
@@ -120,13 +120,13 @@ const NewsHighlightsPanel: React.FC<NewsHighlightsPanelProps> = ({ className = '
       </div>
 
       {/* News List */}
-      <div className="divide-y divide-gray-800/50">
+      <div className="divide-y divide-border/50">
         {isLoading ? (
           <div className="flex items-center justify-center py-10">
-            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+            <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
           </div>
         ) : recentNews.length === 0 ? (
-          <div className="py-10 text-center text-gray-500 text-xs">
+          <div className="py-10 text-center text-stone-500 text-xs">
             暂无新闻
           </div>
         ) : (
@@ -138,10 +138,10 @@ const NewsHighlightsPanel: React.FC<NewsHighlightsPanelProps> = ({ className = '
 
       {/* Footer */}
       {recentNews.length > 0 && (
-        <div className="px-4 py-2 border-t border-gray-800 bg-gray-900/30">
+        <div className="px-4 py-2 border-t border-border bg-surface-raised/30">
           <Link
             to="/news"
-            className="flex items-center justify-center gap-1 text-xs text-gray-400 hover:text-white transition-colors"
+            className="flex items-center justify-center gap-1 text-xs text-stone-400 hover:text-stone-50 transition-colors"
           >
             查看全部新闻
             <ChevronRight className="w-3.5 h-3.5" />

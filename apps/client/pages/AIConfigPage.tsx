@@ -155,7 +155,7 @@ const CONFIG_KEY_INFO: Record<string, ConfigKeyInfo> = {
 const IMPORTANCE_STYLES = {
   critical: 'border-red-500/30 bg-red-500/5',
   high: 'border-amber-500/30 bg-amber-500/5',
-  medium: 'border-gray-500/30 bg-gray-500/5',
+  medium: 'border-stone-500/30 bg-stone-500/5',
 };
 
 // === 主组件 ===
@@ -347,11 +347,11 @@ const AIConfigPage: React.FC = () => {
               <Activity className="w-3 h-3" />
               {status.providers_count} 提供商
             </span>
-            <span className="text-gray-600">•</span>
+            <span className="text-stone-600">•</span>
             <span>{status.configs_count} 配置项</span>
             {status.cached_llms.length > 0 && (
               <>
-                <span className="text-gray-600">•</span>
+                <span className="text-stone-600">•</span>
                 <span className="text-green-400">{status.cached_llms.length} 已缓存</span>
               </>
             )}
@@ -359,8 +359,8 @@ const AIConfigPage: React.FC = () => {
         ) : '管理 AI 提供商和模型分配'
       }
       icon={Cpu}
-      iconColor="text-blue-400"
-      iconBgColor="bg-blue-500/10"
+      iconColor="text-accent"
+      iconBgColor="bg-accent/10"
       variant="standard"
       actions={[
         {
@@ -374,13 +374,13 @@ const AIConfigPage: React.FC = () => {
       noPadding
     >
       {/* Tabs */}
-      <div className="flex border-b border-gray-800 bg-gray-900/30">
+      <div className="flex border-b border-border bg-surface-raised/30">
         <button
           onClick={() => setActiveTab('providers')}
           className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 ${
             activeTab === 'providers'
-              ? 'text-blue-400 border-b-2 border-blue-400 bg-blue-500/5'
-              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+              ? 'text-accent border-b-2 border-accent bg-accent/5'
+              : 'text-stone-400 hover:text-stone-50 hover:bg-surface-overlay/50'
           }`}
         >
           <Shield className="w-4 h-4" />
@@ -390,8 +390,8 @@ const AIConfigPage: React.FC = () => {
           onClick={() => setActiveTab('models')}
           className={`px-6 py-3 text-sm font-medium transition-colors flex items-center gap-2 ${
             activeTab === 'models'
-              ? 'text-blue-400 border-b-2 border-blue-400 bg-blue-500/5'
-              : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+              ? 'text-accent border-b-2 border-accent bg-accent/5'
+              : 'text-stone-400 hover:text-stone-50 hover:bg-surface-overlay/50'
           }`}
         >
           <Sparkles className="w-4 h-4" />
@@ -408,7 +408,7 @@ const AIConfigPage: React.FC = () => {
               {editMode === 'none' && (
                 <button
                   onClick={handleCreateNew}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors font-medium"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors font-medium"
                 >
                   <Plus className="w-4 h-4" />
                   添加 AI 提供商
@@ -417,7 +417,7 @@ const AIConfigPage: React.FC = () => {
 
               {/* Edit Form */}
               {editMode !== 'none' && (
-                <div className="p-5 bg-gray-800/50 rounded-xl border border-gray-700 space-y-5">
+                <div className="p-5 bg-surface-overlay/50 rounded-xl border border-border-strong space-y-5">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-medium text-white">
                       {editMode === 'create' ? '添加新提供商' : '编辑提供商'}
@@ -427,7 +427,7 @@ const AIConfigPage: React.FC = () => {
                         href={selectedProviderInfo.docUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                        className="text-xs text-accent hover:text-amber-300 flex items-center gap-1"
                       >
                         <ExternalLink className="w-3 h-3" />
                         API 文档
@@ -437,7 +437,7 @@ const AIConfigPage: React.FC = () => {
 
                   {/* Provider Type Selection */}
                   <div>
-                    <label className="block text-sm text-gray-300 mb-2">提供商类型</label>
+                    <label className="block text-sm text-stone-300 mb-2">提供商类型</label>
                     <div className="grid grid-cols-5 gap-2">
                       {(Object.keys(PROVIDER_INFO) as AIProviderType[]).map((type) => {
                         const info = PROVIDER_INFO[type];
@@ -449,8 +449,8 @@ const AIConfigPage: React.FC = () => {
                             onClick={() => handleProviderTypeChange(type)}
                             className={`p-3 rounded-lg border text-center transition-all ${
                               isSelected
-                                ? 'border-blue-500 bg-blue-500/10 text-white'
-                                : 'border-gray-700 bg-gray-800/50 text-gray-400 hover:border-gray-600 hover:text-white'
+                                ? 'border-accent bg-accent/10 text-white'
+                                : 'border-border-strong bg-surface-overlay/50 text-stone-400 hover:border-stone-600 hover:text-white'
                             }`}
                           >
                             <div className="text-sm font-medium">{info.label}</div>
@@ -458,7 +458,7 @@ const AIConfigPage: React.FC = () => {
                         );
                       })}
                     </div>
-                    <p className="mt-2 text-xs text-gray-500">{selectedProviderInfo.description}</p>
+                    <p className="mt-2 text-xs text-stone-500">{selectedProviderInfo.description}</p>
                   </div>
 
                   {/* Features */}
@@ -466,7 +466,7 @@ const AIConfigPage: React.FC = () => {
                     {selectedProviderInfo.features.map((feature) => (
                       <span
                         key={feature}
-                        className="px-2 py-1 bg-gray-700/50 text-gray-400 text-xs rounded"
+                        className="px-2 py-1 bg-surface-muted/50 text-stone-400 text-xs rounded"
                       >
                         {feature}
                       </span>
@@ -475,18 +475,18 @@ const AIConfigPage: React.FC = () => {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1.5">名称 *</label>
+                      <label className="block text-xs text-stone-400 mb-1.5">名称 *</label>
                       <input
                         type="text"
                         value={formData.name}
                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        className="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2.5 bg-surface-muted border border-stone-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                         placeholder={`My ${selectedProviderInfo.label}`}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1.5">
+                      <label className="block text-xs text-stone-400 mb-1.5">
                         Base URL
                         {formData.provider_type === 'openai_compatible' && (
                           <span className="text-red-400 ml-1">*</span>
@@ -496,27 +496,27 @@ const AIConfigPage: React.FC = () => {
                         type="text"
                         value={formData.base_url}
                         onChange={(e) => setFormData({ ...formData, base_url: e.target.value })}
-                        className="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2.5 bg-surface-muted border border-stone-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                         placeholder={selectedProviderInfo.defaultBaseUrl || 'https://api.example.com/v1'}
                       />
                     </div>
 
                     <div className="col-span-2">
-                      <label className="block text-xs text-gray-400 mb-1.5 flex items-center gap-2">
+                      <label className="block text-xs text-stone-400 mb-1.5 flex items-center gap-2">
                         API Key *
-                        <span className="text-gray-600">格式: {selectedProviderInfo.apiKeyFormat}</span>
+                        <span className="text-stone-600">格式: {selectedProviderInfo.apiKeyFormat}</span>
                       </label>
                       <input
                         type="password"
                         value={formData.api_key}
                         onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
-                        className="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+                        className="w-full px-3 py-2.5 bg-surface-muted border border-stone-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent font-mono"
                         placeholder={editMode === 'edit' ? '(保持原有密钥不变)' : selectedProviderInfo.apiKeyFormat}
                       />
                     </div>
 
                     <div className="col-span-2">
-                      <label className="block text-xs text-gray-400 mb-1.5 flex items-center justify-between">
+                      <label className="block text-xs text-stone-400 mb-1.5 flex items-center justify-between">
                         <span>模型列表 * (逗号分隔)</span>
                         <button
                           type="button"
@@ -526,7 +526,7 @@ const AIConfigPage: React.FC = () => {
                               models: selectedProviderInfo.suggestedModels.join(', '),
                             })
                           }
-                          className="text-blue-400 hover:text-blue-300 text-xs"
+                          className="text-accent hover:text-amber-300 text-xs"
                         >
                           使用推荐模型
                         </button>
@@ -535,36 +535,36 @@ const AIConfigPage: React.FC = () => {
                         type="text"
                         value={formData.models}
                         onChange={(e) => setFormData({ ...formData, models: e.target.value })}
-                        className="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono"
+                        className="w-full px-3 py-2.5 bg-surface-muted border border-stone-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent font-mono"
                         placeholder={selectedProviderInfo.suggestedModels.slice(0, 3).join(', ')}
                       />
-                      <p className="mt-1 text-xs text-gray-500">
+                      <p className="mt-1 text-xs text-stone-500">
                         推荐: {selectedProviderInfo.suggestedModels.join(', ')}
                       </p>
                     </div>
 
                     <div className="flex items-center gap-6">
-                      <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+                      <label className="flex items-center gap-2 text-sm text-stone-300 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={formData.is_enabled}
                           onChange={(e) => setFormData({ ...formData, is_enabled: e.target.checked })}
-                          className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-600 focus:ring-blue-500 focus:ring-offset-gray-800"
+                          className="w-4 h-4 rounded border-stone-600 bg-surface-muted text-accent focus:ring-accent focus:ring-offset-surface-overlay"
                         />
                         启用
                       </label>
                     </div>
 
                     <div>
-                      <label className="block text-xs text-gray-400 mb-1.5 flex items-center gap-1">
+                      <label className="block text-xs text-stone-400 mb-1.5 flex items-center gap-1">
                         优先级
-                        <HelpCircle className="w-3 h-3 text-gray-600" />
+                        <HelpCircle className="w-3 h-3 text-stone-600" />
                       </label>
                       <input
                         type="number"
                         value={formData.priority}
                         onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) || 99 })}
-                        className="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        className="w-full px-3 py-2.5 bg-surface-muted border border-stone-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
                         min="1"
                         max="99"
                       />
@@ -574,14 +574,14 @@ const AIConfigPage: React.FC = () => {
                   <div className="flex justify-end gap-3 pt-2">
                     <button
                       onClick={handleCancelEdit}
-                      className="px-4 py-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                      className="px-4 py-2 text-stone-400 hover:text-stone-50 hover:bg-surface-muted rounded-lg transition-colors"
                     >
                       取消
                     </button>
                     <button
                       onClick={handleSave}
                       disabled={createProvider.isPending || updateProvider.isPending}
-                      className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors disabled:opacity-50 font-medium"
+                      className="flex items-center gap-2 px-5 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg transition-colors disabled:opacity-50 font-medium"
                     >
                       {(createProvider.isPending || updateProvider.isPending) && (
                         <Loader2 className="w-4 h-4 animate-spin" />
@@ -595,13 +595,13 @@ const AIConfigPage: React.FC = () => {
               {/* Provider List */}
               {loadingProviders ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                  <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
                 </div>
               ) : providers?.length === 0 ? (
-                <div className="text-center py-12 text-gray-400 bg-gray-800/30 rounded-xl border border-dashed border-gray-700">
+                <div className="text-center py-12 text-stone-400 bg-surface-overlay/30 rounded-xl border border-dashed border-border-strong">
                   <Cpu className="w-12 h-12 mx-auto mb-3 opacity-50" />
                   <p>尚未配置任何 AI 提供商</p>
-                  <p className="text-sm mt-1 text-gray-500">点击上方按钮添加第一个提供商</p>
+                  <p className="text-sm mt-1 text-stone-500">点击上方按钮添加第一个提供商</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -610,17 +610,17 @@ const AIConfigPage: React.FC = () => {
                     return (
                       <div
                         key={provider.id}
-                        className={`p-4 bg-gray-800/50 rounded-xl border transition-all ${
+                        className={`p-4 bg-surface-overlay/50 rounded-xl border transition-all ${
                           provider.is_enabled
-                            ? 'border-gray-700 hover:border-gray-600'
-                            : 'border-gray-700/50 opacity-60'
+                            ? 'border-border-strong hover:border-stone-600'
+                            : 'border-border-strong/50 opacity-60'
                         }`}
                       >
                         <div className="flex items-start justify-between">
                           <div className="space-y-2 flex-1">
                             <div className="flex items-center gap-3">
                               <span className="font-medium text-white text-lg">{provider.name}</span>
-                              <span className="text-xs px-2.5 py-1 bg-gray-700 rounded-full text-gray-300">
+                              <span className="text-xs px-2.5 py-1 bg-surface-muted rounded-full text-stone-300">
                                 {info?.label || provider.provider_type}
                               </span>
                               {!provider.is_enabled && (
@@ -628,17 +628,17 @@ const AIConfigPage: React.FC = () => {
                                   已禁用
                                 </span>
                               )}
-                              <span className="text-xs text-gray-500">优先级: {provider.priority}</span>
+                              <span className="text-xs text-stone-500">优先级: {provider.priority}</span>
                             </div>
-                            <div className="text-xs text-gray-400 flex items-center gap-3">
+                            <div className="text-xs text-stone-400 flex items-center gap-3">
                               {provider.base_url && (
                                 <span className="flex items-center gap-1">
-                                  <span className="text-gray-600">URL:</span>
+                                  <span className="text-stone-600">URL:</span>
                                   {provider.base_url}
                                 </span>
                               )}
                               <span className="flex items-center gap-1">
-                                <span className="text-gray-600">Key:</span>
+                                <span className="text-stone-600">Key:</span>
                                 {provider.api_key_masked}
                               </span>
                             </div>
@@ -646,7 +646,7 @@ const AIConfigPage: React.FC = () => {
                               {provider.models.map((model) => (
                                 <span
                                   key={model}
-                                  className="text-xs px-2 py-1 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20"
+                                  className="text-xs px-2 py-1 bg-accent/10 text-accent rounded border border-accent/20"
                                 >
                                   {model}
                                 </span>
@@ -658,14 +658,14 @@ const AIConfigPage: React.FC = () => {
                             <button
                               onClick={() => handleTest(provider)}
                               disabled={testProvider.isPending}
-                              className="p-2 text-gray-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
+                              className="p-2 text-stone-400 hover:text-green-400 hover:bg-green-500/10 rounded-lg transition-colors"
                               title="测试连接"
                             >
                               <Zap className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => handleEdit(provider)}
-                              className="p-2 text-gray-400 hover:text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
+                              className="p-2 text-stone-400 hover:text-accent hover:bg-accent/10 rounded-lg transition-colors"
                               title="编辑"
                             >
                               <Edit2 className="w-4 h-4" />
@@ -673,7 +673,7 @@ const AIConfigPage: React.FC = () => {
                             <button
                               onClick={() => handleDelete(provider)}
                               disabled={deleteProvider.isPending}
-                              className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                              className="p-2 text-stone-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                               title="删除"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -711,10 +711,10 @@ const AIConfigPage: React.FC = () => {
           {activeTab === 'models' && (
             <div className="space-y-4">
               {/* Info Banner */}
-              <div className="p-4 bg-blue-900/20 border border-blue-500/30 rounded-xl flex items-start gap-3">
-                <Info className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+              <div className="p-4 bg-amber-900/20 border border-amber-500/30 rounded-xl flex items-start gap-3">
+                <Info className="w-5 h-5 text-accent shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm text-blue-300">
+                  <p className="text-sm text-amber-300">
                     为不同任务类型分配合适的 AI 模型。深度推理任务建议使用更强的模型，快速响应任务可使用轻量模型以节省成本。
                   </p>
                 </div>
@@ -722,7 +722,7 @@ const AIConfigPage: React.FC = () => {
 
               {loadingConfigs || loadingProviders ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                  <Loader2 className="w-6 h-6 animate-spin text-stone-400" />
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -733,13 +733,13 @@ const AIConfigPage: React.FC = () => {
                     return (
                       <div
                         key={config.config_key}
-                        className={`p-5 bg-gray-800/50 rounded-xl border ${IMPORTANCE_STYLES[info.importance]}`}
+                        className={`p-5 bg-surface-overlay/50 rounded-xl border ${IMPORTANCE_STYLES[info.importance]}`}
                       >
                         <div className="flex items-start gap-4">
                           <div className={`p-3 rounded-lg ${
                             info.importance === 'critical' ? 'bg-red-500/10 text-red-400' :
                             info.importance === 'high' ? 'bg-amber-500/10 text-amber-400' :
-                            'bg-gray-700 text-gray-400'
+                            'bg-surface-muted text-stone-400'
                           }`}>
                             {info.icon}
                           </div>
@@ -750,11 +750,11 @@ const AIConfigPage: React.FC = () => {
                                 <span className="text-xs px-2 py-0.5 bg-red-500/20 text-red-400 rounded">核心</span>
                               )}
                             </div>
-                            <p className="text-xs text-gray-400 mt-1">{info.description}</p>
+                            <p className="text-xs text-stone-400 mt-1">{info.description}</p>
 
                             <div className="grid grid-cols-2 gap-4 mt-4">
                               <div>
-                                <label className="block text-xs text-gray-400 mb-1.5">提供商</label>
+                                <label className="block text-xs text-stone-400 mb-1.5">提供商</label>
                                 <select
                                   value={config.provider_id || ''}
                                   onChange={(e) => {
@@ -764,7 +764,7 @@ const AIConfigPage: React.FC = () => {
                                       handleModelConfigChange(config.config_key, providerId, provider.models[0]);
                                     }
                                   }}
-                                  className="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  className="w-full px-3 py-2.5 bg-surface-muted border border-stone-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                                 >
                                   <option value="">选择提供商...</option>
                                   {providers
@@ -778,7 +778,7 @@ const AIConfigPage: React.FC = () => {
                               </div>
 
                               <div>
-                                <label className="block text-xs text-gray-400 mb-1.5">模型</label>
+                                <label className="block text-xs text-stone-400 mb-1.5">模型</label>
                                 <select
                                   value={config.model_name || ''}
                                   onChange={(e) => {
@@ -787,7 +787,7 @@ const AIConfigPage: React.FC = () => {
                                     }
                                   }}
                                   disabled={!config.provider_id}
-                                  className="w-full px-3 py-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                                  className="w-full px-3 py-2.5 bg-surface-muted border border-stone-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
                                 >
                                   <option value="">选择模型...</option>
                                   {config.provider_id &&
@@ -818,8 +818,8 @@ const AIConfigPage: React.FC = () => {
                             </div>
 
                             {/* Recommended */}
-                            <div className="mt-3 pt-3 border-t border-gray-700/50">
-                              <p className="text-xs text-gray-500">
+                            <div className="mt-3 pt-3 border-t border-border-strong/50">
+                              <p className="text-xs text-stone-500">
                                 推荐模型: {info.recommendedModels.join(' • ')}
                               </p>
                             </div>

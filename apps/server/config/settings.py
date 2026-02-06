@@ -90,6 +90,10 @@ class Settings(BaseSettings):
     LANGSMITH_ENDPOINT: str = os.getenv("LANGSMITH_ENDPOINT", "https://api.smith.langchain.com")
     LANGSMITH_TRACE_SAMPLING_RATE: float = float(os.getenv("LANGSMITH_TRACE_SAMPLING_RATE", "1.0"))
 
+    # Rollout Settings (灰度发布)
+    SUBGRAPH_ROLLOUT_PERCENTAGE: int = int(os.getenv("SUBGRAPH_ROLLOUT_PERCENTAGE", "0"))
+    SUBGRAPH_FORCE_ENABLED_USERS: List[str] = os.getenv("SUBGRAPH_FORCE_ENABLED_USERS", "").split(",") if os.getenv("SUBGRAPH_FORCE_ENABLED_USERS") else []
+
     @property
     def database_url(self) -> str:
         """动态生成数据库连接 URL"""

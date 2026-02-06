@@ -21,7 +21,7 @@ except ImportError:
     yf = None
 
 from config.settings import settings
-from utils import TTLCache
+from services.cache_service import cache_service
 
 logger = structlog.get_logger()
 
@@ -98,7 +98,6 @@ class MarketWatcherService:
     """
 
     _instance = None
-    _cache = TTLCache(default_ttl=60)  # 1 分钟缓存
 
     def __new__(cls):
         if cls._instance is None:
@@ -227,7 +226,7 @@ class MarketWatcherService:
         Returns:
             市场指数列表
         """
-        cached_dict = self._cache.get("indices")
+        cached_dict = cache_service.get_sync("indices")
         if not force_refresh and cached_dict:
             return list(cached_dict.values())
 
@@ -241,17 +240,17 @@ class MarketWatcherService:
 
         # 更新缓存
         indices_dict = {idx.code: idx for idx in all_indices}
-        self._cache.set("indices", indices_dict)
+        cache_service.set_sync("indices", indices_dict, ttl=60)
 
         logger.info("Market indices refreshed", count=len(all_indices))
         return all_indices
 
     async def get_index(self, code: str) -> Optional[MarketIndex]:
         """获取单个指数"""
-        cached_dict = self._cache.get("indices")
+        cached_dict = cache_service.get_sync("indices")
         if not cached_dict:
             await self.get_all_indices()
-            cached_dict = self._cache.get("indices") or {}
+            cached_dict = cache_service.get_sync("indices") or {}
 
         return cached_dict.get(code)
 
@@ -325,13 +324,13 @@ class MarketWatcherService:
 
     def get_stats(self) -> Dict[str, Any]:
         """获取服务统计"""
-        cached_dict = self._cache.get("indices") or {}
+        cached_dict = cache_service.get_sync("indices") or {}
         return {
             "status": "available",
             "akshare_available": AKSHARE_AVAILABLE,
             "yfinance_available": YFINANCE_AVAILABLE,
             "cached_indices": len(cached_dict),
-            "cache_valid": self._cache.is_valid("indices"),
+            "cache_valid": cached_dict is not None,
         }
 
 

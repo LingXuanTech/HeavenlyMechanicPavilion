@@ -296,7 +296,7 @@ export const AudioBriefing: React.FC<AudioBriefingProps> = memo(({
   // TTS 不可用
   if (ttsStatus && !ttsStatus.available) {
     return (
-      <div className={`flex items-center gap-2 text-gray-500 text-sm ${className}`}>
+      <div className={`flex items-center gap-2 text-stone-500 text-sm ${className}`}>
         <VolumeX className="w-4 h-4" />
         <span>语音播报不可用</span>
       </div>
@@ -311,18 +311,18 @@ export const AudioBriefing: React.FC<AudioBriefingProps> = memo(({
           onClick={togglePlay}
           disabled={isLoading}
           className={`flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
-            isLoading ? 'bg-gray-700 cursor-wait' :
-            isPlaying ? 'bg-blue-600 hover:bg-blue-500' :
-            'bg-gray-700 hover:bg-gray-600'
+            isLoading ? 'bg-surface-muted cursor-wait' :
+            isPlaying ? 'bg-accent hover:bg-accent-hover' :
+            'bg-surface-muted hover:bg-surface-muted'
           }`}
           title={isPlaying ? '暂停' : '播放播报'}
         >
           {isLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+            <Loader2 className="w-4 h-4 animate-spin text-stone-400" />
           ) : isPlaying ? (
             <Pause className="w-4 h-4 text-white" />
           ) : (
-            <Volume2 className="w-4 h-4 text-gray-300" />
+            <Volume2 className="w-4 h-4 text-stone-300" />
           )}
         </button>
 
@@ -337,16 +337,16 @@ export const AudioBriefing: React.FC<AudioBriefingProps> = memo(({
 
   // 完整模式
   return (
-    <div className={`bg-gray-800/50 rounded-lg border border-gray-700 p-4 ${className}`}>
+    <div className={`bg-surface-overlay/50 rounded-lg border border-border-strong p-4 ${className}`}>
       {/* 头部 */}
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-medium text-gray-200 flex items-center gap-2">
+        <h4 className="text-sm font-medium text-stone-200 flex items-center gap-2">
           <Volume2 className="w-4 h-4" />
           AI 语音播报
         </h4>
         <button
           onClick={() => setShowSettings(!showSettings)}
-          className="p-1 text-gray-400 hover:text-gray-200 transition-colors"
+          className="p-1 text-stone-400 hover:text-stone-200 transition-colors"
           title="设置"
         >
           <Settings className="w-4 h-4" />
@@ -355,14 +355,14 @@ export const AudioBriefing: React.FC<AudioBriefingProps> = memo(({
 
       {/* 设置面板 */}
       {showSettings && (
-        <div className="mb-4 p-3 bg-gray-900/50 rounded-lg space-y-3">
+        <div className="mb-4 p-3 bg-surface-raised/50 rounded-lg space-y-3">
           {/* 语音选择 */}
           <div>
-            <label className="block text-xs text-gray-400 mb-1">语音</label>
+            <label className="block text-xs text-stone-400 mb-1">语音</label>
             <select
               value={selectedVoice || ''}
               onChange={(e) => setSelectedVoice(e.target.value || null)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-200"
+              className="w-full bg-surface-muted border border-border-strong rounded px-2 py-1 text-sm text-stone-200"
             >
               <option value="">默认</option>
               {voices.map((voice) => (
@@ -375,7 +375,7 @@ export const AudioBriefing: React.FC<AudioBriefingProps> = memo(({
 
           {/* 语速 */}
           <div>
-            <label className="block text-xs text-gray-400 mb-1">
+            <label className="block text-xs text-stone-400 mb-1">
               语速: {speed.toFixed(1)}x
             </label>
             <input
@@ -398,13 +398,13 @@ export const AudioBriefing: React.FC<AudioBriefingProps> = memo(({
           onClick={togglePlay}
           disabled={isLoading}
           className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${
-            isLoading ? 'bg-gray-700 cursor-wait' :
-            isPlaying ? 'bg-blue-600 hover:bg-blue-500' :
-            'bg-gray-700 hover:bg-gray-600'
+            isLoading ? 'bg-surface-muted cursor-wait' :
+            isPlaying ? 'bg-accent hover:bg-accent-hover' :
+            'bg-surface-muted hover:bg-surface-muted'
           }`}
         >
           {isLoading ? (
-            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+            <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
           ) : isPlaying ? (
             <Pause className="w-5 h-5 text-white" />
           ) : (
@@ -421,9 +421,9 @@ export const AudioBriefing: React.FC<AudioBriefingProps> = memo(({
             value={currentTime}
             onChange={handleSeek}
             disabled={!audioRef.current}
-            className="w-full h-1 bg-gray-700 rounded-full appearance-none cursor-pointer"
+            className="w-full h-1 bg-surface-muted rounded-full appearance-none cursor-pointer"
           />
-          <div className="flex justify-between text-xs text-gray-500">
+          <div className="flex justify-between text-xs text-stone-500">
             <span>{formatTime(currentTime)}</span>
             <span>{formatTime(duration)}</span>
           </div>
@@ -433,7 +433,7 @@ export const AudioBriefing: React.FC<AudioBriefingProps> = memo(({
         <div className="flex items-center gap-2">
           <button
             onClick={toggleMute}
-            className="p-1 text-gray-400 hover:text-gray-200 transition-colors"
+            className="p-1 text-stone-400 hover:text-stone-200 transition-colors"
           >
             {isMuted || volume === 0 ? (
               <VolumeX className="w-4 h-4" />
@@ -448,7 +448,7 @@ export const AudioBriefing: React.FC<AudioBriefingProps> = memo(({
             step="0.1"
             value={isMuted ? 0 : volume}
             onChange={handleVolumeChange}
-            className="w-16 h-1 bg-gray-700 rounded-full appearance-none cursor-pointer"
+            className="w-16 h-1 bg-surface-muted rounded-full appearance-none cursor-pointer"
           />
         </div>
 
@@ -456,7 +456,7 @@ export const AudioBriefing: React.FC<AudioBriefingProps> = memo(({
         <button
           onClick={regenerate}
           disabled={isLoading}
-          className="p-2 text-gray-400 hover:text-gray-200 transition-colors"
+          className="p-2 text-stone-400 hover:text-stone-200 transition-colors"
           title="重新生成"
         >
           <RotateCcw className="w-4 h-4" />
@@ -473,7 +473,7 @@ export const AudioBriefing: React.FC<AudioBriefingProps> = memo(({
 
       {/* 提供商信息 */}
       {ttsStatus?.default_provider && (
-        <div className="mt-2 text-xs text-gray-500">
+        <div className="mt-2 text-xs text-stone-500">
           使用 {ttsStatus.default_provider.toUpperCase()} TTS
         </div>
       )}

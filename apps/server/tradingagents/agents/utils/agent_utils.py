@@ -36,10 +36,10 @@ def create_msg_delete(keep_last_n: int = 0):
 
         if keep_last_n > 0 and len(messages) > keep_last_n:
             # 保留最后 N 条消息
-            removal_operations = [RemoveMessage(id=m.id) for m in messages[:-keep_last_n]]
+            removal_operations = [RemoveMessage(id=m.id) for m in messages[:-keep_last_n] if hasattr(m, 'id') and m.id]
         else:
             # 删除所有消息
-            removal_operations = [RemoveMessage(id=m.id) for m in messages]
+            removal_operations = [RemoveMessage(id=m.id) for m in messages if hasattr(m, 'id') and m.id]
 
         # Add a minimal placeholder message
         placeholder = HumanMessage(content="Continue")
@@ -66,7 +66,7 @@ def create_msg_delete_parallel(keep_last_n: int = 3):
 
         # 保留最后 N 条消息
         if len(messages) > keep_last_n:
-            removal_ops = [RemoveMessage(id=m.id) for m in messages[:-keep_last_n]]
+            removal_ops = [RemoveMessage(id=m.id) for m in messages[:-keep_last_n] if hasattr(m, 'id') and m.id]
         else:
             removal_ops = []
 
@@ -76,6 +76,3 @@ def create_msg_delete_parallel(keep_last_n: int = 3):
         return {"messages": removal_ops + [placeholder]}
 
     return delete_messages_parallel
-
-
-        

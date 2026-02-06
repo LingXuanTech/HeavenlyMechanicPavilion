@@ -148,7 +148,7 @@ class GraphSetup:
             sync_message += " Proceeding to debate."
 
             if len(messages) > 3:
-                removal_ops = [RemoveMessage(id=m.id) for m in messages[:-3]]
+                removal_ops = [RemoveMessage(id=m.id) for m in messages[:-3] if hasattr(m, 'id') and m.id]
                 return {
                     "messages": removal_ops + [HumanMessage(content=sync_message)]
                 }

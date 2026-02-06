@@ -51,32 +51,32 @@ const Header: React.FC<HeaderProps> = ({
   const sentiment = marketAnalysis?.global_sentiment || 'Neutral';
 
   return (
-    <header className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-md sticky top-0 z-20 flex flex-col">
+    <header className="border-b border-border bg-surface/80 backdrop-blur-md sticky top-0 z-20 flex flex-col">
       {/* Top Bar: Controls & Status */}
       <div className="h-16 px-6 flex items-center justify-between">
         <div className="flex items-center gap-6">
           <div>
             <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
               Market Overview
-              {isMarketRefreshing && <RefreshCcw className="w-3 h-3 animate-spin text-gray-500" />}
+              {isMarketRefreshing && <RefreshCcw className="w-3 h-3 animate-spin text-stone-500" />}
             </h2>
-            <p className="text-xs text-gray-500 truncate max-w-[200px] sm:max-w-md">{marketSummary}</p>
+            <p className="text-xs text-stone-500 truncate max-w-[200px] sm:max-w-md">{marketSummary}</p>
           </div>
           
-          <div className="h-8 w-px bg-gray-800 mx-2 hidden sm:block"></div>
+          <div className="h-8 w-px bg-border mx-2 hidden sm:block"></div>
 
           <div className="hidden sm:flex items-center gap-4">
             {/* Market Filter */}
             {marketFilter !== undefined && onFilterChange && (
-              <div className="flex items-center gap-1 bg-gray-800/50 rounded-lg p-1">
+              <div className="flex items-center gap-1 bg-surface-overlay/50 rounded-lg p-1">
                 {['ALL', 'CN', 'HK', 'US'].map((filter) => (
                   <button
                     key={filter}
                     onClick={() => onFilterChange(filter)}
                     className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
                       marketFilter === filter
-                        ? 'bg-blue-600 text-white'
-                        : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                        ? 'bg-accent text-stone-950'
+                        : 'text-stone-400 hover:text-stone-50 hover:bg-surface-muted'
                     }`}
                   >
                     {filter}
@@ -86,26 +86,26 @@ const Header: React.FC<HeaderProps> = ({
             )}
 
             <div className="flex flex-col">
-              <span className="text-[10px] text-gray-500 uppercase font-bold">Global Sentiment</span>
-              <span className={`text-sm font-bold ${sentiment === 'Bullish' ? 'text-green-400' : sentiment === 'Bearish' ? 'text-red-400' : 'text-gray-400'}`}>
+              <span className="text-[10px] text-stone-500 uppercase font-bold">Global Sentiment</span>
+              <span className={`text-sm font-bold ${sentiment === 'Bullish' ? 'text-green-400' : sentiment === 'Bearish' ? 'text-red-400' : 'text-stone-400'}`}>
                 {sentiment}
               </span>
             </div>
 
             <div className="flex flex-col">
-              <span className="text-[10px] text-gray-500 uppercase font-bold">Active Agents</span>
-              <span className="text-sm font-bold text-blue-400">{status.activeAgents} Running</span>
+              <span className="text-[10px] text-stone-500 uppercase font-bold">Active Agents</span>
+              <span className="text-sm font-bold text-accent">{status.activeAgents} Running</span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-4">
           <div className="text-right hidden md:block">
-            <div className="text-sm font-mono text-gray-300 flex items-center justify-end gap-2">
-              <Clock className="w-3 h-3 text-gray-500" />
+            <div className="text-sm font-mono text-stone-300 flex items-center justify-end gap-2">
+              <Clock className="w-3 h-3 text-stone-500" />
               {marketAnalysis?.updated_at || status.lastUpdated}
             </div>
-            <div className="text-[10px] text-gray-500 flex items-center justify-end gap-1">
+            <div className="text-[10px] text-stone-500 flex items-center justify-end gap-1">
               <Wifi className="w-3 h-3" /> Connected
             </div>
           </div>
@@ -114,7 +114,7 @@ const Header: React.FC<HeaderProps> = ({
             <button 
               onClick={onRefreshMarket}
               disabled={isMarketRefreshing}
-              className="bg-gray-800 hover:bg-gray-700 text-gray-300 p-2 rounded-md transition-all active:scale-95 disabled:opacity-50"
+              className="bg-surface-overlay hover:bg-surface-muted text-stone-300 p-2 rounded-md transition-all active:scale-95 disabled:opacity-50"
               title="Refresh Global Market"
             >
               <Globe className={`w-4 h-4 ${isMarketRefreshing ? 'animate-spin' : ''}`} />
@@ -122,7 +122,7 @@ const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onRefreshAll}
               disabled={isGlobalRefreshing}
-              className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(37,99,235,0.3)] hover:shadow-[0_0_20px_rgba(37,99,235,0.5)]"
+              className="bg-accent hover:bg-accent-hover text-stone-950 px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-glow-gold hover:shadow-glow-gold-lg"
             >
               <RefreshCcw className={`w-4 h-4 ${isGlobalRefreshing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Run All Agents</span>
@@ -133,7 +133,7 @@ const Header: React.FC<HeaderProps> = ({
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-2 rounded-md transition-all"
+              className="flex items-center gap-2 bg-surface-overlay hover:bg-surface-muted text-stone-300 px-3 py-2 rounded-md transition-all"
             >
               {user?.avatar_url ? (
                 <img src={user.avatar_url} alt="" className="w-6 h-6 rounded-full" />
@@ -147,19 +147,19 @@ const Header: React.FC<HeaderProps> = ({
             </button>
 
             {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg py-1 z-50">
-                <div className="px-4 py-2 border-b border-gray-700">
+              <div className="absolute right-0 mt-2 w-48 bg-surface-raised border border-border-strong rounded-lg shadow-lg py-1 z-50">
+                <div className="px-4 py-2 border-b border-border-strong">
                   <p className="text-sm font-medium text-white truncate">
                     {user?.display_name || 'User'}
                   </p>
-                  <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+                  <p className="text-xs text-stone-400 truncate">{user?.email}</p>
                 </div>
                 <button
                   onClick={() => {
                     logout();
                     setShowUserMenu(false);
                   }}
-                  className="w-full px-4 py-2 text-left text-sm text-gray-300 hover:bg-gray-700 flex items-center gap-2"
+                  className="w-full px-4 py-2 text-left text-sm text-stone-300 hover:bg-surface-overlay flex items-center gap-2"
                 >
                   <LogOut className="w-4 h-4" />
                   Sign Out
@@ -171,11 +171,11 @@ const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Ticker Bar */}
-      <div className="bg-gray-900/50 border-t border-gray-800 h-8 flex items-center overflow-hidden">
+      <div className="bg-surface-raised/50 border-t border-border h-8 flex items-center overflow-hidden">
         <div className="flex gap-8 animate-marquee px-4 w-full">
            {indices.map((idx, i) => (
              <div key={i} className="flex items-center gap-2 text-xs font-mono shrink-0">
-                <span className="font-bold text-gray-400">{idx.name}</span>
+                <span className="font-bold text-stone-400">{idx.name}</span>
                 <span className="text-white">
                   {'current' in idx ? idx.current.toFixed(2) : '---'}
                 </span>
@@ -196,7 +196,7 @@ const Header: React.FC<HeaderProps> = ({
            {/* Duplicate for basic marquee effect */}
            {indices.map((idx, i) => (
              <div key={`dup-${i}`} className="flex items-center gap-2 text-xs font-mono shrink-0">
-                <span className="font-bold text-gray-400">{idx.name}</span>
+                <span className="font-bold text-stone-400">{idx.name}</span>
                 <span className="text-white">
                   {'current' in idx ? idx.current.toFixed(2) : '---'}
                 </span>

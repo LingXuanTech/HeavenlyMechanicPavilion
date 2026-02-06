@@ -24,20 +24,20 @@ import type * as T from '../src/types/schema';
 const TrendIcon: React.FC<{ trend: string; className?: string }> = ({ trend, className = "w-4 h-4" }) => {
   if (trend === 'up') return <TrendingUp className={`${className} text-green-400`} />;
   if (trend === 'down') return <TrendingDown className={`${className} text-red-400`} />;
-  return <Minus className={`${className} text-gray-400`} />;
+  return <Minus className={`${className} text-stone-400`} />;
 };
 
 // 单个指标卡片
 const IndicatorCard: React.FC<{ indicator: T.MacroIndicator; icon: React.ReactNode }> = ({ indicator, icon }) => {
   const changeColor = indicator.change && indicator.change > 0 ? 'text-green-400' :
-                      indicator.change && indicator.change < 0 ? 'text-red-400' : 'text-gray-400';
+                      indicator.change && indicator.change < 0 ? 'text-red-400' : 'text-stone-400';
 
   return (
-    <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 hover:border-gray-600 transition-colors">
+    <div className="bg-surface-overlay/50 rounded-xl p-4 border border-border-strong hover:border-stone-600 transition-colors">
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
-          <span className="text-gray-400">{icon}</span>
-          <span className="text-sm text-gray-400">{indicator.name}</span>
+          <span className="text-stone-400">{icon}</span>
+          <span className="text-sm text-stone-400">{indicator.name}</span>
         </div>
         <TrendIcon trend={indicator.trend} />
       </div>
@@ -56,7 +56,7 @@ const IndicatorCard: React.FC<{ indicator: T.MacroIndicator; icon: React.ReactNo
         )}
       </div>
 
-      <div className="mt-2 text-xs text-gray-500">
+      <div className="mt-2 text-xs text-stone-500">
         {indicator.date} · {indicator.source}
       </div>
     </div>
@@ -72,15 +72,15 @@ const ImpactCard: React.FC<{
 }> = ({ indicator, impact_level, direction, reasoning }) => {
   const directionColor = direction === 'Bullish' ? 'border-green-500 bg-green-500/10' :
                          direction === 'Bearish' ? 'border-red-500 bg-red-500/10' :
-                         'border-gray-500 bg-gray-500/10';
+                         'border-stone-500 bg-stone-500/10';
 
   const directionIcon = direction === 'Bullish' ? <TrendingUp className="w-4 h-4 text-green-400" /> :
                         direction === 'Bearish' ? <TrendingDown className="w-4 h-4 text-red-400" /> :
-                        <Minus className="w-4 h-4 text-gray-400" />;
+                        <Minus className="w-4 h-4 text-stone-400" />;
 
   const levelBadge = impact_level === 'High' ? 'bg-red-500/20 text-red-400' :
                      impact_level === 'Medium' ? 'bg-yellow-500/20 text-yellow-400' :
-                     'bg-gray-500/20 text-gray-400';
+                     'bg-stone-500/20 text-stone-400';
 
   return (
     <div className={`p-4 rounded-lg border-l-4 ${directionColor}`}>
@@ -93,7 +93,7 @@ const ImpactCard: React.FC<{
           {impact_level}
         </span>
       </div>
-      <p className="text-sm text-gray-300">{reasoning}</p>
+      <p className="text-sm text-stone-300">{reasoning}</p>
     </div>
   );
 };
@@ -113,7 +113,7 @@ const MacroPage: React.FC = () => {
 
   // Header 右侧内容：情绪指示器
   const headerRight = analysis && (
-    <div className={`flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-800 ${sentimentColor}`}>
+    <div className={`flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-overlay ${sentimentColor}`}>
       <Activity className="w-4 h-4" />
       <span className="font-bold">{analysis.overview.sentiment}</span>
     </div>
@@ -126,8 +126,8 @@ const MacroPage: React.FC = () => {
         ? `Last updated: ${new Date(analysis.overview.last_updated).toLocaleString()}`
         : '加载中...'}
       icon={Globe}
-      iconColor="text-blue-400"
-      iconBgColor="bg-blue-500/10"
+      iconColor="text-accent"
+      iconBgColor="bg-accent/10"
       variant="wide"
       actions={[
         {
@@ -150,7 +150,7 @@ const MacroPage: React.FC = () => {
           action={
             <button
               onClick={handleRefresh}
-              className="px-4 py-2 bg-gray-800 rounded-lg hover:bg-gray-700 text-white"
+              className="px-4 py-2 bg-surface-overlay rounded-lg hover:bg-surface-muted text-white"
             >
               重试
             </button>
@@ -159,8 +159,8 @@ const MacroPage: React.FC = () => {
       ) : analysis ? (
         <div className="space-y-6">
             {/* 摘要 */}
-            <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-xl p-4 border border-blue-800/50">
-              <p className="text-gray-200">{analysis.overview.summary}</p>
+            <div className="bg-gradient-to-r from-amber-900/30 to-yellow-900/30 rounded-xl p-4 border border-amber-800/50">
+              <p className="text-stone-200">{analysis.overview.summary}</p>
             </div>
 
             {/* 指标网格 */}
@@ -231,12 +231,12 @@ const MacroPage: React.FC = () => {
             )}
 
             {/* 市场展望 */}
-            <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+            <div className="bg-surface-overlay/50 rounded-xl p-4 border border-border-strong">
               <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
                 <Globe className="w-5 h-5 text-purple-400" />
                 Market Outlook
               </h3>
-              <p className="text-gray-200">{analysis.market_outlook}</p>
+              <p className="text-stone-200">{analysis.market_outlook}</p>
             </div>
 
             {/* 风险与机会 */}
@@ -250,7 +250,7 @@ const MacroPage: React.FC = () => {
                   </h4>
                   <ul className="space-y-2">
                     {analysis.risk_factors.map((risk, i) => (
-                      <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
+                      <li key={i} className="text-sm text-stone-300 flex items-start gap-2">
                         <span className="text-red-400 mt-1">•</span>
                         <span>{risk}</span>
                       </li>
@@ -268,7 +268,7 @@ const MacroPage: React.FC = () => {
                   </h4>
                   <ul className="space-y-2">
                     {analysis.opportunities.map((opp, i) => (
-                      <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
+                      <li key={i} className="text-sm text-stone-300 flex items-start gap-2">
                         <span className="text-green-400 mt-1">•</span>
                         <span>{opp}</span>
                       </li>

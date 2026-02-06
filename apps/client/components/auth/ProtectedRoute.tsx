@@ -17,10 +17,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
 
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gray-950">
+      <div className="flex h-screen items-center justify-center bg-surface">
         <div className="flex flex-col items-center gap-4">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-gray-700 border-t-blue-500" />
-          <p className="text-gray-400">Loading...</p>
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-border-strong border-t-accent" />
+          <p className="text-stone-400">Loading...</p>
         </div>
       </div>
     );

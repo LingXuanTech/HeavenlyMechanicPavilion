@@ -149,3 +149,35 @@ async def reload_prompts():
         "message": "Prompts reloaded from file",
         "roles": list(prompt_manager._prompts.keys())
     }
+
+
+class RolloutSettings(BaseModel):
+    """灰度发布设置"""
+    subgraph_rollout_percentage: int
+    subgraph_force_enabled_users: list[str]
+
+
+@router.get("/rollout")
+async def get_rollout_settings():
+    """获取灰度发布设置"""
+    return {
+        "subgraph_rollout_percentage": settings.SUBGRAPH_ROLLOUT_PERCENTAGE,
+        "subgraph_force_enabled_users": settings.SUBGRAPH_FORCE_ENABLED_USERS
+    }
+
+
+@router.put("/rollout", dependencies=[Depends(verify_api_key)])
+async def update_rollout_settings(request: RolloutSettings):
+    """更新灰度发布设置"""
+    # 注意：这里仅更新内存中的 settings，生产环境应持久化到数据库或环境变量
+    settings.SUBGRAPH_ROLLOUT_PERCENTAGE = request.subgraph_rollout_percentage
+    settings.SUBGRAPH_FORCE_ENABLED_USERS = request.subgraph_force_enabled_users
+
+    logger.info("Rollout settings updated",
+                percentage=request.subgraph_rollout_percentage,
+                force_users=request.subgraph_force_enabled_users)
+
+    return {
+        "status": "success",
+        "message": "Rollout settings updated successfully"
+    }

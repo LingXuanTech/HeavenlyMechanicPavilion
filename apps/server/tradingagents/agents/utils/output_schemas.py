@@ -417,6 +417,75 @@ class ScoutAgentOutput(BaseModel):
     sources: List[WebSource] = Field(description="信息来源")
 
 
+# ============ 迭代 6 新增输出模型 ============
+
+class VisionAnalystOutput(BaseModel):
+    """Vision Analyst 结构化输出 - 多模态图表分析"""
+    chart_type: str = Field(description="图表类型（K线图、折线图、柱状图、财务报表截图等）")
+    time_range: Optional[str] = Field(default=None, description="图表时间范围")
+    key_data_points: List[dict] = Field(
+        description="关键数据点",
+        examples=[{"label": "最高价", "value": "150.00"}]
+    )
+    trend: Literal["Bullish", "Bearish", "Neutral"] = Field(description="趋势判断")
+    trend_description: str = Field(description="趋势描述")
+    patterns: List[str] = Field(default_factory=list, description="识别到的技术形态")
+    support_levels: List[float] = Field(default_factory=list, description="支撑位")
+    resistance_levels: List[float] = Field(default_factory=list, description="阻力位")
+    anomalies: List[str] = Field(default_factory=list, description="异常标注")
+    signals: List[str] = Field(default_factory=list, description="技术信号")
+    summary: str = Field(description="综合分析摘要")
+    recommendation: Optional[str] = Field(default=None, description="投资建议")
+    signal: Literal["Strong Buy", "Buy", "Hold", "Sell", "Strong Sell"] = Field(
+        description="基于图表分析的交易信号"
+    )
+    confidence: int = Field(description="信心度 0-100", ge=0, le=100)
+
+
+class SupplyChainAnalystOutput(BaseModel):
+    """Supply Chain Analyst 结构化输出 - 产业链分析"""
+    summary: str = Field(description="产业链分析总结")
+
+    # 产业链位置
+    chain_position: Literal["upstream", "midstream", "downstream", "unknown"] = Field(
+        description="公司在产业链中的位置"
+    )
+    chain_name: str = Field(description="所属产业链名称")
+    segment: str = Field(description="所属环节")
+
+    # 上下游关系
+    key_suppliers: List[dict] = Field(
+        description="关键供应商",
+        examples=[{"name": "宁德时代", "symbol": "300750", "relation": "动力电池供应"}]
+    )
+    key_customers: List[dict] = Field(
+        description="关键客户",
+        examples=[{"name": "比亚迪", "symbol": "002594", "relation": "整车制造"}]
+    )
+
+    # 供应链风险
+    supply_chain_risks: List[dict] = Field(
+        description="供应链风险因素",
+        examples=[{"risk": "原材料价格波动", "severity": "High", "mitigation": "长协锁价"}]
+    )
+
+    # 传导效应
+    transmission_effects: List[str] = Field(
+        description="产业链传导效应分析",
+    )
+
+    # 竞争格局
+    competitive_position: Literal["Leader", "Challenger", "Follower", "Niche"] = Field(
+        description="在产业链环节中的竞争地位"
+    )
+
+    # 信号
+    signal: Literal["Strong Buy", "Buy", "Hold", "Sell", "Strong Sell"] = Field(
+        description="基于产业链分析的交易信号"
+    )
+    confidence: int = Field(description="信心度 0-100", ge=0, le=100)
+
+
 # ============ 最终综合输出模型 ============
 
 class FinalAnalysisOutput(BaseModel):

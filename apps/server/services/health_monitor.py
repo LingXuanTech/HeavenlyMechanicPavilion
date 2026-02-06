@@ -50,11 +50,26 @@ class ErrorRecord(BaseModel):
     count: int = 1
 
 
+class ProviderStatus(BaseModel):
+    """数据源状态"""
+    available: bool
+    failure_count: int
+    threshold: int
+    last_failure: Optional[datetime] = None
+    cooldown_seconds: float
+    total_requests: int
+    successful_requests: int
+    failed_requests: int
+    avg_latency_ms: float
+    last_error: Optional[str] = None
+
+
 class HealthReport(BaseModel):
     """健康报告"""
     overall_status: HealthStatus
     components: List[ComponentHealth]
     system_metrics: SystemMetrics
+    data_providers: Dict[str, ProviderStatus]
     recent_errors: List[ErrorRecord]
     uptime_seconds: float
     checked_at: datetime
@@ -383,10 +398,15 @@ class HealthMonitorService:
         # 获取最近错误
         recent_errors = list(self._error_history)[-10:]
 
+        # 获取数据源状态
+        from services.data_router import MarketRouter
+        data_providers = MarketRouter.get_provider_status()
+
         return HealthReport(
             overall_status=self._calculate_overall_status(components),
             components=components,
             system_metrics=self.get_system_metrics(),
+            data_providers=data_providers,
             recent_errors=recent_errors,
             uptime_seconds=round(uptime, 1),
             checked_at=now

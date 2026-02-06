@@ -1,5 +1,15 @@
 import os
 
+
+def _get_rollout_percentage() -> int:
+    """从环境变量或 settings 获取灰度比例"""
+    try:
+        from config.settings import settings
+        return settings.SUBGRAPH_ROLLOUT_PERCENTAGE
+    except Exception:
+        return int(os.getenv("SUBGRAPH_ROLLOUT_PERCENTAGE", "0"))
+
+
 DEFAULT_CONFIG = {
     "project_dir": os.path.abspath(os.path.join(os.path.dirname(__file__), ".")),
     "results_dir": os.getenv("TRADINGAGENTS_RESULTS_DIR", "./results"),
@@ -17,6 +27,8 @@ DEFAULT_CONFIG = {
     "use_planner": True,           # Use Planner for adaptive analyst selection
     "analysis_level": "L2",        # L1: Quick scan (Market+News+Macro), L2: Full analysis
     "use_subgraphs": False,        # Use SubGraph architecture (experimental)
+    # 灰度发布配置（运行时由 rollout_manager 动态覆盖）
+    "subgraph_rollout_percentage": _get_rollout_percentage(),
     # Debate and discussion settings
     "max_debate_rounds": 1,
     "max_risk_discuss_rounds": 1,

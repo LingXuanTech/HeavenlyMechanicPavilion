@@ -1,7 +1,7 @@
 /**
  * A股市场页面
  *
- * 整合北向资金、龙虎榜、限售解禁三大 A 股特色功能
+ * 整合北向资金、龙虎榜、限售解禁、AH 溢价四大 A 股特色功能
  * 使用 wide 布局以充分展示数据表格
  */
 import React from 'react';
@@ -10,6 +10,7 @@ import { Landmark } from 'lucide-react';
 import PageLayout from '../components/layout/PageLayout';
 import ChinaMarketPanel from '../components/ChinaMarketPanel';
 import NorthMoneyPanel from '../components/NorthMoneyPanel';
+import AHPremiumPanel from '../components/AHPremiumPanel';
 import { useAddStock } from '../hooks';
 import { useToast } from '../components/Toast';
 
@@ -31,7 +32,7 @@ const ChinaMarketPage: React.FC = () => {
   return (
     <PageLayout
       title="A股市场"
-      subtitle="北向资金 · 龙虎榜 · 限售解禁"
+      subtitle="北向资金 · 龙虎榜 · 限售解禁 · AH溢价"
       icon={Landmark}
       iconColor="text-red-400"
       iconBgColor="bg-red-500/10"
@@ -43,6 +44,7 @@ const ChinaMarketPage: React.FC = () => {
         </div>
         <div className="space-y-6">
           <NorthMoneyPanel onStockClick={handleStockClick} />
+          <AHPremiumPanel />
         </div>
       </div>
     </PageLayout>

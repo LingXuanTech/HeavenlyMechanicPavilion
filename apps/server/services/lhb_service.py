@@ -15,7 +15,7 @@ import akshare as ak
 import pandas as pd
 import asyncio
 
-from utils import TTLCache
+from services.cache_service import cache_service
 
 logger = structlog.get_logger(__name__)
 
@@ -257,7 +257,7 @@ class LHBService:
     """龙虎榜解析服务"""
 
     def __init__(self):
-        self._cache = TTLCache(default_ttl=600)  # 10 分钟缓存
+        pass
 
     def _identify_seat_type(self, seat_name: str) -> tuple:
         """识别席位类型和游资信息
@@ -293,7 +293,7 @@ class LHBService:
             trade_date: 交易日期，格式 YYYYMMDD，默认最近交易日
         """
         cache_key = f"daily_lhb_{trade_date or 'latest'}"
-        cached = self._cache.get(cache_key)
+        cached = cache_service.get_sync(cache_key)
         if cached:
             return cached
 
@@ -370,7 +370,7 @@ class LHBService:
             # 按净买入排序
             result.sort(key=lambda x: x.lhb_net_buy, reverse=True)
 
-            self._cache.set(cache_key, result)
+            cache_service.set_sync(cache_key, result, ttl=600)
             logger.info("Fetched daily LHB", count=len(result), date=trade_date)
             return result
 
@@ -381,7 +381,7 @@ class LHBService:
     async def get_stock_lhb_history(self, symbol: str, days: int = 30) -> List[LHBRecord]:
         """获取个股龙虎榜历史"""
         cache_key = f"stock_lhb_{symbol}_{days}"
-        cached = self._cache.get(cache_key)
+        cached = cache_service.get_sync(cache_key)
         if cached:
             return cached
 
@@ -406,7 +406,7 @@ class LHBService:
                 except Exception:
                     continue
 
-            self._cache.set(cache_key, result)
+            cache_service.set_sync(cache_key, result, ttl=600)
             return result
 
         except Exception as e:
@@ -416,7 +416,7 @@ class LHBService:
     async def get_hot_money_activity(self, days: int = 5) -> List[HotMoneySeat]:
         """获取知名游资近期活动"""
         cache_key = f"hot_money_{days}"
-        cached = self._cache.get(cache_key)
+        cached = cache_service.get_sync(cache_key)
         if cached:
             return cached
 
@@ -459,7 +459,7 @@ class LHBService:
                     win_rate=None,  # 需要历史数据计算
                 ))
 
-            self._cache.set(cache_key, result)
+            cache_service.set_sync(cache_key, result, ttl=600)
             return result
 
         except Exception as e:
@@ -502,7 +502,7 @@ class LHBService:
             游资完整画像，包含历史统计和操作特征
         """
         cache_key = f"hot_money_profile_{alias}"
-        cached = self._cache.get(cache_key)
+        cached = cache_service.get_sync(cache_key)
         if cached:
             return cached
 
@@ -566,7 +566,7 @@ class LHBService:
                 success_stocks=[],
             )
 
-            self._cache.set(cache_key, profile)
+            cache_service.set_sync(cache_key, profile, ttl=600)
             return profile
 
         except Exception as e:
@@ -583,7 +583,7 @@ class LHBService:
             游资画像列表
         """
         cache_key = f"all_hot_money_profiles_{tier or 'all'}"
-        cached = self._cache.get(cache_key)
+        cached = cache_service.get_sync(cache_key)
         if cached:
             return cached
 
@@ -606,7 +606,7 @@ class LHBService:
             tier_order = {"一线": 0, "二线": 1, "新锐": 2, "未知": 3}
             result.sort(key=lambda x: (tier_order.get(x.tier, 99), -x.total_appearances))
 
-            self._cache.set(cache_key, result)
+            cache_service.set_sync(cache_key, result, ttl=600)
             return result
 
         except Exception as e:

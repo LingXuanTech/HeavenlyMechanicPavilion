@@ -14,6 +14,7 @@ import {
   getSystemUptime,
   checkLiveness,
   checkReadiness,
+  resetCircuitBreaker,
 } from '../services/api';
 
 export const HEALTH_KEY = ['health'];
@@ -120,6 +121,20 @@ export function useClearHealthErrors() {
     mutationFn: clearHealthErrors,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...HEALTH_KEY, 'errors'] });
+      queryClient.invalidateQueries({ queryKey: [...HEALTH_KEY, 'report'] });
+    },
+  });
+}
+
+/**
+ * 重置熔断状态
+ */
+export function useResetCircuitBreaker() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (provider: string) => resetCircuitBreaker(provider),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...HEALTH_KEY, 'report'] });
     },
   });

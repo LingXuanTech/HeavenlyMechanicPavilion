@@ -278,11 +278,130 @@ class TestSSEStream:
         response = client.get("/api/analyze/stream/nonexistent-task")
         assert response.status_code == 404
 
-    @pytest.mark.skip(reason="SSE events now managed by cache_service, needs refactor")
-    def test_stream_existing_task(self, client):
-        """存在的任务可以连接 SSE"""
-        # TODO: 重构测试以使用 cache_service mock
-        pass
+    def test_stream_existing_task_with_events(self, client):
+        """存在的任务可以连接 SSE 并接收事件"""
+        import asyncio
+        from services.cache_service import cache_service
+
+        task_id = "test-sse-task-001"
+
+        # 设置任务状态和 SSE 事件
+        async def setup_sse_events():
+            # 初始化 SSE 任务
+            await cache_service.init_sse_task(task_id, "AAPL")
+
+            # 推送模拟的分析阶段事件
+            await cache_service.push_sse_event(task_id, "stage_analyst", {
+                "node": "Market Analyst",
+                "stage": "stage_analyst",
+                "status": "completed",
+                "message": "Market analyst completed"
+            })
+            await cache_service.push_sse_event(task_id, "stage_analyst", {
+                "node": "News Analyst",
+                "stage": "stage_analyst",
+                "status": "completed",
+                "message": "News analyst completed"
+            })
+            await cache_service.push_sse_event(task_id, "stage_debate", {
+                "node": "Bull Researcher",
+                "stage": "stage_debate",
+                "status": "completed",
+                "message": "Bull researcher completed"
+            })
+            await cache_service.push_sse_event(task_id, "stage_risk", {
+                "node": "Risk Judge",
+                "stage": "stage_risk",
+                "status": "completed",
+                "message": "Risk assessment completed"
+            })
+            await cache_service.push_sse_event(task_id, "stage_final", {
+                "signal": "Strong Buy",
+                "confidence": 78,
+                "summary": "Test analysis completed"
+            })
+
+            # 设置任务完成状态
+            await cache_service.set_sse_status(task_id, "completed")
+
+        asyncio.get_event_loop().run_until_complete(setup_sse_events())
+
+        try:
+            # 请求 SSE 流
+            response = client.get(f"/api/analyze/stream/{task_id}")
+
+            # 验证响应状态
+            assert response.status_code == 200
+            assert "text/event-stream" in response.headers.get("content-type", "")
+
+            # 解析 SSE 事件
+            events = []
+            for line in response.iter_lines():
+                if line:
+                    line_str = line.decode() if isinstance(line, bytes) else line
+                    if line_str.startswith("data:"):
+                        event_data = json.loads(line_str[5:].strip())
+                        events.append(event_data)
+
+            # 验证收到了预期的事件
+            assert len(events) >= 5
+
+            # 验证事件序列包含各阶段
+            stages = [e.get("stage") for e in events if "stage" in e]
+            assert "stage_analyst" in stages
+            assert "stage_debate" in stages
+            assert "stage_risk" in stages
+
+        finally:
+            # 清理测试数据
+            asyncio.get_event_loop().run_until_complete(
+                cache_service.cleanup_sse_task(task_id)
+            )
+            asyncio.get_event_loop().run_until_complete(
+                cache_service.delete_task(task_id)
+            )
+
+    def test_stream_event_format(self, client):
+        """验证 SSE 事件格式正确"""
+        import asyncio
+        from services.cache_service import cache_service
+
+        task_id = "test-sse-format-001"
+
+        async def setup_events():
+            await cache_service.init_sse_task(task_id, "TSLA")
+            await cache_service.push_sse_event(task_id, "stage_analyst", {
+                "node": "Macro Analyst",
+                "stage": "stage_analyst",
+                "status": "completed",
+                "message": "Macro analyst completed",
+                "payload": {"market_report": "Test macro report content"}
+            })
+            await cache_service.set_sse_status(task_id, "completed")
+
+        asyncio.get_event_loop().run_until_complete(setup_events())
+
+        try:
+            response = client.get(f"/api/analyze/stream/{task_id}")
+            assert response.status_code == 200
+
+            # 解析第一个事件
+            for line in response.iter_lines():
+                if line:
+                    line_str = line.decode() if isinstance(line, bytes) else line
+                    if line_str.startswith("data:"):
+                        event_data = json.loads(line_str[5:].strip())
+                        # 验证事件格式
+                        assert "node" in event_data or "signal" in event_data
+                        if "node" in event_data:
+                            assert "stage" in event_data
+                            assert "status" in event_data
+                        break
+
+        finally:
+            asyncio.get_event_loop().run_until_complete(
+                cache_service.cleanup_sse_task(task_id)
+            )
 
 
 class TestAnalysisIntegration:
@@ -291,9 +410,142 @@ class TestAnalysisIntegration:
     @pytest.mark.asyncio
     async def test_full_analysis_flow_mocked(self, async_client, db_session):
         """完整分析流程（Mock LLM）"""
-        # 这个测试需要 mock 整个 TradingAgentsGraph
-        # 由于复杂度较高，这里只做基本的触发测试
-        pass  # TODO: 实现完整的 mock 集成测试
+        from tests.fixtures.mock_llm_responses import get_sample_synthesized_analysis
+
+        # Mock TradingAgentsGraph 和相关依赖
+        mock_analysis_result = get_sample_synthesized_analysis()
+
+        with patch("api.routes.analysis.analyze.TradingAgentsGraph") as mock_graph_class, \
+             patch("api.routes.analysis.analyze.synthesizer") as mock_synthesizer, \
+             patch("api.routes.analysis.analyze.memory_service") as mock_memory, \
+             patch("api.routes.analysis.analyze.accuracy_tracker") as mock_tracker, \
+             patch("api.routes.analysis.analyze.layered_memory") as mock_layered:
+
+            # 配置 mock
+            mock_memory.is_available.return_value = False
+
+            # Mock synthesizer 返回预设结果
+            mock_synthesizer.synthesize = AsyncMock(return_value=mock_analysis_result)
+
+            # Mock accuracy_tracker
+            mock_tracker.record_prediction = AsyncMock()
+
+            # Mock layered_memory
+            mock_layered.store_layered_analysis = AsyncMock()
+
+            # Mock graph 执行
+            mock_graph_instance = MagicMock()
+            mock_graph_class.return_value = mock_graph_instance
+
+            # 模拟 graph.stream 返回的迭代器
+            def mock_stream(*args, **kwargs):
+                yield {"Market Analyst": {"market_report": "Test market report"}}
+                yield {"News Analyst": {"news_report": "Test news report"}}
+                yield {"Bull Researcher": {"bull_report": "Test bull case"}}
+                yield {"Bear Researcher": {"bear_report": "Test bear case"}}
+                yield {"Risk Judge": {"risk_report": "Test risk assessment"}}
+                yield {"Trader": {"final_decision": "Buy"}}
+
+            mock_graph_instance.graph.stream = mock_stream
+            mock_graph_instance.propagator.create_initial_state.return_value = {}
+            mock_graph_instance.propagator.get_graph_args.return_value = {}
+
+            # 触发分析
+            response = await async_client.post("/api/analyze/AAPL")
+
+            assert response.status_code == 200
+            data = response.json()
+
+            # 验证返回的 task_id 格式
+            assert "task_id" in data
+            assert data["task_id"].startswith("task_AAPL_")
+            assert data["symbol"] == "AAPL"
+            assert data["status"] == "accepted"
+
+            # 验证分析师配置
+            assert "analysts" in data
+            assert isinstance(data["analysts"], list)
+
+    def test_trigger_analysis_with_custom_analysts(self, client):
+        """测试自定义分析师配置"""
+        with patch("api.routes.analysis.analyze.run_analysis_task"):
+            # 指定特定分析师
+            response = client.post(
+                "/api/analyze/AAPL",
+                json={
+                    "analysts": ["market", "news", "macro"],
+                    "analysis_level": "L1",
+                    "use_planner": False
+                }
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["analysis_level"] == "L1"
+            assert data["use_planner"] == False
+            assert set(data["analysts"]) == {"market", "news", "macro"}
+
+    def test_trigger_analysis_with_exclude_analysts(self, client):
+        """测试排除分析师配置"""
+        with patch("api.routes.analysis.analyze.run_analysis_task"):
+            response = client.post(
+                "/api/analyze/600519.SH",
+                json={
+                    "exclude_analysts": ["social"],
+                    "analysis_level": "L2"
+                }
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            # 验证 social 分析师被排除
+            assert "social" not in data["analysts"]
+
+    def test_quick_scan_endpoint(self, client):
+        """测试快速扫描端点"""
+        with patch("api.routes.analysis.analyze.run_analysis_task"):
+            response = client.post("/api/analyze/quick/MSFT")
+
+            assert response.status_code == 200
+            data = response.json()
+            assert data["analysis_level"] == "L1"
+            assert data["task_id"].startswith("quick_MSFT_")
+            assert set(data["analysts"]) == {"market", "news", "macro"}
+            assert "estimated_time_seconds" in data
+
+    def test_task_status_transitions(self, client, db_session):
+        """测试任务状态转换"""
+        import asyncio
+        from services.cache_service import cache_service
+
+        task_id = "test-status-transition-001"
+
+        # 设置初始状态为 running
+        asyncio.get_event_loop().run_until_complete(
+            cache_service.set_task(task_id, {"status": "running", "symbol": "GOOG", "progress": 25})
+        )
+
+        try:
+            # 查询 running 状态
+            response = client.get(f"/api/analyze/status/{task_id}")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["status"] == "running"
+
+            # 更新为 completed
+            asyncio.get_event_loop().run_until_complete(
+                cache_service.set_task(task_id, {"status": "completed", "symbol": "GOOG"})
+            )
+
+            response = client.get(f"/api/analyze/status/{task_id}")
+            assert response.status_code == 200
+            data = response.json()
+            assert data["status"] == "completed"
+
+        finally:
+            asyncio.get_event_loop().run_until_complete(
+                cache_service.delete_task(task_id)
+            )
 
 
 class TestAnalysisEdgeCases:

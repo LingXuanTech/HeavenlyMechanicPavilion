@@ -14,7 +14,7 @@ const MainLayout: React.FC = () => {
   const location = useLocation();
 
   return (
-    <div className="flex h-screen bg-gray-950 text-white overflow-hidden">
+    <div className="flex h-screen bg-surface text-stone-50 overflow-hidden">
       <Sidebar />
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         <AnimatePresence mode="wait">

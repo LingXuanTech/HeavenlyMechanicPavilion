@@ -43,7 +43,7 @@ const RiskGauge: React.FC<RiskGaugeProps> = memo(({ score }) => {
           <path
             d="M 10 50 A 40 40 0 0 1 90 50"
             fill="none"
-            stroke="#374151"
+            stroke="#292524"
             strokeWidth="8"
             strokeLinecap="round"
           />
@@ -73,16 +73,16 @@ const RiskGauge: React.FC<RiskGaugeProps> = memo(({ score }) => {
           <circle cx="50" cy="50" r="4" fill="white" />
 
           {/* 刻度标记 */}
-          <text x="8" y="54" fill="#6B7280" fontSize="6">0</text>
-          <text x="48" y="10" fill="#6B7280" fontSize="6">5</text>
-          <text x="88" y="54" fill="#6B7280" fontSize="6">10</text>
+          <text x="8" y="54" fill="#78716C" fontSize="6">0</text>
+          <text x="48" y="10" fill="#78716C" fontSize="6">5</text>
+          <text x="88" y="54" fill="#78716C" fontSize="6">10</text>
         </svg>
       </div>
 
       {/* 分数显示 */}
       <div className="text-center -mt-1">
         <span className="text-2xl font-bold" style={{ color: getColor(score) }}>{score}</span>
-        <span className="text-xs text-gray-500">/10</span>
+        <span className="text-xs text-stone-500">/10</span>
       </div>
     </div>
   );

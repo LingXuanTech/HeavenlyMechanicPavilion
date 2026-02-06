@@ -35,9 +35,9 @@ const alertConfig: Record<T.AlertLevel, { bg: string; border: string; text: stri
   },
   info: {
     bg: 'bg-blue-950/30',
-    border: 'border-blue-500/30',
+    border: 'border-accent/30',
     text: 'text-blue-300',
-    icon: <Info className="w-4 h-4 text-blue-400" />,
+    icon: <Info className="w-4 h-4 text-accent" />,
   },
   none: {
     bg: '',
@@ -70,9 +70,9 @@ export const KeyMetricsBar: React.FC<{ metrics: string[] }> = ({ metrics }) => {
       {metrics.map((metric, i) => (
         <span
           key={i}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-800/80 border border-gray-700 rounded-full text-xs font-mono text-gray-300"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-surface-overlay/80 border border-border-strong rounded-full text-xs font-mono text-stone-300"
         >
-          <Activity className="w-3 h-3 text-blue-400" />
+          <Activity className="w-3 h-3 text-accent" />
           {metric}
         </span>
       ))}
@@ -134,10 +134,10 @@ const ConfidenceProgress: React.FC<{ value: number }> = ({ value }) => {
   return (
     <div className="w-full space-y-1">
       <div className="flex justify-between text-xs">
-        <span className="text-gray-400">Confidence</span>
+        <span className="text-stone-400">Confidence</span>
         <span className="font-mono font-bold text-white">{value}%</span>
       </div>
-      <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+      <div className="h-2 bg-surface-overlay rounded-full overflow-hidden">
         <div
           className={`h-full ${getColor(value)} rounded-full transition-all duration-1000 ease-out`}
           style={{ width: `${value}%` }}
@@ -174,7 +174,7 @@ export const ConfidenceDisplay: React.FC<{ value: number; mode: T.UIHints['confi
       return (
         <div className="text-center">
           <span className="text-2xl font-bold text-white">{value}</span>
-          <span className="text-xs text-gray-500">%</span>
+          <span className="text-xs text-stone-500">%</span>
         </div>
       );
   }
@@ -204,7 +204,7 @@ export const PlannerInsight: React.FC<{ hints: T.UIHints }> = ({ hints }) => {
         )}
       </button>
       {expanded && (
-        <div className="px-4 pb-3 text-sm text-gray-300 border-t border-purple-800/20 pt-2 animate-in fade-in slide-in-from-top-1 duration-200">
+        <div className="px-4 pb-3 text-sm text-stone-300 border-t border-purple-800/20 pt-2 animate-in fade-in slide-in-from-top-1 duration-200">
           {hints.planner_insight}
         </div>
       )}
@@ -248,7 +248,7 @@ export const ActionSuggestions: React.FC<{ suggestions: string[] }> = ({ suggest
       </div>
       <ul className="space-y-2">
         {suggestions.map((suggestion, i) => (
-          <li key={i} className="text-sm text-gray-300 flex items-start gap-2">
+          <li key={i} className="text-sm text-stone-300 flex items-start gap-2">
             <Zap className="w-3.5 h-3.5 text-indigo-400 mt-0.5 shrink-0" />
             {suggestion}
           </li>
@@ -267,8 +267,8 @@ export const AnalysisLevelBadge: React.FC<{ level: 'L1' | 'L2' }> = ({ level }) 
     <div
       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${
         isL2
-          ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
-          : 'bg-gray-500/10 border-gray-500/30 text-gray-400'
+          ? 'bg-accent/10 border-accent/30 text-accent'
+          : 'bg-stone-500/10 border-stone-500/30 text-stone-400'
       }`}
     >
       <Layers className="w-3 h-3" />
@@ -285,40 +285,52 @@ export const DiagnosticsPanel: React.FC<{ diagnostics?: T.AgentAnalysisResponse[
   if (!diagnostics) return null;
 
   return (
-    <div className="bg-gray-800/30 border border-gray-700/50 rounded-lg overflow-hidden">
+    <div className="bg-surface-overlay/30 border border-border/50 rounded-lg overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-800/50 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 hover:bg-surface-overlay/50 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <Shield className="w-3.5 h-3.5 text-gray-500" />
-          <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Diagnostics</span>
+          <Shield className="w-3.5 h-3.5 text-stone-500" />
+          <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Diagnostics</span>
         </div>
         {diagnostics.elapsed_seconds != null && (
-          <div className="flex items-center gap-1 text-[10px] text-gray-500">
+          <div className="flex items-center gap-1 text-[10px] text-stone-500">
             <Clock className="w-3 h-3" />
             {diagnostics.elapsed_seconds}s
           </div>
         )}
       </button>
       {expanded && (
-        <div className="px-3 pb-2 border-t border-gray-700/30 pt-2 space-y-1.5 text-[11px] text-gray-500 animate-in fade-in duration-200">
+        <div className="px-3 pb-2 border-t border-border/30 pt-2 space-y-1.5 text-[11px] text-stone-500 animate-in fade-in duration-200">
           {diagnostics.task_id && (
             <div className="flex justify-between">
               <span>Task ID</span>
-              <span className="font-mono text-gray-400">{diagnostics.task_id.slice(0, 12)}...</span>
+              <span className="font-mono text-stone-400">{diagnostics.task_id.slice(0, 12)}...</span>
             </div>
           )}
           {diagnostics.analysts_used && diagnostics.analysts_used.length > 0 && (
             <div className="flex justify-between items-start">
               <span className="flex items-center gap-1"><Users className="w-3 h-3" /> Analysts</span>
-              <span className="text-gray-400">{diagnostics.analysts_used.join(', ')}</span>
+              <span className="text-stone-400">{diagnostics.analysts_used.join(', ')}</span>
             </div>
           )}
           {diagnostics.planner_decision && (
             <div className="flex justify-between items-start">
               <span className="flex items-center gap-1"><BrainCircuit className="w-3 h-3" /> Planner</span>
-              <span className="text-gray-400 text-right max-w-[200px]">{diagnostics.planner_decision}</span>
+              <span className="text-stone-400 text-right max-w-[200px]">{diagnostics.planner_decision}</span>
+            </div>
+          )}
+          {diagnostics.architecture_mode && (
+            <div className="flex justify-between items-start">
+              <span className="flex items-center gap-1"><Layers className="w-3 h-3" /> Architecture</span>
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${
+                diagnostics.architecture_mode === 'subgraph'
+                  ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+                  : 'bg-surface-muted text-stone-400'
+              }`}>
+                {diagnostics.architecture_mode}
+              </span>
             </div>
           )}
         </div>
@@ -333,7 +345,7 @@ export const HistoricalCasesCount: React.FC<{ count?: number }> = ({ count }) =>
   if (count == null || count === 0) return null;
 
   return (
-    <div className="inline-flex items-center gap-1.5 text-[11px] text-gray-500">
+    <div className="inline-flex items-center gap-1.5 text-[11px] text-stone-500">
       <History className="w-3 h-3" />
       <span>{count} historical case{count > 1 ? 's' : ''} referenced</span>
     </div>

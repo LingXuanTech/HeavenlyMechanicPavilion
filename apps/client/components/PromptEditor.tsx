@@ -115,7 +115,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ onClose }) => {
         onClick={handleBackdropClick}
         className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center"
       >
-        <div className="bg-gray-900 rounded-xl p-8 text-white">
+        <div className="bg-surface-raised rounded-xl p-8 text-white">
           <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4" />
           <p>Loading prompts...</p>
         </div>
@@ -129,12 +129,12 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ onClose }) => {
         onClick={handleBackdropClick}
         className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center"
       >
-        <div className="bg-gray-900 rounded-xl p-8 text-white text-center">
+        <div className="bg-surface-raised rounded-xl p-8 text-white text-center">
           <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-4" />
           <p className="text-red-400">Failed to load prompts</p>
           <button
             onClick={onClose}
-            className="mt-4 px-4 py-2 bg-gray-700 rounded-lg hover:bg-gray-600"
+            className="mt-4 px-4 py-2 bg-surface-muted rounded-lg hover:bg-surface-muted"
           >
             Close
           </button>
@@ -150,14 +150,14 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ onClose }) => {
       onClick={handleBackdropClick}
       className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
     >
-      <div className="bg-gray-900 border border-gray-800 w-full max-w-6xl h-[90vh] rounded-xl flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-surface-raised border border-border w-full max-w-6xl h-[90vh] rounded-xl flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="shrink-0 p-4 border-b border-gray-800 bg-gray-950/50 flex justify-between items-center">
+        <div className="shrink-0 p-4 border-b border-border bg-surface/50 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <Bot className="w-6 h-6 text-purple-400" />
             <div>
               <h2 className="text-xl font-bold text-white">Prompt Editor</h2>
-              <p className="text-xs text-gray-500">{data?.path}</p>
+              <p className="text-xs text-stone-500">{data?.path}</p>
             </div>
           </div>
 
@@ -166,7 +166,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ onClose }) => {
             <button
               onClick={() => setShowApiKeyInput(!showApiKeyInput)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm transition-colors ${
-                apiKey ? 'bg-green-600/20 text-green-400 border border-green-600' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                apiKey ? 'bg-green-600/20 text-green-400 border border-green-600' : 'bg-surface-overlay text-stone-400 hover:bg-surface-muted'
               }`}
             >
               <Lock className="w-4 h-4" />
@@ -177,7 +177,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ onClose }) => {
             <button
               onClick={handleReload}
               disabled={reloadPromptsMutation.isPending}
-              className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 px-3 py-1.5 bg-surface-overlay text-stone-300 rounded-lg hover:bg-surface-muted transition-colors disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${reloadPromptsMutation.isPending ? 'animate-spin' : ''}`} />
               Reload
@@ -185,7 +185,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ onClose }) => {
 
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 p-2 rounded-full transition-colors"
+              className="text-stone-400 hover:text-stone-50 bg-surface-overlay hover:bg-surface-muted p-2 rounded-full transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -194,18 +194,18 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ onClose }) => {
 
         {/* API Key Input (Collapsible) */}
         {showApiKeyInput && (
-          <div className="shrink-0 p-3 bg-gray-950 border-b border-gray-800">
+          <div className="shrink-0 p-3 bg-surface border-b border-border">
             <div className="flex items-center gap-3 max-w-md">
               <input
                 type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="Enter API Key for write access..."
-                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                className="flex-1 bg-surface-overlay border border-border-strong rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-accent"
               />
               <button
                 onClick={() => setShowApiKeyInput(false)}
-                className="text-gray-500 hover:text-gray-300 text-sm"
+                className="text-stone-500 hover:text-stone-300 text-sm"
               >
                 Hide
               </button>
@@ -216,7 +216,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ onClose }) => {
         {/* Content */}
         <div className="flex-1 flex overflow-hidden">
           {/* Sidebar - Role List */}
-          <div className="w-64 shrink-0 border-r border-gray-800 overflow-y-auto bg-gray-950/50">
+          <div className="w-64 shrink-0 border-r border-border overflow-y-auto bg-surface/50">
             <div className="p-2">
               {roles.map((role) => {
                 const config = ROLE_CONFIG[role] || { icon: '🤖', color: 'gray', label: role };
@@ -230,7 +230,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ onClose }) => {
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-all ${
                       isSelected
                         ? 'bg-purple-600/20 border border-purple-500/50 text-white'
-                        : 'hover:bg-gray-800 text-gray-400 hover:text-white'
+                        : 'hover:bg-surface-overlay text-stone-400 hover:text-stone-50'
                     }`}
                   >
                     <span className="text-lg">{config.icon}</span>
@@ -252,7 +252,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ onClose }) => {
             {selectedRole && editedPrompts[selectedRole] ? (
               <>
                 {/* Editor Header */}
-                <div className="shrink-0 p-4 border-b border-gray-800 flex items-center justify-between">
+                <div className="shrink-0 p-4 border-b border-border flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">
                       {ROLE_CONFIG[selectedRole]?.icon || '🤖'}
@@ -261,14 +261,14 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ onClose }) => {
                       <h3 className="text-lg font-bold text-white">
                         {ROLE_CONFIG[selectedRole]?.label || selectedRole}
                       </h3>
-                      <p className="text-xs text-gray-500">Role: {selectedRole}</p>
+                      <p className="text-xs text-stone-500">Role: {selectedRole}</p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
                     {/* Save Status */}
                     {saveStatus === 'saving' && (
-                      <span className="text-sm text-gray-400 flex items-center gap-2">
+                      <span className="text-sm text-stone-400 flex items-center gap-2">
                         <RefreshCw className="w-4 h-4 animate-spin" /> Saving...
                       </span>
                     )}
@@ -299,49 +299,49 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ onClose }) => {
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
                   {/* System Prompt */}
                   <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-300">
-                      <FileText className="w-4 h-4 text-blue-400" />
+                    <label className="flex items-center gap-2 text-sm font-medium text-stone-300">
+                      <FileText className="w-4 h-4 text-accent" />
                       System Prompt
                     </label>
                     <textarea
                       value={editedPrompts[selectedRole].system}
                       onChange={(e) => handlePromptChange(selectedRole, 'system', e.target.value)}
-                      className="w-full h-48 bg-gray-950 border border-gray-700 rounded-lg p-4 text-sm text-gray-200 font-mono resize-y focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder-gray-600"
+                      className="w-full h-48 bg-surface border border-border-strong rounded-lg p-4 text-sm text-stone-200 font-mono resize-y focus:outline-none focus:ring-1 focus:ring-accent placeholder-gray-600"
                       placeholder="Enter system prompt..."
                     />
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-stone-500">
                       Defines the agent's role, personality, and constraints.
                     </p>
                   </div>
 
                   {/* User Prompt Template */}
                   <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-300">
+                    <label className="flex items-center gap-2 text-sm font-medium text-stone-300">
                       <User className="w-4 h-4 text-green-400" />
                       User Prompt Template
                     </label>
                     <textarea
                       value={editedPrompts[selectedRole].user}
                       onChange={(e) => handlePromptChange(selectedRole, 'user', e.target.value)}
-                      className="w-full h-64 bg-gray-950 border border-gray-700 rounded-lg p-4 text-sm text-gray-200 font-mono resize-y focus:outline-none focus:ring-1 focus:ring-purple-500 placeholder-gray-600"
+                      className="w-full h-64 bg-surface border border-border-strong rounded-lg p-4 text-sm text-stone-200 font-mono resize-y focus:outline-none focus:ring-1 focus:ring-accent placeholder-gray-600"
                       placeholder="Enter user prompt template... Use {variable} for placeholders."
                     />
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-stone-500">
                       Template for user messages. Use {'{symbol}'}, {'{data}'}, etc. as placeholders.
                     </p>
                   </div>
 
                   {/* Preview Section */}
-                  <div className="bg-gray-950/50 border border-gray-800 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-gray-400 mb-2">Character Count</h4>
+                  <div className="bg-surface/50 border border-border rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-stone-400 mb-2">Character Count</h4>
                     <div className="flex gap-6 text-xs">
-                      <span className="text-blue-400">
+                      <span className="text-accent">
                         System: {editedPrompts[selectedRole].system.length} chars
                       </span>
                       <span className="text-green-400">
                         User: {editedPrompts[selectedRole].user.length} chars
                       </span>
-                      <span className="text-gray-500">
+                      <span className="text-stone-500">
                         Total: {editedPrompts[selectedRole].system.length + editedPrompts[selectedRole].user.length} chars
                       </span>
                     </div>
@@ -349,7 +349,7 @@ const PromptEditor: React.FC<PromptEditorProps> = ({ onClose }) => {
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex items-center justify-center text-gray-500">
+              <div className="flex-1 flex items-center justify-center text-stone-500">
                 <div className="text-center">
                   <Bot className="w-16 h-16 mx-auto mb-4 opacity-30" />
                   <p>Select a role to edit its prompts</p>

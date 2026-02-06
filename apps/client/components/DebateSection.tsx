@@ -37,7 +37,7 @@ const DebateMeter: React.FC<{ debate: T.ResearcherDebate }> = ({ debate }) => {
       </div>
 
       {/* 力量条 */}
-      <div className="relative h-3 bg-gray-800 rounded-full overflow-hidden">
+      <div className="relative h-3 bg-surface-overlay rounded-full overflow-hidden">
         <div
           className="absolute left-0 top-0 h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-1000 ease-out"
           style={{ width: `${bullPercent}%` }}
@@ -58,7 +58,7 @@ const DebateMeter: React.FC<{ debate: T.ResearcherDebate }> = ({ debate }) => {
         <span className={`text-xs font-bold px-3 py-1 rounded-full ${
           debate.winner === 'Bull' ? 'bg-green-500/20 text-green-400' :
           debate.winner === 'Bear' ? 'bg-red-500/20 text-red-400' :
-          'bg-gray-500/20 text-gray-400'
+          'bg-stone-500/20 text-stone-400'
         }`}>
           {debate.winner === 'Bull' ? '🐮 多方胜出' : debate.winner === 'Bear' ? '🐻 空方胜出' : '⚖️ 势均力敌'}
         </span>
@@ -106,7 +106,7 @@ const DebateSection: React.FC<DebateSectionProps> = memo(({ debate }) => {
           <p className="text-sm font-semibold text-green-100 mb-3 italic leading-relaxed">"{debate.bull.thesis}"</p>
           <ul className="space-y-2">
             {(debate.bull.points || []).map((p: T.DebatePoint, i: number) => (
-              <li key={i} className="text-xs text-gray-300 flex gap-2 items-start">
+              <li key={i} className="text-xs text-stone-300 flex gap-2 items-start">
                 <span className="mt-1.5 w-1 h-1 rounded-full bg-green-500 shrink-0"></span>
                 <span>{p.argument}</span>
               </li>
@@ -132,7 +132,7 @@ const DebateSection: React.FC<DebateSectionProps> = memo(({ debate }) => {
           <p className="text-sm font-semibold text-red-100 mb-3 italic leading-relaxed">"{debate.bear.thesis}"</p>
           <ul className="space-y-2">
             {(debate.bear.points || []).map((p: T.DebatePoint, i: number) => (
-              <li key={i} className="text-xs text-gray-300 flex gap-2 items-start">
+              <li key={i} className="text-xs text-stone-300 flex gap-2 items-start">
                 <span className="mt-1.5 w-1 h-1 rounded-full bg-red-500 shrink-0"></span>
                 <span>{p.argument}</span>
               </li>
@@ -141,8 +141,8 @@ const DebateSection: React.FC<DebateSectionProps> = memo(({ debate }) => {
         </div>
       </div>
 
-      <div className="bg-gray-800/50 p-3 rounded text-xs text-gray-400 border-l-2 border-gray-600 italic">
-        <span className="font-bold text-gray-300 not-italic">Moderator Conclusion:</span> {debate.conclusion}
+      <div className="bg-surface-overlay/50 p-3 rounded text-xs text-stone-400 border-l-2 border-accent italic">
+        <span className="font-bold text-stone-300 not-italic">Moderator Conclusion:</span> {debate.conclusion}
       </div>
     </div>
   );

@@ -151,7 +151,7 @@ const DashboardPage: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
           {/* Loading State */}
           {isWatchlistLoading && (
-            <div className="flex items-center justify-center h-64 text-gray-500">Loading watchlist...</div>
+            <div className="flex items-center justify-center h-64 text-stone-500">Loading watchlist...</div>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
@@ -180,7 +180,7 @@ const DashboardPage: React.FC = () => {
 
             {/* Empty State */}
             {!isWatchlistLoading && filteredStocks.length === 0 && (
-              <div className="col-span-full h-64 flex flex-col items-center justify-center text-gray-600 border-2 border-dashed border-gray-800 rounded-lg">
+              <div className="col-span-full h-64 flex flex-col items-center justify-center text-stone-600 border-2 border-dashed border-border rounded-lg">
                 <p>No stocks in this filter.</p>
                 <p className="text-sm">Use the "AI Market Scout" in the sidebar to find stocks.</p>
               </div>
@@ -189,12 +189,12 @@ const DashboardPage: React.FC = () => {
         </div>
 
         {/* News Highlights Panel */}
-        <aside className="w-80 shrink-0 border-l border-gray-800 overflow-y-auto p-4 bg-gray-950/50 hidden xl:block">
+        <aside className="w-80 shrink-0 border-l border-border overflow-y-auto p-4 bg-surface/50 hidden xl:block">
           <NewsHighlightsPanel />
         </aside>
       </main>
 
-      <div className="pointer-events-none fixed bottom-0 left-80 right-0 h-32 bg-gradient-to-t from-gray-950 to-transparent z-10 xl:right-80"></div>
+      <div className="pointer-events-none fixed bottom-0 left-80 right-0 h-32 bg-gradient-to-t from-surface to-transparent z-10 xl:right-80"></div>
 
       {/* Detail Modal */}
       {selectedStock && (

@@ -13,7 +13,7 @@ import {
   refreshAggregatedNews,
   getNewsSources,
 } from '../services/api';
-import * as T from '../src/types/schema';
+import type * as T from '../src/types/schema';
 
 export const NEWS_AGGREGATOR_KEY = ['newsAggregator'];
 

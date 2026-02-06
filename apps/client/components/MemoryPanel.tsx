@@ -41,28 +41,28 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ symbol, onSelectMemory }) => 
   return (
     <div className="space-y-4">
       {/* Historical Memories */}
-      <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 bg-gray-950/50 border-b border-gray-800">
+      <div className="bg-surface-raised border border-border rounded-lg overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 bg-surface/50 border-b border-border">
           <div className="flex items-center gap-2">
             <History className="w-4 h-4 text-purple-400" />
             <span className="text-sm font-semibold text-white">Historical Analysis</span>
             {hasMemories && (
-              <span className="text-xs text-gray-500">({memories.length} records)</span>
+              <span className="text-xs text-stone-500">({memories.length} records)</span>
             )}
           </div>
           <button
             onClick={() => refetchMemories()}
-            className="p-1 hover:bg-gray-800 rounded transition-colors"
+            className="p-1 hover:bg-surface-overlay rounded transition-colors"
             title="刷新记忆"
           >
-            <RefreshCw className={`w-3 h-3 text-gray-400 ${memoriesLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-3 h-3 text-stone-400 ${memoriesLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
 
         <div className="p-4">
           {memoriesLoading ? (
             <div className="flex items-center justify-center py-6">
-              <RefreshCw className="w-5 h-5 text-gray-500 animate-spin" />
+              <RefreshCw className="w-5 h-5 text-stone-500 animate-spin" />
             </div>
           ) : hasMemories ? (
             <div className="space-y-2">
@@ -70,18 +70,18 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ symbol, onSelectMemory }) => 
                 <div
                   key={index}
                   onClick={() => onSelectMemory?.(item)}
-                  className="flex items-center justify-between p-3 bg-gray-950/50 rounded border border-gray-800 hover:border-purple-500/30 cursor-pointer transition-colors group"
+                  className="flex items-center justify-between p-3 bg-surface/50 rounded border border-border hover:border-purple-500/30 cursor-pointer transition-colors group"
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-xs px-2 py-0.5 rounded ${getSignalColor(item.memory.signal as string)}`}>
                         {item.memory.signal}
                       </span>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-stone-500">
                         {item.memory.confidence}% confidence
                       </span>
                     </div>
-                    <div className="flex items-center gap-3 text-[10px] text-gray-400">
+                    <div className="flex items-center gap-3 text-[10px] text-stone-400">
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
                         {item.memory.date}
@@ -91,16 +91,16 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ symbol, onSelectMemory }) => 
                         {(item.similarity * 100).toFixed(0)}% similar
                       </span>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1 truncate">
+                    <p className="text-xs text-stone-400 mt-1 truncate">
                       {item.memory.reasoning_summary}
                     </p>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-purple-400 transition-colors" />
+                  <ChevronRight className="w-4 h-4 text-stone-600 group-hover:text-purple-400 transition-colors" />
                 </div>
               ))}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-6 text-gray-500">
+            <div className="flex flex-col items-center justify-center py-6 text-stone-500">
               <Brain className="w-8 h-8 mb-2 opacity-50" />
               <p className="text-sm">No historical analysis found</p>
               <p className="text-xs mt-1">Run analysis to build memory</p>
@@ -111,8 +111,8 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ symbol, onSelectMemory }) => 
 
       {/* Reflection Report */}
       {(reflectionLoading || hasReflection) && (
-        <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-3 bg-gray-950/50 border-b border-gray-800">
+        <div className="bg-surface-raised border border-border rounded-lg overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 bg-surface/50 border-b border-border">
             <Lightbulb className="w-4 h-4 text-yellow-400" />
             <span className="text-sm font-semibold text-white">AI Reflection</span>
           </div>
@@ -120,14 +120,14 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ symbol, onSelectMemory }) => 
           <div className="p-4">
             {reflectionLoading ? (
               <div className="flex items-center justify-center py-4">
-                <RefreshCw className="w-5 h-5 text-gray-500 animate-spin" />
+                <RefreshCw className="w-5 h-5 text-stone-500 animate-spin" />
               </div>
             ) : reflection ? (
               <div className="space-y-4">
                 {/* Patterns */}
                 {reflection.patterns.length > 0 && (
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <div className="flex items-center gap-2 text-xs text-stone-400">
                       <BarChart3 className="w-3 h-3" />
                       <span>Identified Patterns</span>
                     </div>
@@ -135,9 +135,9 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ symbol, onSelectMemory }) => 
                       {reflection.patterns.map((pattern, i) => (
                         <div
                           key={i}
-                          className="flex items-start gap-2 text-xs text-gray-300 bg-gray-950/50 p-2 rounded"
+                          className="flex items-start gap-2 text-xs text-stone-300 bg-surface/50 p-2 rounded"
                         >
-                          <TrendingUp className="w-3 h-3 text-blue-400 mt-0.5 shrink-0" />
+                          <TrendingUp className="w-3 h-3 text-accent mt-0.5 shrink-0" />
                           <span>{pattern}</span>
                         </div>
                       ))}
@@ -148,7 +148,7 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ symbol, onSelectMemory }) => 
                 {/* Lessons */}
                 {reflection.lessons.length > 0 && (
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                    <div className="flex items-center gap-2 text-xs text-stone-400">
                       <AlertCircle className="w-3 h-3" />
                       <span>Key Lessons</span>
                     </div>
@@ -156,7 +156,7 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ symbol, onSelectMemory }) => 
                       {reflection.lessons.map((lesson, i) => (
                         <div
                           key={i}
-                          className="flex items-start gap-2 text-xs text-gray-300 bg-gray-950/50 p-2 rounded"
+                          className="flex items-start gap-2 text-xs text-stone-300 bg-surface/50 p-2 rounded"
                         >
                           <Lightbulb className="w-3 h-3 text-yellow-400 mt-0.5 shrink-0" />
                           <span>{lesson}</span>
@@ -168,8 +168,8 @@ const MemoryPanel: React.FC<MemoryPanelProps> = ({ symbol, onSelectMemory }) => 
 
                 {/* Confidence Adjustment */}
                 {reflection.confidence_adjustment !== 0 && (
-                  <div className="flex items-center justify-between p-3 bg-gray-950/50 rounded border border-gray-800">
-                    <span className="text-xs text-gray-400">Confidence Adjustment</span>
+                  <div className="flex items-center justify-between p-3 bg-surface/50 rounded border border-border">
+                    <span className="text-xs text-stone-400">Confidence Adjustment</span>
                     <span className={`text-sm font-bold ${
                       reflection.confidence_adjustment > 0 ? 'text-green-400' : 'text-red-400'
                     }`}>

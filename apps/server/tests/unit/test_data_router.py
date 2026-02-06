@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 import pandas as pd
 
-from services.data_router import MarketRouter, _price_cache
+from services.data_router import MarketRouter
 from api.exceptions import DataSourceError
 
 
@@ -53,26 +53,33 @@ class TestMarketIdentification:
 class TestPriceCache:
     """测试价格缓存行为"""
 
-    def test_cache_set_and_get(self, sample_stock_price, clear_price_cache):
+    @pytest.mark.asyncio
+    async def test_cache_set_and_get(self, sample_stock_price, clear_price_cache):
         """测试缓存设置和获取"""
-        MarketRouter._set_cached_price("AAPL", sample_stock_price)
-        cached = MarketRouter._get_cached_price("AAPL")
+        await MarketRouter._set_cached_price("AAPL", sample_stock_price)
+        cached = await MarketRouter._get_cached_price("AAPL")
         assert cached is not None
         assert cached.price == sample_stock_price.price
 
-    def test_cache_expiry(self, sample_stock_price, clear_price_cache):
+    @pytest.mark.asyncio
+    async def test_cache_expiry(self, sample_stock_price, clear_price_cache):
         """测试缓存过期"""
-        MarketRouter._set_cached_price("AAPL", sample_stock_price)
+        await MarketRouter._set_cached_price("AAPL", sample_stock_price)
 
         # 模拟缓存过期
-        _price_cache["AAPL"] = (sample_stock_price, datetime.now() - timedelta(seconds=120))
+        from services.cache_service import cache_service
+        from services.data_router import CACHE_KEY_PRICE
+        key = CACHE_KEY_PRICE.format(symbol="AAPL")
+        # 直接操作后端模拟过期
+        cache_service._backend._cache[key] = (sample_stock_price.json(), datetime.now() - timedelta(seconds=120))
 
-        cached = MarketRouter._get_cached_price("AAPL")
+        cached = await MarketRouter._get_cached_price("AAPL")
         assert cached is None
 
-    def test_cache_miss(self, clear_price_cache):
+    @pytest.mark.asyncio
+    async def test_cache_miss(self, clear_price_cache):
         """测试缓存未命中"""
-        cached = MarketRouter._get_cached_price("NONEXISTENT")
+        cached = await MarketRouter._get_cached_price("NONEXISTENT")
         assert cached is None
 
 
@@ -236,7 +243,7 @@ class TestFallbackMechanism:
     async def test_all_providers_fail_uses_cache(self, sample_stock_price, clear_price_cache):
         """所有数据源失败时使用缓存"""
         # 先设置缓存
-        MarketRouter._set_cached_price("AAPL", sample_stock_price)
+        await MarketRouter._set_cached_price("AAPL", sample_stock_price)
 
         with patch.object(MarketRouter, "_get_price_yfinance", side_effect=DataSourceError("yfinance", "Failed")):
             with patch.object(MarketRouter, "_get_price_alpha_vantage", side_effect=DataSourceError("alpha_vantage", "Failed")):

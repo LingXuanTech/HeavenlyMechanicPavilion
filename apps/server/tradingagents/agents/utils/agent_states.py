@@ -23,14 +23,21 @@ class AnalystType:
     POLICY = "policy"           # 政策分析
     FUND_FLOW = "fund_flow"     # 资金流向分析
 
+    # 迭代 6 新增分析师
+    VISION = "vision"           # 多模态图表分析
+    SUPPLY_CHAIN = "supply_chain"  # 产业链分析
+
     # 所有类型
-    ALL = [MARKET, FUNDAMENTALS, NEWS, SOCIAL, MACRO, SENTIMENT, POLICY, FUND_FLOW]
+    ALL = [MARKET, FUNDAMENTALS, NEWS, SOCIAL, MACRO, SENTIMENT, POLICY, FUND_FLOW, VISION, SUPPLY_CHAIN]
 
     # 核心类型（必须有报告）
     CORE = [MARKET, FUNDAMENTALS, NEWS, SOCIAL]
 
     # A股专属类型
     CN_ONLY = [SENTIMENT, POLICY, FUND_FLOW]
+
+    # 扩展类型（可选）
+    EXTENDED = [VISION, SUPPLY_CHAIN]
 
 
 # ============ 分析师报告字段映射 ============
@@ -45,6 +52,8 @@ ANALYST_REPORT_FIELDS = {
     AnalystType.SENTIMENT: "retail_sentiment_report",
     AnalystType.POLICY: "policy_report",
     AnalystType.FUND_FLOW: "china_flow_data",
+    AnalystType.VISION: "vision_report",
+    AnalystType.SUPPLY_CHAIN: "supply_chain_report",
 }
 
 
@@ -130,6 +139,10 @@ class AgentState(MessagesState):
 
     # A 股资金流向数据（北向资金 + 龙虎榜）
     china_flow_data: Annotated[str, "A-share fund flow data: north money + LHB analysis"]
+
+    # 迭代 6 新增报告字段
+    vision_report: Annotated[str, "Report from the Vision Analyst (chart/image analysis)"]
+    supply_chain_report: Annotated[str, "Report from the Supply Chain Analyst (industry chain analysis)"]
 
     # ============ Planner 相关字段 ============
     # Planner/Scout Agent 输出

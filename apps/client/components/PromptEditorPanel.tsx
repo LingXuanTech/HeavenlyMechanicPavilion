@@ -161,9 +161,9 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-gray-900 rounded-lg shadow-2xl w-full max-w-6xl h-[90vh] overflow-hidden border border-gray-700 m-4 flex flex-col">
+      <div className="bg-surface-raised rounded-lg shadow-2xl w-full max-w-6xl h-[90vh] overflow-hidden border border-border-strong m-4 flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 bg-gray-900/80">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-surface-raised/80">
           <div className="flex items-center gap-3">
             <span className="text-2xl">🎯</span>
             <h2 className="text-xl font-semibold text-white">Prompt 配置中心</h2>
@@ -172,13 +172,13 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
             <button
               onClick={() => refreshMutation.mutate()}
               disabled={refreshMutation.isPending}
-              className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+              className="px-3 py-1.5 text-sm bg-surface-muted hover:bg-surface-muted rounded-lg transition-colors"
             >
               {refreshMutation.isPending ? '刷新中...' : '🔄 刷新缓存'}
             </button>
             <button
               onClick={handleExport}
-              className="px-3 py-1.5 text-sm bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
+              className="px-3 py-1.5 text-sm bg-accent hover:bg-accent-hover rounded-lg transition-colors"
             >
               📥 导出 YAML
             </button>
@@ -190,7 +190,7 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
             </button>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white transition-colors text-xl"
+              className="text-stone-400 hover:text-stone-50 transition-colors text-xl"
             >
               ✕
             </button>
@@ -199,13 +199,13 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
 
         <div className="flex-1 flex overflow-hidden">
           {/* Left Sidebar - Prompt List */}
-          <div className="w-80 border-r border-gray-800 flex flex-col">
+          <div className="w-80 border-r border-border flex flex-col">
             {/* Category Filter */}
-            <div className="p-3 border-b border-gray-800">
+            <div className="p-3 border-b border-border">
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value as AgentCategory | 'all')}
-                className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm"
+                className="w-full bg-surface-overlay border border-border-strong rounded-lg px-3 py-2 text-sm"
               >
                 <option value="all">全部分类</option>
                 {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
@@ -219,9 +219,9 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
             {/* Prompt List */}
             <div className="flex-1 overflow-y-auto">
               {isLoadingList ? (
-                <div className="p-4 text-center text-gray-500">加载中...</div>
+                <div className="p-4 text-center text-stone-500">加载中...</div>
               ) : prompts.length === 0 ? (
-                <div className="p-4 text-center text-gray-500">暂无 Prompt</div>
+                <div className="p-4 text-center text-stone-500">暂无 Prompt</div>
               ) : (
                 <div className="divide-y divide-gray-800">
                   {prompts.map((prompt) => (
@@ -231,8 +231,8 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
                         setSelectedPromptId(prompt.id);
                         setEditMode(false);
                       }}
-                      className={`w-full p-3 text-left hover:bg-gray-800/50 transition-colors ${
-                        selectedPromptId === prompt.id ? 'bg-gray-800 border-l-2 border-blue-500' : ''
+                      className={`w-full p-3 text-left hover:bg-surface-overlay/50 transition-colors ${
+                        selectedPromptId === prompt.id ? 'bg-surface-overlay border-l-2 border-accent' : ''
                       }`}
                     >
                       <div className="flex items-center gap-2">
@@ -241,7 +241,7 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
                           {prompt.display_name}
                         </span>
                       </div>
-                      <div className="text-xs text-gray-500 mt-1 truncate">
+                      <div className="text-xs text-stone-500 mt-1 truncate">
                         {prompt.agent_key} · v{prompt.current_version}
                       </div>
                     </button>
@@ -254,35 +254,35 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
           {/* Right Panel - Prompt Detail/Editor */}
           <div className="flex-1 flex flex-col overflow-hidden">
             {!selectedPromptId ? (
-              <div className="flex-1 flex items-center justify-center text-gray-500">
+              <div className="flex-1 flex items-center justify-center text-stone-500">
                 <div className="text-center">
                   <div className="text-4xl mb-3">👈</div>
                   <p>选择左侧的 Prompt 进行查看或编辑</p>
                 </div>
               </div>
             ) : isLoadingDetail ? (
-              <div className="flex-1 flex items-center justify-center text-gray-500">
+              <div className="flex-1 flex items-center justify-center text-stone-500">
                 加载中...
               </div>
             ) : promptDetail ? (
               <>
                 {/* Detail Header */}
-                <div className="px-6 py-4 border-b border-gray-800 bg-gray-800/30">
+                <div className="px-6 py-4 border-b border-border bg-surface-overlay/30">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-lg font-semibold text-white">
                         {CATEGORY_ICONS[promptDetail.category]} {promptDetail.display_name}
                       </h3>
-                      <p className="text-sm text-gray-400 mt-1">{promptDetail.description}</p>
+                      <p className="text-sm text-stone-400 mt-1">{promptDetail.description}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="px-2 py-1 bg-gray-700 rounded text-xs">
+                      <span className="px-2 py-1 bg-surface-muted rounded text-xs">
                         v{promptDetail.current_version}
                       </span>
                       {!editMode ? (
                         <button
                           onClick={handleStartEdit}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition-colors"
+                          className="px-4 py-2 bg-accent hover:bg-accent-hover rounded-lg text-sm font-medium transition-colors"
                         >
                           ✏️ 编辑
                         </button>
@@ -290,7 +290,7 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
                         <div className="flex gap-2">
                           <button
                             onClick={handleCancelEdit}
-                            className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg text-sm font-medium transition-colors"
+                            className="px-4 py-2 bg-surface-muted hover:bg-surface-muted rounded-lg text-sm font-medium transition-colors"
                           >
                             取消
                           </button>
@@ -308,11 +308,11 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
 
                   {/* Variables */}
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <span className="text-xs text-gray-500">可用变量：</span>
+                    <span className="text-xs text-stone-500">可用变量：</span>
                     {(promptDetail.available_variables || []).map((v) => (
                       <code
                         key={v}
-                        className="px-2 py-0.5 bg-gray-700 rounded text-xs text-yellow-400"
+                        className="px-2 py-0.5 bg-surface-muted rounded text-xs text-yellow-400"
                       >
                         {'{'}
                         {v}
@@ -326,18 +326,18 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
                   {/* System Prompt */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-stone-300 mb-2">
                       系统提示词 (System Prompt)
                     </label>
                     {editMode ? (
                       <textarea
                         value={editedSystemPrompt}
                         onChange={(e) => setEditedSystemPrompt(e.target.value)}
-                        className="w-full h-64 bg-gray-800 border border-gray-700 rounded-lg p-4 text-sm font-mono resize-none focus:border-blue-500 focus:outline-none"
+                        className="w-full h-64 bg-surface-overlay border border-border-strong rounded-lg p-4 text-sm font-mono resize-none focus:border-accent focus:outline-none"
                         placeholder="输入系统提示词..."
                       />
                     ) : (
-                      <pre className="w-full bg-gray-800/50 border border-gray-700 rounded-lg p-4 text-sm font-mono whitespace-pre-wrap text-gray-300 max-h-64 overflow-y-auto">
+                      <pre className="w-full bg-surface-overlay/50 border border-border-strong rounded-lg p-4 text-sm font-mono whitespace-pre-wrap text-stone-300 max-h-64 overflow-y-auto">
                         {promptDetail.system_prompt || '(空)'}
                       </pre>
                     )}
@@ -345,18 +345,18 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
 
                   {/* User Prompt Template */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                    <label className="block text-sm font-medium text-stone-300 mb-2">
                       用户消息模板 (User Prompt Template)
                     </label>
                     {editMode ? (
                       <textarea
                         value={editedUserPrompt}
                         onChange={(e) => setEditedUserPrompt(e.target.value)}
-                        className="w-full h-32 bg-gray-800 border border-gray-700 rounded-lg p-4 text-sm font-mono resize-none focus:border-blue-500 focus:outline-none"
+                        className="w-full h-32 bg-surface-overlay border border-border-strong rounded-lg p-4 text-sm font-mono resize-none focus:border-accent focus:outline-none"
                         placeholder="输入用户消息模板..."
                       />
                     ) : (
-                      <pre className="w-full bg-gray-800/50 border border-gray-700 rounded-lg p-4 text-sm font-mono whitespace-pre-wrap text-gray-300">
+                      <pre className="w-full bg-surface-overlay/50 border border-border-strong rounded-lg p-4 text-sm font-mono whitespace-pre-wrap text-stone-300">
                         {promptDetail.user_prompt_template || '(空)'}
                       </pre>
                     )}
@@ -365,14 +365,14 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
                   {/* Change Note (only in edit mode) */}
                   {editMode && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-stone-300 mb-2">
                         变更说明 (可选)
                       </label>
                       <input
                         type="text"
                         value={changeNote}
                         onChange={(e) => setChangeNote(e.target.value)}
-                        className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                        className="w-full bg-surface-overlay border border-border-strong rounded-lg px-4 py-2 text-sm focus:border-accent focus:outline-none"
                         placeholder="描述本次修改的内容..."
                       />
                     </div>
@@ -381,10 +381,10 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
                   {/* Version History */}
                   {!editMode && (promptDetail.version_history?.length || 0) > 0 && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                      <label className="block text-sm font-medium text-stone-300 mb-2">
                         版本历史
                       </label>
-                      <div className="bg-gray-800/50 border border-gray-700 rounded-lg divide-y divide-gray-700">
+                      <div className="bg-surface-overlay/50 border border-border-strong rounded-lg divide-y divide-gray-700">
                         {(promptDetail.version_history || []).map((v) => (
                           <div
                             key={v.version}
@@ -392,11 +392,11 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
                           >
                             <div>
                               <span className="text-sm font-medium">v{v.version}</span>
-                              <span className="text-xs text-gray-500 ml-3">
+                              <span className="text-xs text-stone-500 ml-3">
                                 {new Date(v.created_at).toLocaleString()}
                               </span>
                               {v.change_note && (
-                                <p className="text-xs text-gray-400 mt-1">{v.change_note}</p>
+                                <p className="text-xs text-stone-400 mt-1">{v.change_note}</p>
                               )}
                             </div>
                             <button
@@ -404,7 +404,7 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
                                 rollbackMutation.mutate({ id: promptDetail.id, version: v.version })
                               }
                               disabled={rollbackMutation.isPending}
-                              className="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+                              className="px-3 py-1 text-xs bg-surface-muted hover:bg-surface-muted rounded transition-colors"
                             >
                               回滚
                             </button>
@@ -423,12 +423,12 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
       {/* YAML Import Modal */}
       {showYamlImport && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60]">
-          <div className="bg-gray-900 rounded-lg shadow-2xl w-full max-w-2xl p-6 border border-gray-700 m-4">
+          <div className="bg-surface-raised rounded-lg shadow-2xl w-full max-w-2xl p-6 border border-border-strong m-4">
             <h3 className="text-lg font-semibold text-white mb-4">导入 YAML</h3>
             <textarea
               value={yamlContent}
               onChange={(e) => setYamlContent(e.target.value)}
-              className="w-full h-80 bg-gray-800 border border-gray-700 rounded-lg p-4 text-sm font-mono resize-none focus:border-blue-500 focus:outline-none"
+              className="w-full h-80 bg-surface-overlay border border-border-strong rounded-lg p-4 text-sm font-mono resize-none focus:border-accent focus:outline-none"
               placeholder="粘贴 YAML 内容..."
             />
             <div className="flex justify-end gap-3 mt-4">
@@ -437,7 +437,7 @@ const PromptEditorPanel: React.FC<PromptEditorPanelProps> = ({ onClose }) => {
                   setShowYamlImport(false);
                   setYamlContent('');
                 }}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm"
+                className="px-4 py-2 bg-surface-muted hover:bg-surface-muted rounded-lg text-sm"
               >
                 取消
               </button>

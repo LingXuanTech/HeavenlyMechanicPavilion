@@ -1,5 +1,4 @@
-"""工具模块"""
 
-from .ttl_cache import TTLCache
+from services.cache_service import cache_service
 
-__all__ = ["TTLCache"]
+__all__ = ["cache_service"]

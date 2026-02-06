@@ -53,7 +53,7 @@ const CATEGORY_COLORS: Record<T.NewsCategory, string> = {
   ipo: 'bg-pink-500/20 text-pink-400 border-pink-500/30',
   forex: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
   crypto: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-  general: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+  general: 'bg-stone-500/20 text-stone-400 border-stone-500/30',
 };
 
 // === 辅助组件 ===
@@ -65,7 +65,7 @@ const SentimentIcon: React.FC<{ sentiment: T.NewsSentiment }> = ({ sentiment }) 
     case 'negative':
       return <TrendingDown className="w-4 h-4 text-red-400" />;
     default:
-      return <Minus className="w-4 h-4 text-gray-400" />;
+      return <Minus className="w-4 h-4 text-stone-400" />;
   }
 };
 
@@ -90,7 +90,7 @@ const TimeAgo: React.FC<{ timestamp: string }> = ({ timestamp }) => {
   };
 
   return (
-    <span className="text-xs text-gray-500 flex items-center gap-1">
+    <span className="text-xs text-stone-500 flex items-center gap-1">
       <Clock className="w-3 h-3" />
       {getTimeAgo(timestamp)}
     </span>
@@ -102,36 +102,36 @@ const NewsCard: React.FC<{ news: T.AggregatedNewsItem }> = ({ news }) => (
     href={news.url}
     target="_blank"
     rel="noopener noreferrer"
-    className="block p-4 bg-gray-800/50 hover:bg-gray-800/70 rounded-xl border border-gray-700 hover:border-gray-600 transition-all group"
+    className="block p-4 bg-surface-overlay/50 hover:bg-surface-overlay/70 rounded-xl border border-border-strong hover:border-stone-600 transition-all group"
   >
     <div className="flex items-start gap-3">
       <SentimentIcon sentiment={news.sentiment} />
       <div className="flex-1 min-w-0">
-        <h3 className="text-white font-medium text-sm leading-snug group-hover:text-blue-300 transition-colors line-clamp-2">
+        <h3 className="text-white font-medium text-sm leading-snug group-hover:text-accent transition-colors line-clamp-2">
           {news.title}
         </h3>
         {news.summary && (
-          <p className="text-gray-400 text-xs mt-2 line-clamp-2">{news.summary}</p>
+          <p className="text-stone-400 text-xs mt-2 line-clamp-2">{news.summary}</p>
         )}
         <div className="flex items-center justify-between mt-3">
           <div className="flex items-center gap-2">
             <CategoryBadge category={news.category} />
-            <span className="text-xs text-gray-500">{news.source}</span>
+            <span className="text-xs text-stone-500">{news.source}</span>
           </div>
           <div className="flex items-center gap-2">
             <TimeAgo timestamp={news.published_at} />
-            <ExternalLink className="w-3.5 h-3.5 text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+            <ExternalLink className="w-3.5 h-3.5 text-stone-500 opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
         </div>
         {news.symbols.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {news.symbols.slice(0, 5).map((symbol) => (
-              <span key={symbol} className="text-[10px] px-1.5 py-0.5 bg-gray-700 text-gray-300 rounded">
+              <span key={symbol} className="text-[10px] px-1.5 py-0.5 bg-surface-muted text-stone-300 rounded">
                 {symbol}
               </span>
             ))}
             {news.symbols.length > 5 && (
-              <span className="text-[10px] text-gray-500">+{news.symbols.length - 5}</span>
+              <span className="text-[10px] text-stone-500">+{news.symbols.length - 5}</span>
             )}
           </div>
         )}
@@ -145,20 +145,20 @@ const FlashNewsItem: React.FC<{ news: T.AggregatedNewsItem }> = ({ news }) => (
     href={news.url}
     target="_blank"
     rel="noopener noreferrer"
-    className="flex items-start gap-2 p-3 bg-gray-800/30 hover:bg-gray-800/50 rounded-lg border border-gray-700/50 hover:border-gray-600/50 transition-all group"
+    className="flex items-start gap-2 p-3 bg-surface-overlay/30 hover:bg-surface-overlay/50 rounded-lg border border-border-strong/50 hover:border-stone-600/50 transition-all group"
   >
     <Zap className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
     <div className="flex-1 min-w-0">
-      <p className="text-sm text-gray-200 group-hover:text-white transition-colors line-clamp-2">
+      <p className="text-sm text-stone-200 group-hover:text-white transition-colors line-clamp-2">
         {news.title}
       </p>
       <div className="flex items-center gap-2 mt-1">
         <TimeAgo timestamp={news.published_at} />
-        <span className="text-xs text-gray-600">|</span>
-        <span className="text-xs text-gray-500">{news.source}</span>
+        <span className="text-xs text-stone-600">|</span>
+        <span className="text-xs text-stone-500">{news.source}</span>
       </div>
     </div>
-    <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-gray-400 shrink-0" />
+    <ChevronRight className="w-4 h-4 text-stone-600 group-hover:text-stone-400 shrink-0" />
   </a>
 );
 
@@ -226,11 +226,11 @@ const NewsPage: React.FC = () => {
       ]}
     >
       {/* Filters */}
-      <div className="shrink-0 px-6 py-3 border-b border-gray-800 bg-gray-900/30">
+      <div className="shrink-0 px-6 py-3 border-b border-border bg-surface-raised/30">
         <div className="flex items-center gap-4 overflow-x-auto custom-scrollbar pb-1">
           <div className="flex items-center gap-2 shrink-0">
-            <Filter className="w-4 h-4 text-gray-500" />
-            <span className="text-xs text-gray-500">分类:</span>
+            <Filter className="w-4 h-4 text-stone-500" />
+            <span className="text-xs text-stone-500">分类:</span>
           </div>
           <div className="flex gap-1">
             {categories.map((cat) => (
@@ -239,8 +239,8 @@ const NewsPage: React.FC = () => {
                 onClick={() => setSelectedCategory(cat)}
                 className={`px-3 py-1.5 text-xs rounded-lg whitespace-nowrap transition-colors ${
                   selectedCategory === cat
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800 hover:text-white'
+                    ? 'bg-accent text-white'
+                    : 'bg-surface-overlay/50 text-stone-400 hover:bg-surface-overlay hover:text-white'
                 }`}
               >
                 {cat === 'all' ? '全部' : CATEGORY_LABELS[cat]}
@@ -248,10 +248,10 @@ const NewsPage: React.FC = () => {
             ))}
           </div>
 
-          <div className="h-6 w-px bg-gray-700 shrink-0" />
+          <div className="h-6 w-px bg-border-strong shrink-0" />
 
           <div className="flex items-center gap-2 shrink-0">
-            <span className="text-xs text-gray-500">情感:</span>
+            <span className="text-xs text-stone-500">情感:</span>
           </div>
           <div className="flex gap-1">
             {(['all', 'positive', 'negative', 'neutral'] as const).map((sent) => (
@@ -260,8 +260,8 @@ const NewsPage: React.FC = () => {
                 onClick={() => setSelectedSentiment(sent)}
                 className={`px-3 py-1.5 text-xs rounded-lg whitespace-nowrap transition-colors flex items-center gap-1 ${
                   selectedSentiment === sent
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800 hover:text-white'
+                    ? 'bg-accent text-white'
+                    : 'bg-surface-overlay/50 text-stone-400 hover:bg-surface-overlay hover:text-white'
                 }`}
               >
                 {sent === 'all' && '全部'}
@@ -280,10 +280,10 @@ const NewsPage: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+              <Loader2 className="w-8 h-8 animate-spin text-accent" />
             </div>
           ) : filteredNews.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+            <div className="flex flex-col items-center justify-center h-64 text-stone-500">
               <AlertCircle className="w-12 h-12 mb-3" />
               <p>暂无新闻数据</p>
               <p className="text-sm mt-1">尝试刷新或切换筛选条件</p>
@@ -298,22 +298,22 @@ const NewsPage: React.FC = () => {
         </div>
 
         {/* Flash News Sidebar */}
-        <aside className="w-80 shrink-0 border-l border-gray-800 bg-gray-900/30 overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-gray-800">
+        <aside className="w-80 shrink-0 border-l border-border bg-surface-raised/30 overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-border">
             <h2 className="text-white font-medium flex items-center gap-2">
               <Zap className="w-4 h-4 text-amber-400" />
               快讯
             </h2>
-            <p className="text-xs text-gray-500 mt-1">实时市场快讯</p>
+            <p className="text-xs text-stone-500 mt-1">实时市场快讯</p>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
             {isFlashLoading ? (
               <div className="flex items-center justify-center py-10">
-                <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
               </div>
             ) : flashNews.length === 0 ? (
-              <div className="text-center py-10 text-gray-500 text-sm">
+              <div className="text-center py-10 text-stone-500 text-sm">
                 暂无快讯
               </div>
             ) : (

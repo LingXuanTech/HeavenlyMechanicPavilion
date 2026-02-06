@@ -14,9 +14,28 @@ import akshare as ak
 import pandas as pd
 import asyncio
 
-from utils import TTLCache
-
 logger = structlog.get_logger(__name__)
+
+
+class _SimpleTTLCache:
+    """简单的内存 TTL 缓存（替代已删除的 utils.TTLCache）"""
+
+    def __init__(self, default_ttl: int = 3600):
+        self._data: Dict[str, Any] = {}
+        self._expiry: Dict[str, datetime] = {}
+        self._ttl = default_ttl
+
+    def get(self, key: str) -> Any:
+        if key in self._data:
+            if datetime.now() < self._expiry[key]:
+                return self._data[key]
+            del self._data[key]
+            del self._expiry[key]
+        return None
+
+    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
+        self._data[key] = value
+        self._expiry[key] = datetime.now() + timedelta(seconds=ttl or self._ttl)
 
 
 # ============ 数据模型 ============
@@ -70,7 +89,7 @@ class JiejinService:
     """限售解禁预警服务"""
 
     def __init__(self):
-        self._cache = TTLCache(default_ttl=3600)  # 1 小时缓存（解禁数据变化不频繁）
+        self._cache = _SimpleTTLCache(default_ttl=3600)  # 1 小时缓存（解禁数据变化不频繁）
 
     def _evaluate_pressure(self, jiejin_ratio: float, jiejin_market_value: float) -> str:
         """评估解禁压力等级

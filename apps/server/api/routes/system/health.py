@@ -55,11 +55,23 @@ async def get_full_health_report(force_refresh: bool = Query(False)):
     """
     获取完整健康报告
 
-    返回所有组件的健康状态、系统指标和最近错误。
+    返回所有组件的健康状态、系统指标、数据源状态和最近错误。
     """
     try:
         report = await health_monitor.get_health_report(force_refresh)
-        return report
+        uptime_info = health_monitor.get_uptime()
+
+        # 转换为 API Schema
+        return HealthReport(
+            overall_status=report.overall_status,
+            uptime_seconds=int(report.uptime_seconds),
+            uptime_formatted=uptime_info["uptime_formatted"],
+            components=report.components,
+            metrics=report.system_metrics,
+            data_providers=report.data_providers,
+            recent_errors=report.recent_errors,
+            timestamp=report.checked_at
+        )
 
     except Exception as e:
         logger.error("Failed to get health report", error=str(e))
@@ -263,3 +275,30 @@ async def reset_api_metrics():
     """
     api_metrics.reset()
     return {"status": "success", "message": "API metrics reset"}
+
+
+@router.post("/reset-circuit-breaker/{provider}")
+async def reset_circuit_breaker(provider: str):
+    """
+    重置指定数据源的熔断状态
+    """
+    try:
+        from services.data_router import MarketRouter
+
+        if provider == "all":
+            MarketRouter.reset_all_providers()
+            return {"status": "success", "message": "所有数据源熔断已重置"}
+
+        # 验证 provider 是否有效
+        valid_providers = ["akshare", "yfinance", "alpha_vantage"]
+        if provider not in valid_providers:
+            raise HTTPException(status_code=400, detail=f"无效的数据源: {provider}")
+
+        MarketRouter.reset_provider(provider)
+        return {"status": "success", "message": f"数据源 {provider} 熔断已重置"}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to reset circuit breaker", provider=provider, error=str(e))
+        raise HTTPException(status_code=500, detail=f"重置熔断失败: {str(e)}")

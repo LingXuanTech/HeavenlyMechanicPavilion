@@ -71,9 +71,9 @@ const VARIANT_MAX_WIDTH: Record<PageLayoutVariant, string> = {
 // === 按钮变体样式 ===
 
 const ACTION_BUTTON_STYLES = {
-  primary: 'bg-blue-600 hover:bg-blue-500 text-white',
-  secondary: 'bg-gray-700 hover:bg-gray-600 text-white',
-  ghost: 'text-gray-400 hover:text-white hover:bg-gray-800',
+  primary: 'bg-accent hover:bg-accent-hover text-stone-950',
+  secondary: 'bg-surface-overlay hover:bg-surface-muted text-stone-200',
+  ghost: 'text-stone-400 hover:text-stone-50 hover:bg-surface-overlay',
 };
 
 // === 主组件 ===
@@ -82,8 +82,8 @@ const PageLayout: React.FC<PageLayoutProps> = ({
   title,
   subtitle,
   icon: Icon,
-  iconColor = 'text-blue-400',
-  iconBgColor = 'bg-blue-500/10',
+  iconColor = 'text-accent',
+  iconBgColor = 'bg-accent/10',
   variant = 'standard',
   showBack = true,
   backPath = '/',
@@ -126,13 +126,13 @@ const PageLayout: React.FC<PageLayoutProps> = ({
 
   // 渲染 Header
   const renderHeader = () => (
-    <header className="shrink-0 px-6 py-4 border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm">
+    <header className="shrink-0 px-6 py-4 border-b border-border bg-surface-raised/50 backdrop-blur-sm">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           {showBack && (
             <button
               onClick={() => navigate(backPath)}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
+              className="p-2 hover:bg-surface-overlay rounded-lg transition-colors text-stone-400 hover:text-stone-50"
               aria-label="返回"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -147,7 +147,7 @@ const PageLayout: React.FC<PageLayoutProps> = ({
             <div>
               <h1 className="text-xl font-bold text-white">{title}</h1>
               {subtitle && (
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-stone-500">
                   {typeof subtitle === 'string' ? subtitle : subtitle}
                 </div>
               )}
@@ -167,7 +167,7 @@ const PageLayout: React.FC<PageLayoutProps> = ({
         {renderHeader()}
         <div className="flex-1 flex overflow-hidden">
           {/* 左侧面板 */}
-          <div className={`${splitLeftWidth} border-r border-gray-800 flex flex-col shrink-0 overflow-hidden`}>
+          <div className={`${splitLeftWidth} border-r border-border flex flex-col shrink-0 overflow-hidden`}>
             {splitLeft}
           </div>
           {/* 右侧内容 */}
@@ -211,19 +211,19 @@ export const PageSection: React.FC<PageSectionProps> = ({
   title,
   subtitle,
   icon: Icon,
-  iconColor = 'text-gray-400',
+  iconColor = 'text-stone-400',
   children,
   className = '',
   action,
 }) => (
-  <section className={`bg-gray-800/30 rounded-xl border border-gray-700 overflow-hidden ${className}`}>
+  <section className={`bg-surface-overlay/30 rounded-xl border border-border-strong overflow-hidden ${className}`}>
     {(title || action) && (
-      <div className="px-5 py-4 border-b border-gray-700/50 flex items-center justify-between">
+      <div className="px-5 py-4 border-b border-border-strong/50 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {Icon && <Icon className={`w-5 h-5 ${iconColor}`} />}
           <div>
             {title && <h3 className="font-medium text-white">{title}</h3>}
-            {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
+            {subtitle && <p className="text-xs text-stone-500 mt-0.5">{subtitle}</p>}
           </div>
         </div>
         {action}
@@ -249,17 +249,17 @@ export const StatCard: React.FC<StatCardProps> = ({
   label,
   value,
   icon: Icon,
-  iconColor = 'text-gray-400',
+  iconColor = 'text-stone-400',
   valueColor = 'text-white',
   subtitle,
 }) => (
-  <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+  <div className="bg-surface-overlay/50 rounded-xl p-4 border border-border-strong">
     <div className="flex items-center justify-between mb-2">
-      <span className="text-sm text-gray-400">{label}</span>
+      <span className="text-sm text-stone-400">{label}</span>
       {Icon && <Icon className={`w-4 h-4 ${iconColor}`} />}
     </div>
     <div className={`text-2xl font-bold ${valueColor}`}>{value}</div>
-    {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+    {subtitle && <p className="text-xs text-stone-500 mt-1">{subtitle}</p>}
   </div>
 );
 
@@ -278,10 +278,10 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   description,
   action,
 }) => (
-  <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+  <div className="flex flex-col items-center justify-center py-16 text-stone-500">
     {Icon && <Icon className="w-12 h-12 mb-4 opacity-50" />}
     <p className="text-lg font-medium">{title}</p>
-    {description && <p className="text-sm mt-1 text-gray-600">{description}</p>}
+    {description && <p className="text-sm mt-1 text-stone-600">{description}</p>}
     {action && <div className="mt-4">{action}</div>}
   </div>
 );
@@ -293,7 +293,7 @@ interface LoadingStateProps {
 }
 
 export const LoadingState: React.FC<LoadingStateProps> = ({ message = '加载中...' }) => (
-  <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+  <div className="flex flex-col items-center justify-center py-16 text-stone-500">
     <Loader2 className="w-8 h-8 animate-spin mb-4" />
     <p className="text-sm">{message}</p>
   </div>

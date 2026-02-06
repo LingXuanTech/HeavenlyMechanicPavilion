@@ -33,13 +33,13 @@ interface StockDetailModalProps {
 const WorkflowStep: React.FC<{ icon: React.ReactNode; label: string; active?: boolean; completed?: boolean }> = ({ icon, label, active, completed }) => (
   <div className={`flex flex-col items-center gap-2 relative z-10 ${active ? 'opacity-100 scale-110' : 'opacity-60'} transition-all`}>
     <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 ${
-      completed ? 'bg-blue-600 border-blue-500 text-white' :
-      active ? 'bg-blue-900/50 border-blue-400 text-blue-300 animate-pulse' :
-      'bg-gray-800 border-gray-700 text-gray-500'
+      completed ? 'bg-accent border-accent text-white' :
+      active ? 'bg-accent/10 border-accent text-accent animate-pulse' :
+      'bg-surface-overlay border-border-strong text-stone-500'
     }`}>
       {completed ? <CheckCircle2 className="w-4 h-4" /> : icon}
     </div>
-    <span className={`text-[10px] font-bold uppercase tracking-wider ${active || completed ? 'text-blue-200' : 'text-gray-600'}`}>
+    <span className={`text-[10px] font-bold uppercase tracking-wider ${active || completed ? 'text-amber-200' : 'text-stone-600'}`}>
       {label}
     </span>
   </div>
@@ -180,15 +180,15 @@ ${full_report.reasoning}`;
       onClick={handleBackdropClick}
       className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
     >
-      <div className="bg-gray-900 border border-gray-800 w-full max-w-6xl h-[95vh] rounded-xl flex flex-col shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-200">
+      <div className="bg-surface-raised border border-border w-full max-w-6xl h-[95vh] rounded-xl flex flex-col shadow-2xl overflow-hidden relative animate-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <div className="shrink-0 p-6 border-b border-gray-800 bg-gray-950/50 flex justify-between items-start">
+        <div className="shrink-0 p-6 border-b border-border bg-surface/50 flex justify-between items-start">
            <div className="flex items-center gap-4">
               <div>
                 <h2 className="text-2xl font-bold text-white flex items-center gap-3">
                   {stock.symbol}
-                  <span className="text-sm font-normal text-gray-400 bg-gray-800 px-2 py-1 rounded-md">
+                  <span className="text-sm font-normal text-stone-400 bg-surface-overlay px-2 py-1 rounded-md">
                     {priceData?.market || 'N/A'}
                   </span>
                   {/* Analysis Level Badge */}
@@ -196,11 +196,11 @@ ${full_report.reasoning}`;
                     <AnalysisLevelBadge level={analysis.ui_hints.analysis_level as 'L1' | 'L2'} />
                   )}
                 </h2>
-                <p className="text-gray-400">{stock.name}</p>
+                <p className="text-stone-400">{stock.name}</p>
               </div>
               
               {priceData && (
-                <div className="hidden sm:block pl-6 border-l border-gray-800 ml-2">
+                <div className="hidden sm:block pl-6 border-l border-border ml-2">
                    <div className="text-2xl font-mono font-bold text-white">{priceData.price.toFixed(2)}</div>
                    <div className={`text-sm font-bold ${isUp ? 'text-green-400' : 'text-red-400'}`}>
                       {priceData.change > 0 ? '+' : ''}{priceData.change.toFixed(2)} ({priceData.change_percent.toFixed(2)}%)
@@ -211,16 +211,16 @@ ${full_report.reasoning}`;
 
            <div className="flex items-center gap-4">
              {/* Tab Switcher */}
-             <div className="bg-gray-800 p-1 rounded-lg flex gap-1">
+             <div className="bg-surface-overlay p-1 rounded-lg flex gap-1">
                 <button 
                   onClick={() => setActiveTab('report')}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${activeTab === 'report' ? 'bg-gray-700 text-white shadow' : 'text-gray-400 hover:text-gray-200'}`}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${activeTab === 'report' ? 'bg-surface-muted text-white shadow' : 'text-stone-400 hover:text-stone-200'}`}
                 >
                   <FileText className="w-4 h-4" /> Report
                 </button>
                 <button 
                   onClick={() => setActiveTab('chat')}
-                  className={`px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${activeTab === 'chat' ? 'bg-blue-600 text-white shadow' : 'text-gray-400 hover:text-gray-200'}`}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${activeTab === 'chat' ? 'bg-accent text-white shadow' : 'text-stone-400 hover:text-stone-200'}`}
                 >
                   <MessageSquare className="w-4 h-4" /> Ask Agent
                 </button>
@@ -228,7 +228,7 @@ ${full_report.reasoning}`;
              
              <button 
                 onClick={onClose}
-                className="text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 p-2 rounded-full transition-colors"
+                className="text-stone-400 hover:text-stone-50 bg-surface-overlay hover:bg-surface-muted p-2 rounded-full transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -237,10 +237,10 @@ ${full_report.reasoning}`;
 
         {/* Agent Workflow Visualization */}
         {analysis && (
-            <div className="bg-gray-950/80 border-b border-gray-800 py-3 px-6">
+            <div className="bg-surface/80 border-b border-border py-3 px-6">
                 <div className="flex justify-between items-center max-w-3xl mx-auto relative">
                     {/* Connecting Line */}
-                    <div className="absolute top-4 left-0 right-0 h-0.5 bg-gray-800 -z-0"></div>
+                    <div className="absolute top-4 left-0 right-0 h-0.5 bg-surface-overlay -z-0"></div>
 
                     <WorkflowStep icon={<Search className="w-4 h-4" />} label="Analyst Team" completed />
                     <WorkflowStep icon={<Swords className="w-4 h-4" />} label="Bull/Bear Debate" completed />
@@ -252,7 +252,7 @@ ${full_report.reasoning}`;
 
         {/* Agentic UI Alerts & Key Metrics */}
         {analysis?.ui_hints && (
-          <div className="px-6 py-3 space-y-3 border-b border-gray-800/50 bg-gray-900/30">
+          <div className="px-6 py-3 space-y-3 border-b border-border/50 bg-surface-raised/30">
             {/* Alert Banner */}
             <AlertBanner hints={analysis.ui_hints} />
 
@@ -279,18 +279,18 @@ ${full_report.reasoning}`;
                 {/* --- LEFT COLUMN: Chart & Deep Dive --- */}
                 <div className="lg:col-span-2 space-y-6">
                     {/* 图表区域 - 支持全屏 */}
-                    <div className={`bg-gray-950 rounded-lg border border-gray-800 overflow-hidden ${
+                    <div className={`bg-surface rounded-lg border border-border overflow-hidden ${
                       isChartFullscreen ? 'fixed inset-0 z-[60] rounded-none' : ''
                     }`}>
                       {/* 图表类型切换栏 */}
-                      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-gray-800 bg-gray-900/50">
-                        <div className="flex bg-gray-800 rounded-md p-0.5">
+                      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-surface-raised/50">
+                        <div className="flex bg-surface-overlay rounded-md p-0.5">
                           <button
                             onClick={() => setChartType('candlestick')}
                             className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-all ${
                               chartType === 'candlestick'
-                                ? 'bg-gray-700 text-white'
-                                : 'text-gray-400 hover:text-gray-200'
+                                ? 'bg-surface-muted text-white'
+                                : 'text-stone-400 hover:text-stone-200'
                             }`}
                             title="K 线图"
                           >
@@ -300,20 +300,20 @@ ${full_report.reasoning}`;
                             onClick={() => setChartType('area')}
                             className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-all ${
                               chartType === 'area'
-                                ? 'bg-gray-700 text-white'
-                                : 'text-gray-400 hover:text-gray-200'
+                                ? 'bg-surface-muted text-white'
+                                : 'text-stone-400 hover:text-stone-200'
                             }`}
                             title="面积图"
                           >
                             <LineChart className="w-3 h-3" />
                           </button>
                         </div>
-                        <div className="w-px h-4 bg-gray-700" />
-                        <span className="text-xs text-gray-500">{stock.symbol} · {priceData?.market || 'N/A'}</span>
+                        <div className="w-px h-4 bg-surface-muted" />
+                        <span className="text-xs text-stone-500">{stock.symbol} · {priceData?.market || 'N/A'}</span>
                         {isChartFullscreen && (
                           <button
                             onClick={toggleChartFullscreen}
-                            className="ml-auto px-2 py-1 text-xs text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 rounded transition-colors"
+                            className="ml-auto px-2 py-1 text-xs text-stone-400 hover:text-stone-50 bg-surface-overlay hover:bg-surface-muted rounded transition-colors"
                           >
                             ✕ 退出全屏
                           </button>
@@ -361,16 +361,16 @@ ${full_report.reasoning}`;
                             />
                           )
                         ) : isChartLoading ? (
-                          <div className="h-full flex items-center justify-center text-gray-600">
+                          <div className="h-full flex items-center justify-center text-stone-600">
                             <div className="flex flex-col items-center gap-2">
-                              <div className="w-6 h-6 border-2 border-gray-600 border-t-blue-500 rounded-full animate-spin" />
+                              <div className="w-6 h-6 border-2 border-border-strong border-t-accent rounded-full animate-spin" />
                               <span className="text-sm">加载图表数据...</span>
                             </div>
                           </div>
                         ) : (
-                          <div className="h-full flex items-center justify-center text-gray-600">
+                          <div className="h-full flex items-center justify-center text-stone-600">
                             <div className="flex flex-col items-center gap-2">
-                              <div className="w-6 h-6 border-2 border-gray-600 border-t-blue-500 rounded-full animate-spin" />
+                              <div className="w-6 h-6 border-2 border-border-strong border-t-accent rounded-full animate-spin" />
                               <span className="text-sm">Loading Chart...</span>
                             </div>
                           </div>
@@ -413,7 +413,7 @@ ${full_report.reasoning}`;
                              )}
                              <button 
                                 onClick={handleCopyReport}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold rounded-md transition-all"
+                                className="flex items-center gap-2 px-3 py-1.5 bg-surface-overlay hover:bg-surface-muted text-stone-300 text-xs font-bold rounded-md transition-all"
                              >
                                {isCopied ? <Check className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3" />}
                                {isCopied ? 'Copied' : 'Copy'}
@@ -441,7 +441,7 @@ ${full_report.reasoning}`;
                     {analysis ? (
                       <div className="space-y-6">
                         {/* Signal & Trade Setup Card */}
-                        <div className="bg-gray-800/40 rounded-xl p-5 border border-gray-700">
+                        <div className="bg-surface-overlay/40 rounded-xl p-5 border border-border-strong">
                           <div
                             className={`text-center py-4 rounded-lg border-2 mb-4 ${
                               analysis.signal.includes('Buy')
@@ -462,8 +462,8 @@ ${full_report.reasoning}`;
 
                         {/* --- RISK MANAGEMENT TEAM (ENHANCED UI) --- */}
                         {analysis.full_report.risk_assessment && (
-                          <div className="bg-gray-800/40 rounded-xl p-4 border border-gray-700">
-                            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                          <div className="bg-surface-overlay/40 rounded-xl p-4 border border-border-strong">
+                            <h4 className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-4 flex items-center gap-2">
                               <ShieldAlert className="w-4 h-4" /> Risk Assessment
                             </h4>
 
@@ -486,25 +486,25 @@ ${full_report.reasoning}`;
                                 >
                                   {analysis.full_report.risk_assessment.verdict.toUpperCase()}
                                 </div>
-                                <p className="text-[10px] text-gray-500">Risk Score (0-10)</p>
+                                <p className="text-[10px] text-stone-500">Risk Score (0-10)</p>
                               </div>
                             </div>
 
                             <div className="space-y-2 text-xs">
-                              <div className="flex justify-between border-b border-gray-700/50 pb-1">
-                                <span className="text-gray-400">Volatility</span>
-                                <span className="text-gray-200">
+                              <div className="flex justify-between border-b border-border-strong/50 pb-1">
+                                <span className="text-stone-400">Volatility</span>
+                                <span className="text-stone-200">
                                   {analysis.full_report.risk_assessment.volatility_status}
                                 </span>
                               </div>
-                              <div className="flex justify-between border-b border-gray-700/50 pb-1">
-                                <span className="text-gray-400">Max Drawdown Risk</span>
-                                <span className="text-gray-200">
+                              <div className="flex justify-between border-b border-border-strong/50 pb-1">
+                                <span className="text-stone-400">Max Drawdown Risk</span>
+                                <span className="text-stone-200">
                                   {analysis.full_report.risk_assessment.max_drawdown_risk}
                                 </span>
                               </div>
                               <div className="flex justify-between pt-1">
-                                <span className="text-gray-400">Liquidity</span>
+                                <span className="text-stone-400">Liquidity</span>
                                 <span
                                   className={
                                     analysis.full_report.risk_assessment.liquidity_concerns
@@ -529,7 +529,7 @@ ${full_report.reasoning}`;
 
                       </div>
                     ) : (
-                      <div className="bg-gray-800/40 rounded-xl p-8 border border-gray-700 text-center text-gray-500">
+                      <div className="bg-surface-overlay/40 rounded-xl p-8 border border-border-strong text-center text-stone-500">
                         Run analysis to see data.
                       </div>
                     )}

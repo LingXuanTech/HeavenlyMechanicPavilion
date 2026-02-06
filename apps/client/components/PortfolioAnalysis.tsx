@@ -28,7 +28,7 @@ const getCorrelationColor = (value: number): string => {
   if (value >= 0.7) return 'bg-red-600'; // 高正相关
   if (value >= 0.4) return 'bg-orange-500'; // 中正相关
   if (value >= 0.1) return 'bg-yellow-500'; // 低正相关
-  if (value >= -0.1) return 'bg-gray-600'; // 无相关
+  if (value >= -0.1) return 'bg-surface-muted'; // 无相关
   if (value >= -0.4) return 'bg-cyan-500'; // 低负相关
   if (value >= -0.7) return 'bg-blue-500'; // 中负相关
   return 'bg-blue-700'; // 高负相关
@@ -36,7 +36,7 @@ const getCorrelationColor = (value: number): string => {
 
 const getCorrelationTextColor = (value: number): string => {
   if (Math.abs(value) >= 0.4) return 'text-white';
-  return 'text-gray-300';
+  return 'text-stone-300';
 };
 
 // 分散化评分颜色
@@ -58,7 +58,7 @@ const HeatmapCell: React.FC<{
   return (
     <div
       className={`relative w-12 h-12 flex items-center justify-center text-xs font-mono cursor-pointer transition-all hover:ring-2 hover:ring-white/50 ${
-        isDiagonal ? 'bg-gray-700' : getCorrelationColor(value)
+        isDiagonal ? 'bg-surface-muted' : getCorrelationColor(value)
       } ${getCorrelationTextColor(value)}`}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
@@ -67,11 +67,11 @@ const HeatmapCell: React.FC<{
 
       {/* Tooltip */}
       {showTooltip && !isDiagonal && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 whitespace-nowrap">
-          <div className="text-xs text-gray-400">
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-surface-raised border border-border-strong rounded-lg shadow-xl z-50 whitespace-nowrap">
+          <div className="text-xs text-stone-400">
             {rowSymbol} ↔ {colSymbol}
           </div>
-          <div className={`text-sm font-bold ${value > 0 ? 'text-red-400' : 'text-blue-400'}`}>
+          <div className={`text-sm font-bold ${value > 0 ? 'text-red-400' : 'text-accent'}`}>
             {value > 0 ? '正相关' : '负相关'}: {(value * 100).toFixed(1)}%
           </div>
         </div>
@@ -123,14 +123,14 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
       onClick={handleBackdropClick}
       className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
     >
-      <div className="bg-gray-900 border border-gray-800 w-full max-w-5xl max-h-[90vh] rounded-xl flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-surface-raised border border-border w-full max-w-5xl max-h-[90vh] rounded-xl flex flex-col shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="shrink-0 p-4 border-b border-gray-800 bg-gray-950/50 flex justify-between items-center">
+        <div className="shrink-0 p-4 border-b border-border bg-surface/50 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <PieChart className="w-6 h-6 text-cyan-400" />
             <div>
               <h2 className="text-xl font-bold text-white">Portfolio Analysis</h2>
-              <p className="text-xs text-gray-500">{stocks.length} stocks in portfolio</p>
+              <p className="text-xs text-stone-500">{stocks.length} stocks in portfolio</p>
             </div>
           </div>
 
@@ -146,7 +146,7 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
 
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white bg-gray-800 hover:bg-gray-700 p-2 rounded-full transition-colors"
+              className="text-stone-400 hover:text-stone-50 bg-surface-overlay hover:bg-surface-muted p-2 rounded-full transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -156,12 +156,12 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {stocks.length < 2 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+            <div className="flex flex-col items-center justify-center h-64 text-stone-500">
               <AlertTriangle className="w-12 h-12 mb-4 opacity-50" />
               <p>需要至少 2 只股票来进行组合分析</p>
             </div>
           ) : portfolioMutation.isPending && !analysis ? (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+            <div className="flex flex-col items-center justify-center h-64 text-stone-500">
               <RefreshCw className="w-12 h-12 mb-4 animate-spin" />
               <p>正在分析组合...</p>
             </div>
@@ -171,7 +171,7 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
               <p>分析失败: {(portfolioMutation.error as Error).message}</p>
               <button
                 onClick={handleAnalyze}
-                className="mt-4 px-4 py-2 bg-gray-800 rounded-lg hover:bg-gray-700"
+                className="mt-4 px-4 py-2 bg-surface-overlay rounded-lg hover:bg-surface-muted"
               >
                 重试
               </button>
@@ -181,16 +181,16 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
               {/* 顶部摘要卡片 */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* 分散化评分 */}
-                <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                <div className="bg-surface-overlay/50 rounded-xl p-4 border border-border-strong">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-gray-400">Diversification Score</span>
-                    <Info className="w-4 h-4 text-gray-600" />
+                    <span className="text-sm text-stone-400">Diversification Score</span>
+                    <Info className="w-4 h-4 text-stone-600" />
                   </div>
                   <div className={`text-4xl font-bold ${getDiversificationColor(analysis.diversification_score)}`}>
                     {analysis.diversification_score}
-                    <span className="text-lg text-gray-500">/100</span>
+                    <span className="text-lg text-stone-500">/100</span>
                   </div>
-                  <div className="mt-2 h-2 bg-gray-700 rounded-full overflow-hidden">
+                  <div className="mt-2 h-2 bg-surface-muted rounded-full overflow-hidden">
                     <div
                       className={`h-full transition-all duration-1000 ${
                         analysis.diversification_score >= 70 ? 'bg-green-500' :
@@ -202,16 +202,16 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
                 </div>
 
                 {/* 风险聚类 */}
-                <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                <div className="bg-surface-overlay/50 rounded-xl p-4 border border-border-strong">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-gray-400">Risk Clusters</span>
-                    <Link2 className="w-4 h-4 text-gray-600" />
+                    <span className="text-sm text-stone-400">Risk Clusters</span>
+                    <Link2 className="w-4 h-4 text-stone-600" />
                   </div>
                   <div className="text-4xl font-bold text-white">
                     {analysis.risk_clusters.length}
-                    <span className="text-lg text-gray-500"> groups</span>
+                    <span className="text-lg text-stone-500"> groups</span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-stone-500 mt-2">
                     {analysis.risk_clusters.length === 0
                       ? '无高度相关股票群'
                       : `${analysis.risk_clusters.reduce((sum, c) => sum + (c.stocks?.length || 0), 0)} stocks in correlated groups`}
@@ -219,16 +219,16 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
                 </div>
 
                 {/* 股票数量 */}
-                <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                <div className="bg-surface-overlay/50 rounded-xl p-4 border border-border-strong">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-gray-400">Analyzed Stocks</span>
+                    <span className="text-sm text-stone-400">Analyzed Stocks</span>
                     <CheckCircle className="w-4 h-4 text-green-500" />
                   </div>
                   <div className="text-4xl font-bold text-white">
                     {analysis.correlation.symbols.length}
-                    <span className="text-lg text-gray-500">/{stocks.length}</span>
+                    <span className="text-lg text-stone-500">/{stocks.length}</span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-stone-500 mt-2">
                     {analysis.correlation.symbols.length === stocks.length
                       ? '所有股票数据完整'
                       : `${stocks.length - analysis.correlation.symbols.length} 只股票数据不足`}
@@ -237,7 +237,7 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
               </div>
 
               {/* 相关性热力图 */}
-              <div className="bg-gray-800/30 rounded-xl p-4 border border-gray-700">
+              <div className="bg-surface-overlay/30 rounded-xl p-4 border border-border-strong">
                 <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
                   <span className="w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-red-500" />
                   Correlation Heatmap
@@ -250,7 +250,7 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
                       <div className="w-20" /> {/* 空白角 */}
                       {analysis.correlation.symbols.map(symbol => (
                         <div key={symbol} className="w-12 text-center">
-                          <span className="text-xs text-gray-400 font-mono truncate block" style={{ writingMode: 'vertical-lr' }}>
+                          <span className="text-xs text-stone-400 font-mono truncate block" style={{ writingMode: 'vertical-lr' }}>
                             {symbol.split('.')[0]}
                           </span>
                         </div>
@@ -262,7 +262,7 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
                       <div key={i} className="flex items-center">
                         {/* 行标题 */}
                         <div className="w-20 pr-2 text-right">
-                          <span className="text-xs text-gray-400 font-mono truncate">
+                          <span className="text-xs text-stone-400 font-mono truncate">
                             {analysis.correlation.symbols[i].split('.')[0]}
                           </span>
                         </div>
@@ -283,12 +283,12 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
                 </div>
 
                 {/* 图例 */}
-                <div className="mt-4 flex items-center justify-center gap-4 text-xs text-gray-400">
+                <div className="mt-4 flex items-center justify-center gap-4 text-xs text-stone-400">
                   <span className="flex items-center gap-1">
                     <span className="w-4 h-4 rounded bg-blue-700" /> -1.0 负相关
                   </span>
                   <span className="flex items-center gap-1">
-                    <span className="w-4 h-4 rounded bg-gray-600" /> 0 无相关
+                    <span className="w-4 h-4 rounded bg-surface-muted" /> 0 无相关
                   </span>
                   <span className="flex items-center gap-1">
                     <span className="w-4 h-4 rounded bg-red-600" /> +1.0 正相关
@@ -298,7 +298,7 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
 
               {/* 收益摘要 */}
               {sortedReturns.length > 0 && (
-                <div className="bg-gray-800/30 rounded-xl p-4 border border-gray-700">
+                <div className="bg-surface-overlay/30 rounded-xl p-4 border border-border-strong">
                   <h3 className="text-lg font-bold text-white mb-4">Returns Summary (1M)</h3>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -311,11 +311,11 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
                             : 'bg-red-950/30 border-red-900/50'
                         }`}
                       >
-                        <div className="text-xs text-gray-400 font-mono truncate">{item.symbol.split('.')[0]}</div>
+                        <div className="text-xs text-stone-400 font-mono truncate">{item.symbol.split('.')[0]}</div>
                         <div className={`text-lg font-bold ${item.total_return >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                           {item.total_return >= 0 ? '+' : ''}{item.total_return.toFixed(1)}%
                         </div>
-                        <div className="text-xs text-gray-500">Vol: {item.volatility.toFixed(1)}%</div>
+                        <div className="text-xs text-stone-500">Vol: {item.volatility.toFixed(1)}%</div>
                       </div>
                     ))}
                   </div>
@@ -323,17 +323,17 @@ const PortfolioAnalysisComponent: React.FC<PortfolioAnalysisProps> = ({ stocks, 
               )}
 
               {/* 建议 */}
-              <div className="bg-gray-800/30 rounded-xl p-4 border border-gray-700">
+              <div className="bg-surface-overlay/30 rounded-xl p-4 border border-border-strong">
                 <h3 className="text-lg font-bold text-white mb-4">Recommendations</h3>
 
                 <div className="space-y-3">
                   {analysis.recommendations.map((rec, i) => (
                     <div
                       key={i}
-                      className="flex items-start gap-3 p-3 bg-gray-900/50 rounded-lg border border-gray-700"
+                      className="flex items-start gap-3 p-3 bg-surface-raised/50 rounded-lg border border-border-strong"
                     >
                       <span className="text-xl">{rec.charAt(0)}</span>
-                      <p className="text-sm text-gray-300">{rec.slice(2)}</p>
+                      <p className="text-sm text-stone-300">{rec.slice(2)}</p>
                     </div>
                   ))}
                 </div>

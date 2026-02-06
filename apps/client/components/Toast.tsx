@@ -4,7 +4,7 @@
  * 轻量级 toast 通知，支持 success/error/warning/info 类型。
  * 使用 React Context 提供全局访问。
  */
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { X, CheckCircle, AlertTriangle, AlertCircle, Info } from 'lucide-react';
 
 // =============================================================================
@@ -163,15 +163,15 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
         pointer-events-auto flex items-start gap-3 p-3 rounded-lg border backdrop-blur-sm
         ${config.bgClass} ${config.borderClass}
         animate-[slideIn_0.2s_ease-out]
-        shadow-lg shadow-black/20
+        shadow-lg shadow-black/30
       `}
       role="alert"
     >
       <Icon className={`w-5 h-5 mt-0.5 flex-shrink-0 ${config.iconClass}`} />
-      <p className="text-sm text-gray-200 flex-1">{toast.message}</p>
+      <p className="text-sm text-stone-200 flex-1">{toast.message}</p>
       <button
         onClick={() => onRemove(toast.id)}
-        className="text-gray-500 hover:text-gray-300 transition-colors flex-shrink-0"
+        className="text-stone-500 hover:text-stone-300 transition-colors flex-shrink-0"
       >
         <X className="w-4 h-4" />
       </button>

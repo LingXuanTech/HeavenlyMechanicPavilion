@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+@theme {
+  /* 语义化颜色 - 表面 */
+  --color-surface: #0C0A09;
+  --color-surface-raised: #1C1917;
+  --color-surface-overlay: #292524;
+  --color-surface-muted: #44403C;
+
+  /* 语义化颜色 - 边框 */
+  --color-border: #292524;
+  --color-border-subtle: #1C1917;
+  --color-border-strong: #44403C;
+
+  /* 强调色 - 金色 */
+  --color-accent: #CA8A04;
+  --color-accent-hover: #EAB308;
+  --color-accent-muted: #854D0E;
+
+  /* 交易语义色 */
+  --color-trading-green: #10B981;
+  --color-trading-red: #EF4444;
+  --color-trading-yellow: #F59E0B;
+
+  /* 字体 */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.6);
+  --shadow-glow-gold: 0 0 15px rgba(202, 138, 4, 0.3);
+  --shadow-glow-gold-lg: 0 0 25px rgba(202, 138, 4, 0.5);
+  --shadow-glow-green: 0 0 15px rgba(16, 185, 129, 0.3);
+  --shadow-glow-red: 0 0 15px rgba(239, 68, 68, 0.3);
+
+  /* 动画 */
+  --animate-marquee: marquee 30s linear infinite;
+  --animate-glow-pulse: glow-pulse 2s ease-in-out infinite;
+
+  @keyframes marquee {
+    0% { transform: translateX(0%); }
+    100% { transform: translateX(-50%); }
+  }
+  @keyframes glow-pulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+}
+
+/* 基础样式 */
+@layer base {
+  body {
+    @apply bg-surface text-stone-50 font-sans antialiased;
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { @apply bg-surface; }
+  ::-webkit-scrollbar-thumb { @apply bg-stone-700 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-stone-600; }
+
+  button, [role="button"], a, select { cursor: pointer; }
+}
+
+/* 组件层 */
+@layer components {
+  .text-glow-gold { text-shadow: 0 0 10px rgba(202, 138, 4, 0.3); }
+
+  .card {
+    @apply bg-surface-raised border border-border rounded-xl transition-all duration-200;
+  }
+  .card:hover { @apply border-border-strong; }
+
+  .btn-primary {
+    @apply bg-accent hover:bg-accent-hover text-stone-950 font-semibold
+           px-4 py-2 rounded-lg transition-all duration-200
+           shadow-glow-gold hover:shadow-glow-gold-lg cursor-pointer;
+  }
+  .btn-secondary {
+    @apply bg-surface-overlay hover:bg-surface-muted text-stone-200
+           font-medium px-4 py-2 rounded-lg transition-all duration-200
+           border border-border cursor-pointer;
+  }
+  .btn-ghost {
+    @apply text-stone-400 hover:text-stone-50 hover:bg-surface-overlay
+           px-3 py-2 rounded-lg transition-all duration-200 cursor-pointer;
+  }
+}

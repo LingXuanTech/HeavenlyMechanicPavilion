@@ -54,6 +54,38 @@ from .analysis import (
 
 from .chat import ChatMessage, ChatResponse
 
+from .alternative import (
+    AHPremiumStock,
+    AHPremiumStats,
+    AHPremiumListResponse,
+    ArbitrageSignal,
+    AHPremiumHistoryPoint,
+    AHPremiumDetailResponse,
+    PatentNewsItem,
+    PatentAnalysisResponse,
+)
+
+from .vision import (
+    VisionKeyDataPoint,
+    VisionAnalysisResult,
+    VisionAnalysisResponse,
+)
+
+from .supply_chain import (
+    ChainSegmentCounts,
+    ChainSummary,
+    ChainListResponse,
+    GraphNode,
+    GraphEdge,
+    ChainGraphStats,
+    ChainGraphResponse,
+    ChainPosition,
+    StockChainPositionResponse,
+    SupplyChainImpactAnalysis,
+    SupplyChainImpact,
+    SupplyChainImpactResponse,
+)
+
 __all__ = [
     # 枚举
     "SignalType",
@@ -100,4 +132,30 @@ __all__ = [
     # Chat
     "ChatMessage",
     "ChatResponse",
+    # Alternative Data
+    "AHPremiumStock",
+    "AHPremiumStats",
+    "AHPremiumListResponse",
+    "ArbitrageSignal",
+    "AHPremiumHistoryPoint",
+    "AHPremiumDetailResponse",
+    "PatentNewsItem",
+    "PatentAnalysisResponse",
+    # Vision
+    "VisionKeyDataPoint",
+    "VisionAnalysisResult",
+    "VisionAnalysisResponse",
+    # Supply Chain
+    "ChainSegmentCounts",
+    "ChainSummary",
+    "ChainListResponse",
+    "GraphNode",
+    "GraphEdge",
+    "ChainGraphStats",
+    "ChainGraphResponse",
+    "ChainPosition",
+    "StockChainPositionResponse",
+    "SupplyChainImpactAnalysis",
+    "SupplyChainImpact",
+    "SupplyChainImpactResponse",
 ]

@@ -41,6 +41,14 @@ pytest --cov=. --cov-report=html    # 生成覆盖率报告
 ruff check .                        # Lint 检查
 ruff check . --fix                  # 自动修复 lint 问题
 mypy api/ services/ config/ db/     # 类型检查
+
+# 数据库迁移 (Alembic)
+alembic revision --autogenerate -m "description"  # 自动生成迁移脚本
+alembic upgrade head                              # 应用所有迁移到最新版本
+alembic downgrade -1                              # 回滚一个版本
+alembic current                                   # 查看当前迁移版本
+alembic history                                   # 查看迁移历史
+alembic stamp head                                # 标记当前数据库为最新版本（不执行迁移）
 ```
 
 ### Docker 全栈

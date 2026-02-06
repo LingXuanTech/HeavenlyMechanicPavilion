@@ -32,6 +32,10 @@ from services.north_money_service import (
     NorthMoneyAnomaly,
     NorthMoneyRealtime,
     north_money_service,
+    NorthMoneyHistoryData,
+    CorrelationResult,
+    CorrelationAnalysis,
+    HistoryQueryResult,
 )
 
 
@@ -764,3 +768,95 @@ class TestNorthMoneyServiceSingleton:
         """全局单例存在"""
         assert north_money_service is not None
         assert isinstance(north_money_service, NorthMoneyService)
+
+
+# =============================================================================
+# 历史持久化与相关性测试
+# =============================================================================
+
+class TestNorthMoneyPersistence:
+    """历史持久化与相关性测试"""
+
+    @pytest.fixture
+    def service(self):
+        """创建服务实例"""
+        svc = NorthMoneyService()
+        svc._cache.clear()
+        return svc
+
+    @pytest.mark.asyncio
+    async def test_save_daily_data_mock(self, service):
+        """测试保存每日数据 (Mock 数据库和 API)"""
+        mock_north_df = pd.DataFrame({
+            '日期': [datetime.now().strftime("%Y-%m-%d")],
+            '北向资金': [85.0],
+            '沪股通': [50.0],
+            '深股通': [35.0],
+            '累计净流入': [1000.0]
+        })
+        
+        mock_index_df = pd.DataFrame({
+            'close': [3000.0]
+        }, index=[datetime.now().strftime("%Y-%m-%d")])
+
+        with patch("services.north_money_service.ak.stock_hsgt_north_net_flow_in_em", return_value=mock_north_df):
+            with patch("services.north_money_service.ak.stock_zh_index_daily", return_value=mock_index_df):
+                with patch("services.north_money_service.Session") as mock_session_cm:
+                    mock_session = MagicMock()
+                    mock_session_cm.return_value.__enter__.return_value = mock_session
+                    mock_session.exec.return_value.first.return_value = None
+                    
+                    result = await service.save_daily_data()
+                    
+                    assert result is True
+                    assert mock_session.add.called
+                    assert mock_session.commit.called
+
+    @pytest.mark.asyncio
+    async def test_get_history_mock(self, service):
+        """测试查询历史数据 (Mock 数据库)"""
+        mock_record = MagicMock()
+        mock_record.date = "2026-02-02"
+        mock_record.north_inflow = 85.0
+        mock_record.sh_inflow = 50.0
+        mock_record.sz_inflow = 35.0
+        mock_record.cumulative_inflow = 1000.0
+        mock_record.market_index = 3000.0
+        mock_record.hs300_index = 4000.0
+        mock_record.cyb_index = 2000.0
+
+        with patch("services.north_money_service.Session") as mock_session_cm:
+            mock_session = MagicMock()
+            mock_session_cm.return_value.__enter__.return_value = mock_session
+            mock_session.exec.return_value.all.return_value = [mock_record]
+            
+            result = await service.get_history(limit=1)
+            
+            assert result.total_count == 1
+            assert result.data[0].date == "2026-02-02"
+            assert result.statistics["avg_inflow"] == 85.0
+
+    @pytest.mark.asyncio
+    async def test_calculate_correlation_mock(self, service):
+        """测试相关性计算 (Mock 历史数据)"""
+        mock_history = HistoryQueryResult(
+            data=[
+                NorthMoneyHistoryData(date=f"2026-02-{i:02d}", north_inflow=float(i*10),
+                                     sh_inflow=5.0, sz_inflow=5.0, cumulative_inflow=100.0,
+                                     market_index=float(3000 + i*10), hs300_index=4000.0, cyb_index=2000.0)
+                for i in range(1, 11)
+            ],
+            total_count=10,
+            start_date="2026-02-01",
+            end_date="2026-02-10",
+            statistics={}
+        )
+
+        with patch.object(service, 'get_history', return_value=mock_history):
+            result = await service.calculate_correlation(days=10)
+            
+            assert result.analysis_date == datetime.now().strftime("%Y-%m-%d")
+            assert len(result.correlations) > 0
+            # 构造的数据是正相关的
+            assert result.correlations[0].correlation > 0.9
+            assert "正相关" in result.summary

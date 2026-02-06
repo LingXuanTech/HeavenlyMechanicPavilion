@@ -86,7 +86,7 @@ export const ChartToolbar: React.FC<ChartToolbarProps> = ({
   );
 
   return (
-    <div className={`flex items-center justify-between gap-2 px-3 py-1.5 bg-gray-900/80 border-b border-gray-800 ${className}`}>
+    <div className={`flex items-center justify-between gap-2 px-3 py-1.5 bg-surface-raised/80 border-b border-border ${className}`}>
       {/* 左侧：时间周期 */}
       <div className="flex items-center gap-0.5">
         {PERIOD_OPTIONS.map((option) => (
@@ -95,8 +95,8 @@ export const ChartToolbar: React.FC<ChartToolbarProps> = ({
             onClick={() => onPeriodChange(option.value)}
             className={`px-2 py-0.5 text-xs rounded transition-colors ${
               activePeriod === option.value
-                ? 'bg-blue-600 text-white'
-                : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                ? 'bg-accent text-white'
+                : 'text-stone-400 hover:text-white hover:bg-surface-muted'
             }`}
           >
             {option.label}
@@ -114,7 +114,7 @@ export const ChartToolbar: React.FC<ChartToolbarProps> = ({
             className={`px-1.5 py-0.5 text-[10px] font-mono rounded transition-colors ${
               activeIndicators.includes(option.value)
                 ? 'text-white'
-                : 'text-gray-500 hover:text-gray-300'
+                : 'text-stone-500 hover:text-stone-300'
             }`}
             style={
               activeIndicators.includes(option.value)
@@ -132,27 +132,27 @@ export const ChartToolbar: React.FC<ChartToolbarProps> = ({
             onClick={() => setShowIndicatorPanel(!showIndicatorPanel)}
             className={`px-1.5 py-0.5 text-[10px] rounded transition-colors ${
               showIndicatorPanel
-                ? 'bg-gray-700 text-white'
-                : 'text-gray-500 hover:text-gray-300'
+                ? 'bg-surface-muted text-white'
+                : 'text-stone-500 hover:text-stone-300'
             }`}
           >
             指标 ▾
           </button>
 
           {showIndicatorPanel && (
-            <div className="absolute top-full right-0 mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-50 p-2 min-w-[160px]">
-              <div className="text-[10px] text-gray-400 mb-1 px-1">技术指标</div>
+            <div className="absolute top-full right-0 mt-1 bg-surface-overlay border border-border-strong rounded-lg shadow-xl z-50 p-2 min-w-[160px]">
+              <div className="text-[10px] text-stone-400 mb-1 px-1">技术指标</div>
               {INDICATOR_OPTIONS.map((option) => (
                 <button
                   key={option.value}
                   onClick={() => toggleIndicator(option.value)}
-                  className="w-full flex items-center gap-2 px-2 py-1 text-xs rounded hover:bg-gray-700 transition-colors"
+                  className="w-full flex items-center gap-2 px-2 py-1 text-xs rounded hover:bg-surface-muted transition-colors"
                 >
                   <span
                     className="w-2 h-2 rounded-full"
                     style={{ backgroundColor: option.color }}
                   />
-                  <span className={activeIndicators.includes(option.value) ? 'text-white' : 'text-gray-400'}>
+                  <span className={activeIndicators.includes(option.value) ? 'text-white' : 'text-stone-400'}>
                     {option.label}
                   </span>
                   {activeIndicators.includes(option.value) && (
@@ -161,13 +161,13 @@ export const ChartToolbar: React.FC<ChartToolbarProps> = ({
                 </button>
               ))}
 
-              <div className="border-t border-gray-700 mt-1 pt-1">
+              <div className="border-t border-border-strong mt-1 pt-1">
                 <button
                   onClick={onVolumeToggle}
-                  className="w-full flex items-center gap-2 px-2 py-1 text-xs rounded hover:bg-gray-700 transition-colors"
+                  className="w-full flex items-center gap-2 px-2 py-1 text-xs rounded hover:bg-surface-muted transition-colors"
                 >
-                  <span className="w-2 h-2 rounded-full bg-blue-400" />
-                  <span className={showVolume ? 'text-white' : 'text-gray-400'}>成交量</span>
+                  <span className="w-2 h-2 rounded-full bg-accent" />
+                  <span className={showVolume ? 'text-white' : 'text-stone-400'}>成交量</span>
                   {showVolume && <span className="ml-auto text-green-400">✓</span>}
                 </button>
               </div>
@@ -180,7 +180,7 @@ export const ChartToolbar: React.FC<ChartToolbarProps> = ({
       <div className="flex items-center gap-1">
         <button
           onClick={onFullscreenToggle}
-          className="px-1.5 py-0.5 text-[10px] text-gray-500 hover:text-white rounded hover:bg-gray-700 transition-colors"
+          className="px-1.5 py-0.5 text-[10px] text-stone-500 hover:text-white rounded hover:bg-surface-muted transition-colors"
           title={isFullscreen ? '退出全屏' : '全屏'}
         >
           {isFullscreen ? '⤓' : '⤢'}

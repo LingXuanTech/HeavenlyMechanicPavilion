@@ -1,11 +1,11 @@
 /**
  * 前端类型定义中心
  *
- * 所有类型都从 OpenAPI 自动生成的 api.ts 中导出
+ * 所有类型都从 OpenAPI 自动生成的 generated/ 目录导出
  * 不再手动定义类型，确保前后端类型同步
  */
 
-import { paths, components } from './api';
+import { paths, components } from './generated';
 
 // ============ 辅助类型 ============
 
@@ -108,7 +108,26 @@ export type NewsSentiment = Schemas['NewsSentiment'];
 export type NewsAggregateResult = Schemas['NewsAggregateResult'];
 
 // --- 健康检查 ---
-export type HealthReport = Schemas['HealthReport'];
+
+/**
+ * 数据源状态（与后端 api/schemas/health.py ProviderStatus 对齐）
+ */
+export interface ProviderStatus {
+  available: boolean;
+  failure_count: number;
+  threshold: number;
+  last_failure?: string | null;
+  cooldown_seconds: number;
+  total_requests: number;
+  successful_requests: number;
+  failed_requests: number;
+  avg_latency_ms: number;
+  last_error?: string | null;
+}
+
+export type HealthReport = Schemas['HealthReport'] & {
+  data_providers: Record<string, ProviderStatus>;
+};
 export type HealthStatus = Schemas['HealthStatus'];
 export type SystemMetrics = Schemas['SystemMetrics'];
 export type ErrorRecord = Schemas['ErrorRecord'];
@@ -169,112 +188,52 @@ export type ModelConfigListResponse = Schemas['ModelConfigListResponse'];
 // --- Chat ---
 export type ChatMessage = Schemas['ChatMessage'];
 
-// ============ 兼容性别名（逐步废弃） ============
-// 这些别名是为了兼容旧代码，新代码应直接使用上面的类型
+// --- 分析任务 ---
+export type AnalysisTaskStatus = Schemas['AnalysisTaskStatus'];
+
+// ============ 前端专用类型（从 frontend-types.ts 导出） ============
+export type {
+  MarketStatus,
+  FlashNews,
+  MarketOpportunity,
+  PortfolioAnalysisResult,
+  QuickPortfolioCheck,
+  MarketSentiment,
+  AggregatedNewsItem,
+  RolloutSettings,
+} from './frontend-types';
+
+// ============ 待迁移类型（后端 schema 已定义，等 api.ts 重新生成后切换为 Schemas['xxx']） ============
+export type {
+  // 另类数据
+  AHPremiumStock,
+  AHPremiumStats,
+  AHPremiumListResponse,
+  ArbitrageSignal,
+  AHPremiumDetailResponse,
+  PatentNewsItem,
+  PatentAnalysisResponse,
+  // Vision
+  VisionKeyDataPoint,
+  VisionAnalysisResult,
+  VisionAnalysisResponse,
+  // 产业链
+  ChainSummary,
+  ChainListResponse,
+  GraphNode,
+  GraphEdge,
+  ChainGraphResponse,
+  ChainPosition,
+  StockChainPositionResponse,
+  SupplyChainImpact,
+  SupplyChainImpactResponse,
+} from './frontend-types';
+
+// ============ 兼容性别名 ============
 
 /** @deprecated 使用 AgentAnalysisResponse */
 export type AgentAnalysis = AgentAnalysisResponse;
 
-/** @deprecated 使用 AssetPrice */
-export type Stock = AssetPrice;
-
-/** @deprecated 使用 StockNorthHolding */
-export type NorthMoneyHolding = StockNorthHolding;
-
-// ============ 前端专用类型（后端未定义） ============
-
-/**
- * 市场状态（前端 UI 专用）
- */
-export interface MarketStatus {
-  sentiment: 'Bullish' | 'Bearish' | 'Neutral';
-  lastUpdated: string;
-  activeAgents: number;
-}
-
-/**
- * 快讯新闻（前端 UI 专用）
- */
-export interface FlashNews {
-  id: string;
-  time: string;
-  headline: string;
-  impact: 'High' | 'Medium' | 'Low';
-  sentiment: 'Positive' | 'Negative';
-  relatedSymbols: string[];
-}
-
-/**
- * 市场机会（Scout 返回）
- */
-export interface MarketOpportunity {
-  symbol: string;
-  name: string;
-  market: 'US' | 'HK' | 'CN';
-  reason: string;
-  score: number;
-}
-
-
-/**
- * 分析任务状态
- */
-export type AnalysisTaskStatus = Schemas['AnalysisTaskStatus'];
-
-/**
- * 投资组合分析结果
- */
-export interface PortfolioAnalysisResult {
-  correlation: CorrelationResult;
-  diversification_score: number;
-  risk_clusters: Array<{
-    stocks: string[];
-    avg_correlation: number;
-    risk_level: string;
-  }>;
-  recommendations: string[];
-}
-
-/**
- * 快速投资组合检查
- */
-export interface QuickPortfolioCheck {
-  summary: string;
-  risk_level: string;
-  top_risks: string[];
-}
-
-/**
- * 市场情绪数据
- */
-export interface MarketSentiment {
-  global_sentiment: string;
-  risk_level: number;
-  regions: Record<string, {
-    indices_count: number;
-    avg_change_percent: number;
-    sentiment: string;
-  }>;
-  updated_at: string;
-}
-
-/**
- * 宏观影响分析 (兼容旧名称，建议使用 MacroAnalysisResult)
- */
+/** @deprecated 使用 MacroAnalysisResult */
 export type MacroImpactAnalysis = MacroAnalysisResult;
 
-/**
- * 聚合新闻条目
- */
-export interface AggregatedNewsItem {
-  id: string;
-  title: string;
-  summary?: string | null;
-  source: string;
-  url: string;
-  category: NewsCategory;
-  sentiment: NewsSentiment;
-  symbols: string[];
-  published_at: string;
-  fetched_at: string;
-}

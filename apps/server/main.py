@@ -28,12 +28,83 @@ structlog.configure(
 )
 logger = structlog.get_logger()
 
+
+def run_migrations() -> bool:
+    """
+    运行 Alembic 数据库迁移
+    
+    Returns:
+        bool: 迁移是否成功执行
+    """
+    try:
+        from alembic.config import Config
+        from alembic import command
+        from alembic.runtime.migration import MigrationContext
+        from sqlalchemy import create_engine
+        
+        # 获取 alembic.ini 的路径
+        alembic_ini_path = os.path.join(os.path.dirname(__file__), "alembic.ini")
+        
+        if not os.path.exists(alembic_ini_path):
+            logger.warning("Alembic configuration not found, skipping migrations", path=alembic_ini_path)
+            return False
+        
+        # 创建 Alembic 配置
+        alembic_cfg = Config(alembic_ini_path)
+        # 设置脚本位置为相对于 main.py 的路径
+        alembic_cfg.set_main_option("script_location", os.path.join(os.path.dirname(__file__), "alembic"))
+        
+        # 检查当前迁移状态
+        engine = create_engine(settings.database_url)
+        with engine.connect() as connection:
+            context = MigrationContext.configure(connection)
+            current_rev = context.get_current_revision()
+            
+        logger.info("Database migration status", current_revision=current_rev)
+        
+        # 运行迁移到最新版本
+        logger.info("Running database migrations...")
+        command.upgrade(alembic_cfg, "head")
+        
+        # 获取迁移后的版本
+        with engine.connect() as connection:
+            context = MigrationContext.configure(connection)
+            new_rev = context.get_current_revision()
+            
+        logger.info("Database migrations completed",
+                   previous_revision=current_rev,
+                   current_revision=new_rev)
+        return True
+        
+    except ImportError:
+        logger.warning("Alembic not installed, falling back to init_db()")
+        return False
+    except Exception as e:
+        logger.error("Migration failed", error=str(e), error_type=type(e).__name__)
+        return False
+
+
+def initialize_database():
+    """
+    初始化数据库
+    
+    优先使用 Alembic 迁移，如果失败则回退到 init_db()
+    """
+    # 尝试运行 Alembic 迁移
+    migration_success = run_migrations()
+    
+    if not migration_success:
+        # 回退到直接创建表（开发环境或迁移失败时）
+        logger.info("Falling back to init_db() for database initialization")
+        init_db()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup logic
     logger.info("Starting Stock Agents Monitoring Dashboard API", env=settings.ENV)
-    # Initialize DB
-    init_db()
+    # Initialize DB with migration support
+    initialize_database()
     # Initialize Scheduler, etc.
     watchlist_scheduler.start()
     yield

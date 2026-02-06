@@ -408,10 +408,10 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = memo(({
   if (klineData.length === 0) {
     return (
       <div
-        className={`flex items-center justify-center bg-gray-900/50 rounded-lg ${className}`}
+        className={`flex items-center justify-center bg-surface-raised/50 rounded-lg ${className}`}
         style={{ height }}
       >
-        <span className="text-gray-500">No chart data available</span>
+        <span className="text-stone-500">No chart data available</span>
       </div>
     );
   }
@@ -453,7 +453,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = memo(({
 
       {/* 股票代码标签 */}
       {symbol && (
-        <div className="absolute top-2 right-2 text-xs text-gray-500 bg-gray-900/80 px-2 py-1 rounded">
+        <div className="absolute top-2 right-2 text-xs text-stone-500 bg-surface-raised/80 px-2 py-1 rounded">
           {symbol}
         </div>
       )}

@@ -1,0 +1,87 @@
+# 前端 CI 流水线
+# 触发条件：push/PR 到 main 分支，且 apps/client/** 有变更
+name: Frontend CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/client/**"
+      - ".github/workflows/frontend-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "apps/client/**"
+      - ".github/workflows/frontend-ci.yml"
+
+# 取消同一 PR 的旧运行
+concurrency:
+  group: frontend-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend-ci:
+    name: Frontend CI (Node 20)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/client
+
+    steps:
+      # 检出代码
+      - name: Checkout 代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 设置 Node.js 环境
+      - name: 设置 Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      # 安装 pnpm
+      - name: 安装 pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      # 获取 pnpm store 目录
+      - name: 获取 pnpm store 目录
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      # 缓存 pnpm 依赖
+      - name: 缓存 pnpm 依赖
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('apps/client/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+
+      # 安装依赖
+      - name: 安装依赖
+        run: pnpm install --frozen-lockfile
+
+      # Lint 检查 (ESLint)
+      - name: Lint 检查 (ESLint)
+        run: pnpm lint
+
+      # 类型检查 (TypeScript)
+      - name: 类型检查 (TypeScript)
+        run: npx tsc --noEmit
+
+      # 构建项目
+      - name: 构建项目
+        run: pnpm build
+
+      # 上传构建产物（可选，用于后续部署）
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: frontend-dist
+          path: apps/client/dist
+          retention-days: 7

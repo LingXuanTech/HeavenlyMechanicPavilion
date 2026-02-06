@@ -28,7 +28,8 @@ os.environ.setdefault("ALPHA_VANTAGE_API_KEY", "")
 from db.models import (
     Watchlist, AnalysisResult, ChatHistory,
     AIProvider, AIModelConfig,
-    AgentPrompt, PromptVersion
+    AgentPrompt, PromptVersion,
+    User, RefreshToken, OAuthAccount, WebAuthnCredential
 )
 
 
@@ -271,9 +272,9 @@ def sample_stock_price():
 # =============================================================================
 
 @pytest.fixture
-def clear_price_cache():
+async def clear_price_cache():
     """清除价格缓存"""
     from services.data_router import MarketRouter
-    MarketRouter.clear_cache()
+    await MarketRouter.clear_cache()
     yield
-    MarketRouter.clear_cache()
+    await MarketRouter.clear_cache()

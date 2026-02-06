@@ -102,6 +102,7 @@ export {
   useLiveness,
   useReadiness,
   useClearHealthErrors,
+  useResetCircuitBreaker,
   HEALTH_KEY,
 } from './useHealth';
 
@@ -199,3 +200,52 @@ export {
   getConfigKeyLabel,
   getConfigKeyDescription,
 } from './useAIConfig';
+
+// 另类数据（AH 溢价 + 专利监控）
+export {
+  useAHPremiumList,
+  useAHPremiumDetail,
+  usePatentAnalysis,
+  alternativeDataKeys,
+} from './useAlternativeData';
+export type {
+  AHPremiumStock,
+  AHPremiumStats,
+  AHPremiumListResponse,
+  ArbitrageSignal,
+  AHPremiumDetailResponse,
+  PatentNewsItem,
+  PatentAnalysisResponse,
+} from './useAlternativeData';
+
+// Vision 分析（多模态）
+export {
+  useVisionAnalysis,
+  useVisionHistory,
+  visionKeys,
+} from './useVision';
+export type {
+  VisionAnalysisResult,
+  VisionAnalysisResponse,
+  VisionKeyDataPoint,
+} from './useVision';
+
+// 产业链知识图谱
+export {
+  useChainList,
+  useChainGraph,
+  useStockChainPosition,
+  useSupplyChainImpact,
+  supplyChainKeys,
+} from './useSupplyChain';
+export type {
+  ChainSummary,
+  ChainListResponse,
+  GraphNode,
+  GraphEdge,
+  ChainGraphResponse,
+  ChainPosition,
+  StockChainPositionResponse,
+  SupplyChainImpact,
+  SupplyChainImpactResponse,
+} from './useSupplyChain';
