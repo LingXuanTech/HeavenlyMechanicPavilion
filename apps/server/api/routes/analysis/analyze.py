@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 import time
 import uuid
 import structlog
@@ -8,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from typing import AsyncGenerator, Optional, Iterator, Any, List, Literal, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 from sse_starlette.sse import ServerSentEvent, EventSourceResponse
 from sqlmodel import Session, select
 from api.sse import sse_manager
@@ -45,6 +46,10 @@ _graph_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="graph_wo
 # 是否使用任务队列（生产环境）而非 BackgroundTasks（开发环境）
 # 当配置了 REDIS_URL 且 USE_TASK_QUEUE=true 时启用
 USE_TASK_QUEUE = bool(settings.REDIS_URL) and os.getenv("USE_TASK_QUEUE", "false").lower() == "true"
+
+# Symbol 验证正则表达式
+# 支持格式：AAPL, 000001.SZ, 600000.SH, 00700.HK
+SYMBOL_PATTERN = re.compile(r'^[A-Z0-9]{1,10}(\.(SH|SZ|HK))?$', re.IGNORECASE)
 
 
 async def async_stream_wrapper(sync_iterator: Iterator[Any]) -> AsyncGenerator[Any, None]:
@@ -401,6 +406,18 @@ class AnalyzeRequest(BaseModel):
         description="是否强制启用 SubGraph 架构 (灰度测试用)"
     )
 
+    @validator('trade_date')
+    def validate_trade_date(cls, v):
+        """验证日期格式"""
+        if v is None:
+            return v
+        try:
+            from datetime import datetime
+            datetime.fromisoformat(v.replace('Z', '+00:00'))
+            return v
+        except ValueError:
+            raise ValueError('trade_date 必须是有效的 ISO 格式日期（如 2024-01-01）')
+
 
 @router.post("/{symbol}")
 async def trigger_analysis(
@@ -424,6 +441,13 @@ async def trigger_analysis(
     - 开发环境（默认）: 使用 BackgroundTasks 直接执行
     - 生产环境（USE_TASK_QUEUE=true）: 入队到 Redis Stream，由 worker 处理
     """
+    # 验证 symbol 格式
+    if not SYMBOL_PATTERN.match(symbol):
+        raise HTTPException(
+            status_code=400,
+            detail=f"无效的股票代码格式: {symbol}。支持格式：AAPL, 000001.SZ, 600000.SH, 00700.HK"
+        )
+
     if body is None:
         body = AnalyzeRequest()
 
@@ -686,6 +710,13 @@ async def quick_scan(symbol: str, background_tasks: BackgroundTasks):
     - 跳过辩论和风险评估阶段
     - 预计 15-20 秒完成
     """
+    # 验证 symbol 格式
+    if not SYMBOL_PATTERN.match(symbol):
+        raise HTTPException(
+            status_code=400,
+            detail=f"无效的股票代码格式: {symbol}。支持格式：AAPL, 000001.SZ, 600000.SH, 00700.HK"
+        )
+
     task_id = f"quick_{symbol}_{uuid.uuid4().hex[:8]}"
     trade_date = date.today().isoformat()
 

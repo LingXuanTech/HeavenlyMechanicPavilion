@@ -358,7 +358,7 @@ class CacheService:
     TASK_TTL = 3600  # 任务状态保留 1 小时
 
     SSE_EVENT_PREFIX = "sse_events:"
-    SSE_EVENT_TTL = 1800  # SSE 事件保留 30 分钟
+    SSE_EVENT_TTL = 3600  # SSE 事件保留 1 小时（从 30 分钟增加，防止长时间分析中断）
 
     async def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
         """获取任务状态"""

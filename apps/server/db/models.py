@@ -24,6 +24,10 @@ class AnalysisResult(SQLModel, table=True):
         Index("ix_analysis_symbol_created", "symbol", "created_at"),
         # 复合索引：优化 "按状态筛选指定股票分析" 查询
         Index("ix_analysis_symbol_status", "symbol", "status"),
+        # 单独索引：优化按状态筛选所有分析的查询（如管理后台）
+        Index("ix_analysis_status", "status"),
+        # 复合索引：优化按日期范围查询（如统计报表）
+        Index("ix_analysis_date_status", "date", "status"),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
@@ -498,6 +502,10 @@ class NotificationLog(SQLModel, table=True):
     __tablename__ = "notification_logs"
     __table_args__ = (
         Index("ix_notif_log_user_sent", "user_id", "sent_at"),
+        # 新增索引：优化按渠道和发送状态查询
+        Index("ix_notif_log_channel_delivered", "channel", "delivered"),
+        # 新增索引：优化按股票查询通知历史
+        Index("ix_notif_log_symbol_sent", "symbol", "sent_at"),
     )
 
     id: Optional[int] = Field(default=None, primary_key=True)
