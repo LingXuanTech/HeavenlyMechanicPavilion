@@ -4,8 +4,8 @@
 """
 
 import structlog
-from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from typing import Optional
+from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Query
+from typing import Optional, List
 
 from api.schemas.vision import VisionAnalysisResponse
 
@@ -58,6 +58,7 @@ async def analyze_image(
         content_type=file.content_type,
         description=description,
         symbol=symbol,
+        file_name=file.filename,
     )
 
     if not result.get("success") and "error" in result:
@@ -66,18 +67,76 @@ async def analyze_image(
     return result
 
 
+@router.post("/analyze-batch")
+async def analyze_batch(
+    files: List[UploadFile] = File(..., description="多个图片文件"),
+    description: str = Form("", description="共享的用户描述"),
+    symbol: str = Form("", description="关联股票代码"),
+):
+    """批量上传图片进行 Vision 分析
+
+    支持同时上传多张图片，并行分析（最大并发 3）。
+    所有图片共享同一个 batch_id。
+
+    - **files**: 多个图片文件
+    - **description**: 共享的用户描述
+    - **symbol**: 关联的股票代码
+    """
+    from services.vision_service import vision_service, SUPPORTED_FORMATS
+
+    if len(files) == 0:
+        raise HTTPException(status_code=400, detail="No files provided")
+
+    if len(files) > 10:
+        raise HTTPException(status_code=400, detail="Maximum 10 files per batch")
+
+    # 预处理文件
+    file_infos = []
+    for f in files:
+        if not f.content_type or f.content_type not in SUPPORTED_FORMATS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported format for {f.filename}: {f.content_type}",
+            )
+        data = await f.read()
+        if len(data) == 0:
+            continue
+        file_infos.append({
+            "image_data": data,
+            "content_type": f.content_type,
+            "filename": f.filename,
+        })
+
+    if not file_infos:
+        raise HTTPException(status_code=400, detail="All files are empty")
+
+    logger.info("Batch vision analysis requested", count=len(file_infos), symbol=symbol)
+
+    result = await vision_service.analyze_batch(
+        files=file_infos,
+        description=description,
+        symbol=symbol,
+    )
+
+    return result
+
+
 @router.get("/history")
 async def get_vision_history(
     symbol: Optional[str] = None,
-    limit: int = 10,
+    content_type: Optional[str] = Query(None, description="筛选内容类型: image | audio"),
+    limit: int = Query(default=10, ge=1, le=100),
 ):
     """获取 Vision 分析历史记录
 
     Args:
         symbol: 筛选股票代码（可选）
+        content_type: 筛选内容类型（可选）
         limit: 返回数量
     """
     from services.vision_service import vision_service
 
-    history = await vision_service.get_analysis_history(symbol=symbol or "", limit=limit)
+    history = await vision_service.get_analysis_history(
+        symbol=symbol or "", limit=limit, content_type=content_type
+    )
     return {"history": history, "total": len(history)}

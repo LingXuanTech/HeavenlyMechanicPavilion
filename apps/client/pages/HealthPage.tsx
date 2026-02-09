@@ -3,12 +3,14 @@
  *
  * 展示系统组件状态、数据源健康度、系统指标和错误日志
  */
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   useHealthReport,
   useResetCircuitBreaker,
   useClearHealthErrors,
+  useProviderHistory,
 } from '../hooks';
+import type { CircuitBreakerEvent } from '../hooks';
 import PageLayout from '../components/layout/PageLayout';
 import type { ProviderStatus } from '../src/types/schema';
 import {
@@ -27,12 +29,15 @@ import {
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   Cell,
+  ReferenceLine,
 } from 'recharts';
 
 const HealthPage: React.FC = () => {
@@ -338,8 +343,9 @@ interface ProviderCardProps {
 }
 
 const ProviderCard: React.FC<ProviderCardProps> = ({ name, stats, onReset }) => {
-  const successRate = stats.total_requests > 0 
-    ? (stats.successful_requests / stats.total_requests) * 100 
+  const [showHistory, setShowHistory] = useState(false);
+  const successRate = stats.total_requests > 0
+    ? (stats.successful_requests / stats.total_requests) * 100
     : 100;
 
   return (
@@ -353,14 +359,22 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ name, stats, onReset }) => 
           }`} />
           <h3 className="font-bold text-stone-100 capitalize">{name}</h3>
         </div>
-        {!stats.available && (
-          <button 
-            onClick={onReset}
-            className="text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 px-2 py-1 rounded border border-red-500/30 transition-colors"
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="text-xs text-stone-400 hover:text-accent px-2 py-1 rounded border border-border hover:border-accent/50 transition-colors"
           >
-            手动重置
+            {showHistory ? '收起' : '趋势'}
           </button>
-        )}
+          {!stats.available && (
+            <button
+              onClick={onReset}
+              className="text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 px-2 py-1 rounded border border-red-500/30 transition-colors"
+            >
+              手动重置
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4 mb-4">
@@ -403,6 +417,144 @@ const ProviderCard: React.FC<ProviderCardProps> = ({ name, stats, onReset }) => 
           </div>
         )}
       </div>
+
+      {/* 延迟趋势面板 */}
+      {showHistory && (
+        <div className="mt-4 pt-4 border-t border-border">
+          <ProviderHistoryPanel provider={name} />
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * 数据源调用历史面板
+ *
+ * 展示延迟趋势折线图和熔断事件时间线
+ */
+const ProviderHistoryPanel: React.FC<{ provider: string }> = ({ provider }) => {
+  const { data, isLoading } = useProviderHistory(provider, 60);
+
+  // 将原始记录聚合为时间桶（每分钟一个点）
+  const chartData = useMemo(() => {
+    if (!data?.records || data.records.length === 0) return [];
+
+    const buckets: Record<string, { latencies: number[]; failures: number; total: number }> = {};
+
+    for (const r of data.records) {
+      // 按分钟聚合
+      const key = r.timestamp.slice(0, 16); // "YYYY-MM-DDTHH:MM"
+      if (!buckets[key]) {
+        buckets[key] = { latencies: [], failures: 0, total: 0 };
+      }
+      buckets[key].total++;
+      if (r.success) {
+        buckets[key].latencies.push(r.latency_ms);
+      } else {
+        buckets[key].failures++;
+      }
+    }
+
+    return Object.entries(buckets)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([time, bucket]) => ({
+        time: time.slice(11), // "HH:MM"
+        avgLatency: bucket.latencies.length > 0
+          ? Math.round(bucket.latencies.reduce((a, b) => a + b, 0) / bucket.latencies.length)
+          : 0,
+        failures: bucket.failures,
+        total: bucket.total,
+      }));
+  }, [data?.records]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-4 text-stone-500 text-xs">
+        <RefreshCw className="w-3 h-3 animate-spin mr-1" />
+        加载历史数据...
+      </div>
+    );
+  }
+
+  if (!data || data.records.length === 0) {
+    return (
+      <div className="text-center py-4 text-stone-500 text-xs">
+        暂无调用记录
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* 统计摘要 */}
+      <div className="grid grid-cols-4 gap-2 text-center">
+        <div>
+          <div className="text-[10px] text-stone-500">调用数</div>
+          <div className="text-sm font-medium text-stone-200">{data.summary.total_calls}</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-stone-500">成功率</div>
+          <div className={`text-sm font-medium ${data.summary.success_rate > 90 ? 'text-green-400' : 'text-amber-400'}`}>
+            {data.summary.success_rate}%
+          </div>
+        </div>
+        <div>
+          <div className="text-[10px] text-stone-500">P95 延迟</div>
+          <div className="text-sm font-medium text-accent">{data.summary.p95_latency_ms}ms</div>
+        </div>
+        <div>
+          <div className="text-[10px] text-stone-500">最大延迟</div>
+          <div className="text-sm font-medium text-orange-400">{data.summary.max_latency_ms}ms</div>
+        </div>
+      </div>
+
+      {/* 延迟趋势折线图 */}
+      {chartData.length > 1 && (
+        <div className="h-32">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#44403c" vertical={false} />
+              <XAxis dataKey="time" stroke="#6b7280" tick={{ fontSize: 10 }} />
+              <YAxis stroke="#6b7280" tick={{ fontSize: 10 }} />
+              <Tooltip
+                contentStyle={{ backgroundColor: '#1c1917', border: '1px solid #44403c', fontSize: 12 }}
+                labelStyle={{ color: '#9CA3AF' }}
+              />
+              <Line
+                type="monotone"
+                dataKey="avgLatency"
+                stroke="#D97706"
+                strokeWidth={2}
+                dot={false}
+                name="平均延迟(ms)"
+              />
+              {data.summary.p95_latency_ms > 0 && (
+                <ReferenceLine
+                  y={data.summary.p95_latency_ms}
+                  stroke="#EF4444"
+                  strokeDasharray="3 3"
+                  label={{ value: 'P95', fill: '#EF4444', fontSize: 10 }}
+                />
+              )}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* 熔断事件时间线 */}
+      {data.circuit_breaker_events.length > 0 && (
+        <div className="space-y-1">
+          <div className="text-[10px] text-red-400 font-medium">熔断事件</div>
+          {data.circuit_breaker_events.map((evt: CircuitBreakerEvent, idx: number) => (
+            <div key={idx} className="flex items-center gap-2 text-[10px] text-stone-400 bg-red-500/10 rounded px-2 py-1">
+              <AlertCircle className="w-3 h-3 text-red-400 flex-shrink-0" />
+              <span className="text-stone-500">{evt.timestamp.slice(11, 19)}</span>
+              <span className="text-red-300 truncate">{evt.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

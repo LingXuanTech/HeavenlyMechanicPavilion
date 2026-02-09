@@ -33,6 +33,8 @@ from db.models import AnalysisResult, engine, get_session
 from services.accuracy_tracker import accuracy_tracker
 from services.task_queue import task_queue
 from services.rollout_manager import should_use_subgraph
+from api.dependencies import get_current_user_optional
+from db.models import User
 
 router = APIRouter(prefix="/analyze", tags=["Analysis"])
 logger = structlog.get_logger()
@@ -388,7 +390,12 @@ class AnalyzeRequest(BaseModel):
 
 
 @router.post("/{symbol}")
-async def trigger_analysis(symbol: str, background_tasks: BackgroundTasks, body: AnalyzeRequest = None):
+async def trigger_analysis(
+    symbol: str,
+    background_tasks: BackgroundTasks,
+    body: AnalyzeRequest = None,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
     """触发股票分析任务
 
     支持自定义分析师配置：
@@ -411,6 +418,9 @@ async def trigger_analysis(symbol: str, background_tasks: BackgroundTasks, body:
 
     task_id = f"task_{symbol}_{uuid.uuid4().hex[:8]}"
 
+    # 从可选 JWT 认证中提取 user_id
+    user_id = str(current_user.id) if current_user else None
+
     # 返回将使用的分析师配置供前端展示
     market_config = MarketAnalystRouter.get_market_config(symbol)
     effective_analysts = body.analysts or MarketAnalystRouter.get_analysts(
@@ -430,7 +440,7 @@ async def trigger_analysis(symbol: str, background_tasks: BackgroundTasks, body:
             override_analysts=body.analysts,
             exclude_analysts=body.exclude_analysts,
             use_subgraphs=body.use_subgraphs,
-            user_id=None, # TODO: 从 Auth 中获取当前用户 ID
+            user_id=user_id,  # 从 JWT 可选认证获取
         )
         logger.info("Task enqueued", task_id=task_id, symbol=symbol, mode="queue")
     else:
@@ -445,7 +455,7 @@ async def trigger_analysis(symbol: str, background_tasks: BackgroundTasks, body:
             analysis_level=body.analysis_level,
             use_planner=body.use_planner,
             use_subgraphs=body.use_subgraphs,
-            user_id=None, # TODO: 从 Auth 中获取当前用户 ID
+            user_id=user_id,  # 从 JWT 可选认证获取
         )
         logger.info("Task scheduled", task_id=task_id, symbol=symbol, mode="background")
 

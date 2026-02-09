@@ -270,8 +270,26 @@ class WatchlistScheduler:
                 time=f"{settings.DAILY_ANALYSIS_HOUR:02d}:{settings.DAILY_ANALYSIS_MINUTE:02d}"
             )
 
+        # 北向资金板块数据采集：每日 15:30（收盘后）
+        self.scheduler.add_job(
+            self._collect_sector_data,
+            CronTrigger(hour=15, minute=30, day_of_week="mon-fri"),
+            id="collect_north_sector_data",
+            replace_existing=True,
+        )
+        logger.info("North money sector data collection scheduled (15:30 weekdays)")
+
         self.scheduler.start()
         logger.info("Watchlist scheduler started")
+
+    async def _collect_sector_data(self):
+        """采集北向资金板块数据（定时任务回调）"""
+        try:
+            from services.north_money_service import north_money_service
+            result = await north_money_service.save_sector_data()
+            logger.info("Sector data collection completed", result=result)
+        except Exception as e:
+            logger.error("Sector data collection failed", error=str(e))
 
     def shutdown(self):
         """关闭调度器"""

@@ -37,7 +37,7 @@ export class ApiError extends Error {
 /**
  * 统一请求封装
  */
-async function request<T>(
+export async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {

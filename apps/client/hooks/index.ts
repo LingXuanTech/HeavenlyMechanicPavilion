@@ -103,7 +103,15 @@ export {
   useReadiness,
   useClearHealthErrors,
   useResetCircuitBreaker,
+  useProviderHistory,
+  useTrackedProviders,
   HEALTH_KEY,
+} from './useHealth';
+export type {
+  ProviderHistoryRecord,
+  ProviderHistorySummary,
+  CircuitBreakerEvent,
+  ProviderHistoryResponse,
 } from './useHealth';
 
 // AI Scout
@@ -249,3 +257,29 @@ export type {
   SupplyChainImpact,
   SupplyChainImpactResponse,
 } from './useSupplyChain';
+
+// 风控建模
+export {
+  useCalculateVaR,
+  useStressTest,
+  useRiskMetrics,
+} from './useRiskModeling';
+export type {
+  VaRResult,
+  StressTestScenario,
+  StressTestResult,
+  RiskMetrics,
+} from './useRiskModeling';
+
+// SubGraph A/B 指标
+export {
+  useSubgraphComparison,
+  useUpdateRollout,
+  SUBGRAPH_METRICS_KEY,
+} from './useSubgraphMetrics';
+export type {
+  ModeStats,
+  Recommendation,
+  SubgraphComparison,
+  RolloutUpdateResult,
+} from './useSubgraphMetrics';

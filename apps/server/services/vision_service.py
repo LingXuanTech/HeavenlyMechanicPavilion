@@ -5,6 +5,9 @@
 
 import base64
 import io
+import json
+import uuid
+import asyncio
 import structlog
 from typing import Dict, Any, Optional, List
 from datetime import datetime
@@ -57,6 +60,8 @@ class VisionService:
         content_type: str,
         description: str = "",
         symbol: str = "",
+        file_name: Optional[str] = None,
+        batch_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """分析上传的图片
 
@@ -65,6 +70,8 @@ class VisionService:
             content_type: MIME 类型
             description: 用户描述（可选）
             symbol: 关联的股票代码（可选）
+            file_name: 原始文件名（可选）
+            batch_id: 批量分析 ID（可选）
 
         Returns:
             分析结果字典
@@ -89,7 +96,7 @@ class VisionService:
             # 调用 Vision 模型
             result = await self._call_vision_model(b64_image, processed_type, prompt)
 
-            return {
+            analysis_result = {
                 "success": True,
                 "symbol": symbol,
                 "description": description,
@@ -99,6 +106,15 @@ class VisionService:
                 "processed_size": len(processed_data),
             }
 
+            # 持久化到数据库
+            record_id = self._persist_analysis(
+                analysis_result, symbol, description, file_name, len(image_data), batch_id
+            )
+            if record_id:
+                analysis_result["record_id"] = record_id
+
+            return analysis_result
+
         except Exception as e:
             logger.error("Vision analysis failed", error=str(e), symbol=symbol)
             return {
@@ -107,6 +123,105 @@ class VisionService:
                 "symbol": symbol,
                 "timestamp": datetime.now().isoformat(),
             }
+
+    def _persist_analysis(
+        self,
+        result: Dict[str, Any],
+        symbol: str,
+        description: str,
+        file_name: Optional[str],
+        file_size: int,
+        batch_id: Optional[str] = None,
+    ):
+        """持久化分析结果到数据库"""
+        try:
+            from sqlmodel import Session
+            from db.models import VisionAnalysisRecord, engine
+
+            analysis = result.get("analysis", {})
+
+            record = VisionAnalysisRecord(
+                symbol=symbol or None,
+                content_type="image",
+                file_name=file_name,
+                file_size=file_size,
+                description=description or None,
+                analysis_json=json.dumps(analysis, ensure_ascii=False),
+                chart_type=analysis.get("chart_type"),
+                confidence=analysis.get("confidence"),
+                batch_id=batch_id,
+            )
+
+            with Session(engine) as session:
+                session.add(record)
+                session.commit()
+                session.refresh(record)
+
+            logger.info("Vision analysis persisted", id=record.id, symbol=symbol)
+            return record.id
+
+        except Exception as e:
+            logger.warning("Failed to persist vision analysis", error=str(e))
+            return None
+
+    async def analyze_batch(
+        self,
+        files: List[Dict[str, Any]],
+        description: str = "",
+        symbol: str = "",
+    ) -> Dict[str, Any]:
+        """批量分析多张图片
+
+        Args:
+            files: 文件列表，每个元素包含 image_data, content_type, filename
+            description: 共享的用户描述
+            symbol: 关联股票代码
+
+        Returns:
+            批量分析结果
+        """
+        batch_id = f"batch_{uuid.uuid4().hex[:8]}"
+        semaphore = asyncio.Semaphore(3)  # 限制并发数
+
+        async def analyze_one(file_info: Dict[str, Any], index: int):
+            async with semaphore:
+                result = await self.analyze_image(
+                    image_data=file_info["image_data"],
+                    content_type=file_info["content_type"],
+                    description=description,
+                    symbol=symbol,
+                    file_name=file_info.get("filename"),
+                    batch_id=batch_id,
+                )
+                result["index"] = index
+                result["filename"] = file_info.get("filename", f"file_{index}")
+                return result
+
+        results = await asyncio.gather(
+            *[analyze_one(f, i) for i, f in enumerate(files)],
+            return_exceptions=True,
+        )
+
+        # 处理异常
+        processed_results = []
+        for r in results:
+            if isinstance(r, Exception):
+                processed_results.append({
+                    "success": False,
+                    "error": str(r),
+                })
+            else:
+                processed_results.append(r)
+
+        successes = sum(1 for r in processed_results if r.get("success"))
+
+        return {
+            "batch_id": batch_id,
+            "total": len(files),
+            "successes": successes,
+            "failures": len(files) - successes,
+            "results": processed_results,
+        }
 
     def _process_image(self, image_data: bytes, content_type: str) -> tuple:
         """处理和压缩图片
@@ -250,18 +365,61 @@ class VisionService:
                 "confidence": 50,
             }
 
-    async def get_analysis_history(self, symbol: str = "", limit: int = 10) -> List[Dict[str, Any]]:
+    async def get_analysis_history(
+        self,
+        symbol: str = "",
+        limit: int = 10,
+        content_type: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
         """获取 Vision 分析历史
 
         Args:
             symbol: 筛选股票代码（可选）
             limit: 返回数量
+            content_type: 筛选内容类型 image|audio（可选）
 
         Returns:
             历史分析记录列表
         """
-        # TODO: 持久化到数据库后实现
-        return []
+        try:
+            from sqlmodel import Session, select, col
+            from db.models import VisionAnalysisRecord, engine
+
+            with Session(engine) as session:
+                stmt = select(VisionAnalysisRecord)
+
+                if symbol:
+                    stmt = stmt.where(VisionAnalysisRecord.symbol == symbol)
+                if content_type:
+                    stmt = stmt.where(VisionAnalysisRecord.content_type == content_type)
+
+                stmt = (
+                    stmt.order_by(col(VisionAnalysisRecord.created_at).desc())
+                    .limit(limit)
+                )
+
+                records = session.exec(stmt).all()
+
+            return [
+                {
+                    "id": r.id,
+                    "symbol": r.symbol,
+                    "content_type": r.content_type,
+                    "file_name": r.file_name,
+                    "file_size": r.file_size,
+                    "description": r.description,
+                    "analysis": json.loads(r.analysis_json) if r.analysis_json else {},
+                    "chart_type": r.chart_type,
+                    "confidence": r.confidence,
+                    "batch_id": r.batch_id,
+                    "created_at": r.created_at.isoformat(),
+                }
+                for r in records
+            ]
+
+        except Exception as e:
+            logger.error("Failed to get vision analysis history", error=str(e))
+            return []
 
 
 # 单例

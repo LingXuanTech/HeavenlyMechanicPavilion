@@ -37,6 +37,8 @@ import {
   useHealthErrors,
   useClearHealthErrors,
   useSystemUptime,
+  useSubgraphComparison,
+  useUpdateRollout,
 } from '../hooks';
 import type * as T from '../src/types/schema';
 
@@ -382,27 +384,139 @@ const SettingsPage: React.FC = () => {
   );
 
   const renderRolloutSection = () => {
-    const [rollout, setRollout] = useState<T.RolloutSettings>({
-      subgraph_rollout_percentage: 0,
-      subgraph_force_enabled_users: [],
-    });
-    const [loading, setLoading] = useState(false);
+    // 使用真实的 hooks
+    const { data: comparison, isLoading: isComparisonLoading, refetch: refetchComparison } = useSubgraphComparison(7);
+    const updateRollout = useUpdateRollout();
+    const [localRollout, setLocalRollout] = useState<number>(0);
+    const [forceUsers, setForceUsers] = useState<string>('');
 
-    // 模拟加载和保存逻辑，实际应使用 hook
+    // 同步服务端数据到本地状态
+    React.useEffect(() => {
+      if (comparison?.current_rollout_percentage !== undefined) {
+        setLocalRollout(comparison.current_rollout_percentage);
+      }
+    }, [comparison?.current_rollout_percentage]);
+
     const handleSaveRollout = async () => {
-      setLoading(true);
       try {
-        // await api.put('/settings/rollout', rollout);
+        await updateRollout.mutateAsync(localRollout);
         toast.success('灰度配置已更新');
-      } catch (err) {
+        refetchComparison();
+      } catch {
         toast.error('更新失败');
-      } finally {
-        setLoading(false);
+      }
+    };
+
+    // 推荐操作的颜色和图标
+    const getRecommendationStyle = (action: string) => {
+      switch (action) {
+        case 'subgraph_ready':
+          return { bg: 'bg-emerald-500/20', border: 'border-emerald-500/30', text: 'text-emerald-400', icon: CheckCircle };
+        case 'monolith_better':
+          return { bg: 'bg-red-500/20', border: 'border-red-500/30', text: 'text-red-400', icon: AlertTriangle };
+        default:
+          return { bg: 'bg-amber-500/20', border: 'border-amber-500/30', text: 'text-amber-400', icon: AlertCircle };
       }
     };
 
     return (
       <div className="space-y-4">
+        {/* A/B 对比数据卡片 */}
+        {isComparisonLoading ? (
+          <div className="p-4 bg-surface-overlay/30 rounded-lg border border-border-strong flex items-center justify-center">
+            <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+            <span className="ml-2 text-stone-400 text-sm">加载对比数据...</span>
+          </div>
+        ) : comparison ? (
+          <>
+            {/* 推荐操作 */}
+            {comparison.recommendation && (
+              <div className={`p-4 rounded-lg border ${getRecommendationStyle(comparison.recommendation.action).bg} ${getRecommendationStyle(comparison.recommendation.action).border}`}>
+                <div className="flex items-start gap-3">
+                  {React.createElement(getRecommendationStyle(comparison.recommendation.action).icon, {
+                    className: `w-5 h-5 ${getRecommendationStyle(comparison.recommendation.action).text} flex-shrink-0 mt-0.5`
+                  })}
+                  <div className="flex-1">
+                    <h4 className={`font-medium ${getRecommendationStyle(comparison.recommendation.action).text}`}>
+                      {comparison.recommendation.action === 'subgraph_ready' && '✓ SubGraph 已就绪'}
+                      {comparison.recommendation.action === 'monolith_better' && '⚠ Monolith 表现更优'}
+                      {comparison.recommendation.action === 'needs_more_data' && '⏳ 需要更多数据'}
+                    </h4>
+                    <p className="text-xs text-stone-400 mt-1">{comparison.recommendation.reason}</p>
+                    <p className="text-xs text-stone-500 mt-2">
+                      建议灰度比例: <span className="text-orange-400 font-mono">{comparison.recommendation.suggested_rollout}%</span>
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Monolith vs SubGraph 对比 */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Monolith 统计 */}
+              <div className="p-4 bg-surface-overlay/30 rounded-lg border border-border-strong">
+                <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-400" />
+                  Monolith
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-stone-400">样本数</span>
+                    <span className="text-white font-mono">{comparison.monolith.count}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-stone-400">成功率</span>
+                    <span className={`font-mono ${(comparison.monolith.success_rate ?? 0) >= 90 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {comparison.monolith.success_rate?.toFixed(1) ?? '-'}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-stone-400">平均耗时</span>
+                    <span className="text-white font-mono">{comparison.monolith.avg_elapsed_seconds?.toFixed(1) ?? '-'}s</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-stone-400">平均置信度</span>
+                    <span className="text-white font-mono">{comparison.monolith.avg_confidence?.toFixed(0) ?? '-'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* SubGraph 统计 */}
+              <div className="p-4 bg-surface-overlay/30 rounded-lg border border-orange-500/30">
+                <h4 className="text-white font-medium mb-3 flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-orange-400" />
+                  SubGraph
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-stone-400">样本数</span>
+                    <span className="text-white font-mono">{comparison.subgraph.count}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-stone-400">成功率</span>
+                    <span className={`font-mono ${(comparison.subgraph.success_rate ?? 0) >= 90 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                      {comparison.subgraph.success_rate?.toFixed(1) ?? '-'}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-stone-400">平均耗时</span>
+                    <span className="text-white font-mono">{comparison.subgraph.avg_elapsed_seconds?.toFixed(1) ?? '-'}s</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-stone-400">平均置信度</span>
+                    <span className="text-white font-mono">{comparison.subgraph.avg_confidence?.toFixed(0) ?? '-'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-stone-500 text-center">
+              统计周期: 最近 {comparison.period_days} 天
+            </p>
+          </>
+        ) : null}
+
+        {/* 灰度比例滑块 */}
         <div className="p-4 bg-surface-overlay/30 rounded-lg border border-border-strong">
           <h4 className="text-white font-medium mb-2">SubGraph 架构灰度比例</h4>
           <div className="flex items-center gap-4">
@@ -410,33 +524,35 @@ const SettingsPage: React.FC = () => {
               type="range"
               min="0"
               max="100"
-              value={rollout.subgraph_rollout_percentage}
-              onChange={(e) => setRollout({ ...rollout, subgraph_rollout_percentage: parseInt(e.target.value) })}
+              value={localRollout}
+              onChange={(e) => setLocalRollout(parseInt(e.target.value))}
               className="flex-1 h-2 bg-surface-muted rounded-lg appearance-none cursor-pointer accent-orange-500"
             />
-            <span className="text-orange-400 font-mono w-12 text-right">{rollout.subgraph_rollout_percentage}%</span>
+            <span className="text-orange-400 font-mono w-12 text-right">{localRollout}%</span>
           </div>
           <p className="text-xs text-stone-500 mt-2">
             控制多少比例的请求将路由到新的 SubGraph 模块化架构。
           </p>
         </div>
 
+        {/* 强制启用用户 */}
         <div className="p-4 bg-surface-overlay/30 rounded-lg border border-border-strong">
           <h4 className="text-white font-medium mb-2">强制启用用户</h4>
           <textarea
-            value={rollout.subgraph_force_enabled_users.join(', ')}
-            onChange={(e) => setRollout({ ...rollout, subgraph_force_enabled_users: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+            value={forceUsers}
+            onChange={(e) => setForceUsers(e.target.value)}
             placeholder="用户 ID，逗号分隔"
             className="w-full h-20 px-3 py-2 bg-surface-muted border border-stone-600 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-500"
           />
         </div>
 
+        {/* 保存按钮 */}
         <button
           onClick={handleSaveRollout}
-          disabled={loading}
+          disabled={updateRollout.isPending}
           className="w-full py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
         >
-          {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+          {updateRollout.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
           保存灰度配置
         </button>
       </div>

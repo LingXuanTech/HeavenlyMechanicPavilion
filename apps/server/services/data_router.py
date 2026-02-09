@@ -165,6 +165,10 @@ def _record_provider_success(provider: str, latency: float = 0.0):
     stats["successful_requests"] += 1
     stats["total_latency"] += latency
 
+    # 同步到健康监控历史
+    from services.health_monitor import health_monitor
+    health_monitor.record_provider_call(provider, latency * 1000, success=True)
+
 
 def _record_provider_failure(provider: str, error: Exception, latency: float = 0.0):
     """记录数据源失败"""
@@ -176,6 +180,10 @@ def _record_provider_failure(provider: str, error: Exception, latency: float = 0
     stats["failed_requests"] += 1
     stats["total_latency"] += latency
     stats["last_error"] = str(error)
+
+    # 同步到健康监控历史
+    from services.health_monitor import health_monitor
+    health_monitor.record_provider_call(provider, latency * 1000, success=False, error=str(error))
 
     logger.warning(
         "Provider failure recorded",

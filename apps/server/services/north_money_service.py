@@ -13,6 +13,7 @@
 from datetime import datetime, date as DateType, time as TimeType
 from typing import List, Optional, Dict, Any, Tuple
 from pydantic import BaseModel, Field
+import json
 import structlog
 import akshare as ak
 import pandas as pd
@@ -844,11 +845,131 @@ class NorthMoneyService:
                 data_range=""
             )
 
-    async def get_sector_flow_history(self, days: int = 5) -> Dict[str, List[float]]:
-        """获取板块资金流向历史（简化版，用于趋势分析）"""
-        # 暂时保留，因为任务主要关注整体北向资金持久化
-        logger.debug("Sector flow history not implemented, returning empty")
-        return {}
+    async def get_sector_flow_history(self, days: int = 5, sector: Optional[str] = None) -> Dict[str, Any]:
+        """获取板块资金流向历史
+
+        从数据库查询持久化的板块流向数据，按 sector_name 分组返回。
+
+        Args:
+            days: 查询天数
+            sector: 筛选特定板块（可选）
+
+        Returns:
+            板块流向历史数据
+        """
+        try:
+            from sqlmodel import Session, select, col
+            from db.models import NorthMoneySectorRecord, engine
+            from datetime import timedelta
+
+            cutoff = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+
+            with Session(engine) as session:
+                stmt = (
+                    select(NorthMoneySectorRecord)
+                    .where(col(NorthMoneySectorRecord.date) >= cutoff)
+                )
+                if sector:
+                    stmt = stmt.where(NorthMoneySectorRecord.sector_name == sector)
+                stmt = stmt.order_by(NorthMoneySectorRecord.date.asc())
+
+                records = session.exec(stmt).all()
+
+            if not records:
+                return {"days": days, "sector": sector, "data": {}, "total_records": 0}
+
+            # 按板块分组
+            grouped: Dict[str, list] = {}
+            for r in records:
+                if r.sector_name not in grouped:
+                    grouped[r.sector_name] = []
+                grouped[r.sector_name].append({
+                    "date": r.date,
+                    "net_inflow": r.net_inflow,
+                    "buy_amount": r.buy_amount,
+                    "sell_amount": r.sell_amount,
+                    "top_stocks": json.loads(r.top_stocks_json) if r.top_stocks_json else [],
+                })
+
+            return {
+                "days": days,
+                "sector": sector,
+                "data": grouped,
+                "total_records": len(records),
+                "sectors": list(grouped.keys()),
+            }
+
+        except Exception as e:
+            logger.error("Failed to get sector flow history", error=str(e))
+            return {"days": days, "sector": sector, "data": {}, "total_records": 0, "error": str(e)}
+
+    async def save_sector_data(self) -> Dict[str, Any]:
+        """采集并持久化板块级北向资金数据
+
+        调用 AkShare 获取板块排名数据，写入 NorthMoneySectorRecord。
+        适合由定时任务在每日 15:30 调用。
+        """
+        import json as _json
+        try:
+            df = await asyncio.to_thread(ak.stock_hsgt_board_rank_em)
+
+            if df is None or df.empty:
+                logger.warning("No sector data from AkShare")
+                return {"saved": 0, "message": "No data available"}
+
+            today = datetime.now().strftime("%Y-%m-%d")
+            saved_count = 0
+
+            from sqlmodel import Session
+            from db.models import NorthMoneySectorRecord, engine
+
+            with Session(engine) as session:
+                for _, row in df.iterrows():
+                    try:
+                        sector_name = str(row.get("板块名称", row.get("行业", "")))
+                        if not sector_name:
+                            continue
+
+                        net_inflow = float(row.get("净买入", row.get("净流入", 0)) or 0) / 1e8
+                        buy_amount = float(row.get("买入金额", 0) or 0) / 1e8
+                        sell_amount = float(row.get("卖出金额", 0) or 0) / 1e8
+
+                        # 检查是否已存在
+                        from sqlmodel import select
+                        existing = session.exec(
+                            select(NorthMoneySectorRecord)
+                            .where(NorthMoneySectorRecord.date == today)
+                            .where(NorthMoneySectorRecord.sector_name == sector_name)
+                        ).first()
+
+                        if existing:
+                            existing.net_inflow = net_inflow
+                            existing.buy_amount = buy_amount
+                            existing.sell_amount = sell_amount
+                        else:
+                            record = NorthMoneySectorRecord(
+                                date=today,
+                                sector_name=sector_name,
+                                net_inflow=net_inflow,
+                                buy_amount=buy_amount,
+                                sell_amount=sell_amount,
+                                top_stocks_json="[]",
+                            )
+                            session.add(record)
+
+                        saved_count += 1
+                    except Exception as row_err:
+                        logger.warning("Failed to save sector row", error=str(row_err))
+                        continue
+
+                session.commit()
+
+            logger.info("Sector data saved", date=today, count=saved_count)
+            return {"saved": saved_count, "date": today}
+
+        except Exception as e:
+            logger.error("Failed to save sector data", error=str(e))
+            return {"saved": 0, "error": str(e)}
 
     # ============ 盘中实时流向 ============
 

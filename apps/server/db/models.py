@@ -428,6 +428,90 @@ class NorthMoneyHistoryRecord(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=datetime.now)
 
 
+# ============ 北向资金板块流向历史 ============
+
+class NorthMoneySectorRecord(SQLModel, table=True):
+    """北向资金板块级流向历史记录"""
+    __tablename__ = "north_money_sector_history"
+    __table_args__ = (
+        Index("ix_north_sector_date_name", "date", "sector_name"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    date: str = Field(index=True)                              # 日期 YYYY-MM-DD
+    sector_name: str = Field(index=True)                       # 板块名称
+    net_inflow: float = Field(default=0.0)                     # 板块净流入（亿元）
+    buy_amount: float = Field(default=0.0)                     # 买入金额（亿元）
+    sell_amount: float = Field(default=0.0)                    # 卖出金额（亿元）
+    top_stocks_json: str = Field(default="[]")                 # 板块内 TOP 股票 JSON
+
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
+# ============ Vision 分析记录 ============
+
+class VisionAnalysisRecord(SQLModel, table=True):
+    """Vision 图表分析持久化记录"""
+    __tablename__ = "vision_analysis_records"
+    __table_args__ = (
+        Index("ix_vision_symbol_created", "symbol", "created_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    symbol: Optional[str] = Field(default=None, index=True)    # 关联股票代码
+    content_type: str = Field(default="image")                 # image | audio
+    file_name: Optional[str] = Field(default=None)             # 原始文件名
+    file_size: Optional[int] = Field(default=None)             # 文件大小（字节）
+    description: Optional[str] = Field(default=None)           # 用户补充说明
+    analysis_json: str = Field(default="{}")                   # 分析结果 JSON
+    chart_type: Optional[str] = Field(default=None)            # 图表类型
+    confidence: Optional[float] = Field(default=None)          # 置信度
+    batch_id: Optional[str] = Field(default=None, index=True)  # 批量分析 ID
+
+    created_at: datetime = Field(default_factory=datetime.now)
+
+
+# ============ 推送通知模型 ============
+
+class NotificationConfig(SQLModel, table=True):
+    """用户推送通知配置"""
+    __tablename__ = "notification_configs"
+    __table_args__ = (
+        Index("ix_notif_config_user_channel", "user_id", "channel", unique=True),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)                           # 关联用户 ID
+    channel: str = Field(default="telegram")                   # telegram | wechat | email
+    channel_user_id: Optional[str] = Field(default=None)       # 渠道内用户标识（如 chat_id）
+    is_enabled: bool = Field(default=True)                     # 是否启用
+    signal_threshold: str = Field(default="STRONG_BUY")        # STRONG_BUY | BUY | ALL
+    quiet_hours_start: Optional[int] = Field(default=None)     # 静默开始时（0-23）
+    quiet_hours_end: Optional[int] = Field(default=None)       # 静默结束时（0-23）
+
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+
+class NotificationLog(SQLModel, table=True):
+    """推送通知日志"""
+    __tablename__ = "notification_logs"
+    __table_args__ = (
+        Index("ix_notif_log_user_sent", "user_id", "sent_at"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(index=True)
+    channel: str = Field(default="telegram")
+    title: str = Field(default="")
+    body: str = Field(default="")
+    signal: Optional[str] = Field(default=None)                # 信号类型
+    symbol: Optional[str] = Field(default=None)                # 关联股票
+    sent_at: datetime = Field(default_factory=datetime.now)
+    delivered: bool = Field(default=False)
+    error: Optional[str] = Field(default=None)
+
+
 def get_engine():
     """根据配置创建数据库引擎"""
     db_url = settings.database_url

@@ -3,6 +3,7 @@
 提供沪深港通北向资金数据接口
 """
 
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, List
 import structlog
@@ -289,4 +290,41 @@ async def sync_north_money_data(
         raise HTTPException(status_code=400, detail="Invalid date format, use YYYY-MM-DD")
     except Exception as e:
         logger.error("Failed to sync north money data", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/sector-history")
+async def get_sector_flow_history(
+    days: int = Query(default=5, ge=1, le=30, description="查询天数"),
+    sector: Optional[str] = Query(None, description="筛选板块名称"),
+):
+    """
+    获取北向资金板块流向历史
+
+    从数据库查询持久化的板块级流向数据，按板块分组返回。
+    需要先通过定时任务或 POST /sync-sectors 采集数据。
+    """
+    try:
+        return await north_money_service.get_sector_flow_history(days=days, sector=sector)
+    except Exception as e:
+        logger.error("Failed to get sector flow history", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/sync-sectors", status_code=201)
+async def sync_sector_data():
+    """
+    手动触发板块级北向资金数据采集
+
+    调用 AkShare 获取板块排名数据并持久化到数据库。
+    """
+    try:
+        result = await north_money_service.save_sector_data()
+        if result.get("error"):
+            raise HTTPException(status_code=500, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to sync sector data", error=str(e))
         raise HTTPException(status_code=500, detail=str(e))

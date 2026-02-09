@@ -84,6 +84,7 @@ class HealthMonitorService:
     2. 收集系统指标
     3. 记录和追踪错误
     4. 提供诊断 API
+    5. 记录数据源调用历史（延迟、成功/失败、熔断事件）
     """
 
     _instance = None
@@ -92,6 +93,11 @@ class HealthMonitorService:
     _component_cache: Dict[str, ComponentHealth] = {}
     _cache_ttl = timedelta(seconds=30)
     _last_check: Optional[datetime] = None
+
+    # 数据源调用历史：{ provider: deque([{timestamp, latency_ms, success, error}]) }
+    _provider_history: Dict[str, deque] = {}
+    # 熔断事件时间线
+    _circuit_breaker_events: deque = deque(maxlen=200)
 
     def __new__(cls):
         if cls._instance is None:
@@ -310,6 +316,98 @@ class HealthMonitorService:
             message=f"Available: {', '.join(providers)}",
             last_check=datetime.now()
         )
+
+    def record_provider_call(
+        self,
+        provider: str,
+        latency_ms: float,
+        success: bool,
+        error: Optional[str] = None,
+    ):
+        """记录数据源调用（供 data_router 调用）
+
+        Args:
+            provider: 数据源名称 (akshare/yfinance/alpha_vantage)
+            latency_ms: 调用延迟（毫秒）
+            success: 是否成功
+            error: 错误信息（失败时）
+        """
+        if provider not in self._provider_history:
+            self._provider_history[provider] = deque(maxlen=500)
+
+        record = {
+            "timestamp": datetime.now().isoformat(),
+            "latency_ms": round(latency_ms, 2),
+            "success": success,
+            "error": error[:200] if error else None,
+        }
+        self._provider_history[provider].append(record)
+
+        # 检测熔断事件：连续失败达到阈值
+        if not success:
+            recent_failures = sum(
+                1 for r in list(self._provider_history[provider])[-5:]
+                if not r["success"]
+            )
+            if recent_failures >= 5:
+                self._circuit_breaker_events.append({
+                    "timestamp": datetime.now().isoformat(),
+                    "provider": provider,
+                    "event": "circuit_open",
+                    "message": f"{provider} 连续失败 {recent_failures} 次，触发熔断",
+                })
+
+    def get_provider_history(
+        self, provider: str, minutes: int = 60
+    ) -> Dict[str, Any]:
+        """获取数据源调用历史
+
+        Args:
+            provider: 数据源名称
+            minutes: 查询最近 N 分钟的数据
+
+        Returns:
+            包含调用记录、统计摘要和熔断事件的字典
+        """
+        cutoff = (datetime.now() - timedelta(minutes=minutes)).isoformat()
+
+        # 过滤时间范围内的记录
+        history = self._provider_history.get(provider, deque())
+        records = [r for r in history if r["timestamp"] >= cutoff]
+
+        # 统计摘要
+        total = len(records)
+        successes = sum(1 for r in records if r["success"])
+        failures = total - successes
+        latencies = [r["latency_ms"] for r in records if r["success"]]
+
+        summary = {
+            "total_calls": total,
+            "successes": successes,
+            "failures": failures,
+            "success_rate": round(successes / total * 100, 2) if total > 0 else 0,
+            "avg_latency_ms": round(sum(latencies) / len(latencies), 2) if latencies else 0,
+            "p95_latency_ms": round(sorted(latencies)[int(len(latencies) * 0.95)] if latencies else 0, 2),
+            "max_latency_ms": round(max(latencies), 2) if latencies else 0,
+        }
+
+        # 相关熔断事件
+        cb_events = [
+            e for e in self._circuit_breaker_events
+            if e["provider"] == provider and e["timestamp"] >= cutoff
+        ]
+
+        return {
+            "provider": provider,
+            "period_minutes": minutes,
+            "records": records,
+            "summary": summary,
+            "circuit_breaker_events": cb_events,
+        }
+
+    def get_all_provider_histories(self) -> List[str]:
+        """获取所有有记录的数据源名称"""
+        return list(self._provider_history.keys())
 
     def get_system_metrics(self) -> SystemMetrics:
         """获取系统指标"""

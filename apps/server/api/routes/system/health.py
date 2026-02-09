@@ -302,3 +302,29 @@ async def reset_circuit_breaker(provider: str):
     except Exception as e:
         logger.error("Failed to reset circuit breaker", provider=provider, error=str(e))
         raise HTTPException(status_code=500, detail=f"重置熔断失败: {str(e)}")
+
+
+@router.get("/provider-history")
+async def get_provider_history(
+    provider: str = Query(..., description="数据源名称 (akshare/yfinance/alpha_vantage)"),
+    minutes: int = Query(default=60, ge=1, le=1440, description="查询最近 N 分钟"),
+):
+    """
+    获取数据源调用历史
+
+    返回指定数据源在时间范围内的调用记录、统计摘要和熔断事件。
+    用于 HealthPage 的延迟趋势折线图和熔断事件时间线。
+    """
+    try:
+        return health_monitor.get_provider_history(provider, minutes)
+    except Exception as e:
+        logger.error("Failed to get provider history", provider=provider, error=str(e))
+        raise HTTPException(status_code=500, detail=f"获取数据源历史失败: {str(e)}")
+
+
+@router.get("/provider-history/providers")
+async def get_tracked_providers():
+    """
+    获取所有有调用记录的数据源名称列表
+    """
+    return {"providers": health_monitor.get_all_provider_histories()}

@@ -43,6 +43,7 @@ from services.accuracy_tracker import accuracy_tracker
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 from db.models import AnalysisResult, engine
+from services.rollout_manager import should_use_subgraph
 from sqlmodel import Session
 import json
 import time
@@ -109,6 +110,15 @@ class AnalysisWorker:
             config["analysis_level"] = task.analysis_level
             config["use_planner"] = task.use_planner
             market = MarketRouter.get_market(symbol)
+
+            # 灰度路由逻辑
+            effective_use_subgraphs = should_use_subgraph(
+                user_id=getattr(task, "user_id", None),
+                request_id=task_id,
+                force_param=getattr(task, "use_subgraphs", None),
+            )
+            config["use_subgraphs"] = effective_use_subgraphs
+            architecture_mode = "subgraph" if effective_use_subgraphs else "monolith"
 
             # 选择分析师
             selected_analysts = MarketAnalystRouter.get_analysts(
@@ -223,6 +233,7 @@ class AnalysisWorker:
                     task_id=task_id,
                     status="completed",
                     elapsed_seconds=elapsed_seconds,
+                    architecture_mode=architecture_mode,
                 )
                 session.add(analysis_result)
                 session.commit()
@@ -315,6 +326,7 @@ class AnalysisWorker:
                     status="failed",
                     error_message=str(e),
                     elapsed_seconds=elapsed_seconds,
+                    architecture_mode=architecture_mode if 'architecture_mode' in locals() else "unknown",
                 )
                 session.add(analysis_result)
                 session.commit()

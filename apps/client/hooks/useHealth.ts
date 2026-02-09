@@ -15,6 +15,7 @@ import {
   checkLiveness,
   checkReadiness,
   resetCircuitBreaker,
+  request,
 } from '../services/api';
 
 export const HEALTH_KEY = ['health'];
@@ -137,5 +138,66 @@ export function useResetCircuitBreaker() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [...HEALTH_KEY, 'report'] });
     },
+  });
+}
+
+// === 数据源调用历史 ===
+
+export interface ProviderHistoryRecord {
+  timestamp: string;
+  latency_ms: number;
+  success: boolean;
+  error: string | null;
+}
+
+export interface ProviderHistorySummary {
+  total_calls: number;
+  successes: number;
+  failures: number;
+  success_rate: number;
+  avg_latency_ms: number;
+  p95_latency_ms: number;
+  max_latency_ms: number;
+}
+
+export interface CircuitBreakerEvent {
+  timestamp: string;
+  provider: string;
+  event: string;
+  message: string;
+}
+
+export interface ProviderHistoryResponse {
+  provider: string;
+  period_minutes: number;
+  records: ProviderHistoryRecord[];
+  summary: ProviderHistorySummary;
+  circuit_breaker_events: CircuitBreakerEvent[];
+}
+
+/**
+ * 获取数据源调用历史
+ */
+export function useProviderHistory(provider: string, minutes: number = 60) {
+  return useQuery({
+    queryKey: [...HEALTH_KEY, 'provider-history', provider, minutes],
+    queryFn: () =>
+      request<ProviderHistoryResponse>(
+        `/health/provider-history?provider=${encodeURIComponent(provider)}&minutes=${minutes}`,
+      ),
+    enabled: !!provider,
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
+  });
+}
+
+/**
+ * 获取所有有记录的数据源名称
+ */
+export function useTrackedProviders() {
+  return useQuery({
+    queryKey: [...HEALTH_KEY, 'tracked-providers'],
+    queryFn: () => request<{ providers: string[] }>('/health/provider-history/providers'),
+    staleTime: 60 * 1000,
   });
 }
