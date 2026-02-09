@@ -63,12 +63,20 @@ export interface UseStreamingAnalysisOptions {
   typewriterSpeed?: number;
   /** 是否自动开始 */
   autoStart?: boolean;
+  /** 是否启用自动重连 */
+  enableReconnect?: boolean;
+  /** 最大重连次数 */
+  maxReconnectAttempts?: number;
+  /** 初始重连延迟 (ms) */
+  reconnectDelay?: number;
   /** 阶段变化回调 */
   onStageChange?: (stage: string) => void;
   /** 完成回调 */
   onComplete?: (analysis: T.AgentAnalysis) => void;
   /** 错误回调 */
   onError?: (error: string) => void;
+  /** 重连回调 */
+  onReconnect?: (attempt: number) => void;
 }
 
 /**
@@ -96,9 +104,13 @@ export interface UseStreamingAnalysisOptions {
 export function useStreamingAnalysis(options: UseStreamingAnalysisOptions = {}) {
   const {
     typewriterSpeed = 15,
+    enableReconnect = true,
+    maxReconnectAttempts = 3,
+    reconnectDelay = 1000,
     onStageChange,
     onComplete,
     onError,
+    onReconnect,
   } = options;
 
   // 流式打字机
@@ -121,12 +133,20 @@ export function useStreamingAnalysis(options: UseStreamingAnalysisOptions = {}) 
   // Refs
   const eventSourceRef = useRef<EventSource | null>(null);
   const taskIdRef = useRef<string | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isManualDisconnectRef = useRef(false);
 
   // 断开连接
   const disconnect = useCallback(() => {
+    isManualDisconnectRef.current = true;
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
+    }
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
     }
     setIsConnected(false);
   }, []);
@@ -140,7 +160,104 @@ export function useStreamingAnalysis(options: UseStreamingAnalysisOptions = {}) 
     setError(null);
     clearTypewriter();
     taskIdRef.current = null;
+    reconnectAttemptsRef.current = 0;
   }, [disconnect, clearTypewriter]);
+
+  // 连接 SSE 流（支持重连）
+  const connectSSE = useCallback((taskId: string) => {
+    isManualDisconnectRef.current = false;
+
+    const eventSource = new EventSource(`${API_BASE}/analyze/stream/${taskId}`);
+    eventSourceRef.current = eventSource;
+    setIsConnected(true);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const parsed = JSON.parse(event.data) as SSEEvent;
+
+        // 处理文本块事件
+        if (parsed.event === 'text_chunk') {
+          const chunkData = (parsed as SSETextChunkEvent).data;
+          append(chunkData.chunk);
+          setStageProgress(chunkData.progress);
+        }
+        // 处理阶段事件
+        else if (parsed.event?.startsWith('stage_')) {
+          const stageData = (parsed as SSEStageEvent).data;
+          const newStage = stageData.stage || parsed.event.replace('stage_', '');
+
+          if (newStage === 'analyst') setStage('analyst');
+          else if (newStage === 'debate') setStage('debate');
+          else if (newStage === 'risk') setStage('risk');
+          else if (newStage === 'final') setStage('synthesis');
+
+          onStageChange?.(newStage);
+        }
+        // 处理完成事件
+        else if (parsed.event === 'analysis_complete') {
+          const analysisData = (parsed as SSEAnalysisCompleteEvent).data;
+          setAnalysis(analysisData);
+          setStage('complete');
+          setStageProgress(100);
+          disconnect();
+          onComplete?.(analysisData);
+        }
+        // 处理错误事件
+        else if (parsed.event === 'error') {
+          const errMsg = (parsed as SSEStageEvent).data.message || 'Unknown error';
+          setError(errMsg);
+          setStage('error');
+          disconnect();
+          onError?.(errMsg);
+        }
+      } catch {
+        // 忽略解析错误
+      }
+    };
+
+    eventSource.onerror = () => {
+      // 如果是手动断开，不重连
+      if (isManualDisconnectRef.current) {
+        return;
+      }
+
+      setIsConnected(false);
+
+      // 尝试重连（指数退避）
+      if (enableReconnect && reconnectAttemptsRef.current < maxReconnectAttempts) {
+        reconnectAttemptsRef.current += 1;
+        const delay = reconnectDelay * Math.pow(2, reconnectAttemptsRef.current - 1);
+
+        console.log(
+          `SSE connection lost. Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts})...`
+        );
+
+        onReconnect?.(reconnectAttemptsRef.current);
+
+        reconnectTimeoutRef.current = setTimeout(() => {
+          if (taskIdRef.current && !isManualDisconnectRef.current) {
+            connectSSE(taskIdRef.current);
+          }
+        }, delay);
+      } else {
+        // 重连失败
+        setError('Connection lost. Please refresh the page.');
+        setStage('error');
+        disconnect();
+        onError?.('Connection lost after multiple retry attempts');
+      }
+    };
+  }, [
+    append,
+    disconnect,
+    enableReconnect,
+    maxReconnectAttempts,
+    reconnectDelay,
+    onStageChange,
+    onComplete,
+    onError,
+    onReconnect,
+  ]);
 
   // 开始分析
   const startAnalysis = useCallback(async (symbol: string, date?: string) => {
@@ -163,60 +280,7 @@ export function useStreamingAnalysis(options: UseStreamingAnalysisOptions = {}) 
       taskIdRef.current = taskId;
 
       // 2. 连接 SSE 流
-      const eventSource = new EventSource(`${API_BASE}/analyze/stream/${taskId}`);
-      eventSourceRef.current = eventSource;
-      setIsConnected(true);
-
-      eventSource.onmessage = (event) => {
-        try {
-          const parsed = JSON.parse(event.data) as SSEEvent;
-
-          // 处理文本块事件
-          if (parsed.event === 'text_chunk') {
-            const chunkData = (parsed as SSETextChunkEvent).data;
-            append(chunkData.chunk);
-            setStageProgress(chunkData.progress);
-          }
-          // 处理阶段事件
-          else if (parsed.event?.startsWith('stage_')) {
-            const stageData = (parsed as SSEStageEvent).data;
-            const newStage = stageData.stage || parsed.event.replace('stage_', '');
-
-            if (newStage === 'analyst') setStage('analyst');
-            else if (newStage === 'debate') setStage('debate');
-            else if (newStage === 'risk') setStage('risk');
-            else if (newStage === 'final') setStage('synthesis');
-
-            onStageChange?.(newStage);
-          }
-          // 处理完成事件
-          else if (parsed.event === 'analysis_complete') {
-            const analysisData = (parsed as SSEAnalysisCompleteEvent).data;
-            setAnalysis(analysisData);
-            setStage('complete');
-            setStageProgress(100);
-            disconnect();
-            onComplete?.(analysisData);
-          }
-          // 处理错误事件
-          else if (parsed.event === 'error') {
-            const errMsg = (parsed as SSEStageEvent).data.message || 'Unknown error';
-            setError(errMsg);
-            setStage('error');
-            disconnect();
-            onError?.(errMsg);
-          }
-        } catch {
-          // 忽略解析错误
-        }
-      };
-
-      eventSource.onerror = () => {
-        setError('Connection lost');
-        setStage('error');
-        disconnect();
-        onError?.('Connection lost');
-      };
+      connectSSE(taskId);
 
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Unknown error';
@@ -224,7 +288,7 @@ export function useStreamingAnalysis(options: UseStreamingAnalysisOptions = {}) 
       setStage('error');
       onError?.(errMsg);
     }
-  }, [reset, append, disconnect, onStageChange, onComplete, onError]);
+  }, [reset, connectSSE, onError]);
 
   // 清理
   useEffect(() => {

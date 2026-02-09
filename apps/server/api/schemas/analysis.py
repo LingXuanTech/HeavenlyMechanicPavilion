@@ -311,9 +311,11 @@ class AnalysisHistoryItem(BaseModel):
 class AnalysisHistoryResponse(BaseModel):
     """分析历史响应"""
     items: List[AnalysisHistoryItem] = Field(..., description="历史记录列表")
-    total: int = Field(..., description="总记录数")
-    offset: int = Field(..., description="偏移量")
+    total: Optional[int] = Field(None, description="总记录数（仅 offset 分页时返回）")
+    offset: Optional[int] = Field(None, description="偏移量（offset 分页）")
     limit: int = Field(..., description="每页数量")
+    next_cursor: Optional[int] = Field(None, description="下一页游标（cursor 分页）")
+    has_more: bool = Field(False, description="是否有更多数据")
 
 
 class AnalysisDetailResponse(BaseModel):

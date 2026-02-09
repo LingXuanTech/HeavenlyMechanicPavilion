@@ -571,10 +571,21 @@ async def get_analysis_history(
     symbol: str,
     limit: int = Query(default=10, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
+    cursor: Optional[int] = Query(default=None, description="Cursor-based pagination (ID of last item)"),
     status: Optional[str] = Query(default=None, description="Filter by status: completed, failed"),
+    count_total: bool = Query(default=True, description="Whether to count total items (expensive for large datasets)"),
     session: Session = Depends(get_session)
 ):
-    """获取指定股票的历史分析记录（支持分页和状态筛选）"""
+    """获取指定股票的历史分析记录（支持 offset 和 cursor 分页）
+
+    分页方式：
+    - Offset 分页（默认）: 使用 offset 和 limit 参数
+    - Cursor 分页（推荐）: 使用 cursor 和 limit 参数，性能更好
+
+    Cursor 分页示例：
+    1. 首次请求: GET /history/AAPL?limit=10
+    2. 后续请求: GET /history/AAPL?limit=10&cursor=<last_item_id>
+    """
     statement = select(AnalysisResult).where(AnalysisResult.symbol == symbol)
 
     if status:
@@ -583,21 +594,49 @@ async def get_analysis_history(
     # 使用复合索引 ix_analysis_symbol_created
     statement = statement.order_by(AnalysisResult.created_at.desc())
 
-    # 先获取总数
-    from sqlmodel import func
-    count_stmt = select(func.count()).select_from(AnalysisResult).where(AnalysisResult.symbol == symbol)
-    if status:
-        count_stmt = count_stmt.where(AnalysisResult.status == status)
-    total = session.exec(count_stmt).one()
+    # Cursor 分页（基于 ID，性能更好）
+    if cursor is not None:
+        statement = statement.where(AnalysisResult.id < cursor)
+        # Cursor 分页不需要 offset
+        statement = statement.limit(limit)
+    else:
+        # Offset 分页（向后兼容）
+        statement = statement.offset(offset).limit(limit)
 
-    # 分页
-    statement = statement.offset(offset).limit(limit)
     results = session.exec(statement).all()
+
+    # 可选的总数计算（对大数据集很昂贵）
+    total = None
+    if count_total and cursor is None:  # Cursor 分页不计算总数
+        from sqlmodel import func
+        count_stmt = select(func.count()).select_from(AnalysisResult).where(AnalysisResult.symbol == symbol)
+        if status:
+            count_stmt = count_stmt.where(AnalysisResult.status == status)
+        total = session.exec(count_stmt).one()
+
+    # 计算下一个 cursor
+    next_cursor = results[-1].id if results else None
+    has_more = len(results) == limit  # 如果返回了 limit 条记录，可能还有更多
 
     return AnalysisHistoryResponse(
         items=[
             AnalysisHistoryItem(
                 id=r.id,
+                date=r.date,
+                signal=r.signal,
+                confidence=r.confidence,
+                status=r.status,
+                created_at=r.created_at.isoformat(),
+                task_id=r.task_id,
+            )
+            for r in results
+        ],
+        total=total,
+        offset=offset if cursor is None else None,
+        limit=limit,
+        next_cursor=next_cursor if cursor is not None else None,
+        has_more=has_more,
+    )
                 date=r.date,
                 signal=r.signal,
                 confidence=r.confidence,
