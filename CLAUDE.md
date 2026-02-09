@@ -83,7 +83,7 @@ apps/
     │   ├── dependencies.py  # FastAPI 依赖注入（API Key 验证）
     │   ├── middleware.py    # RequestTracingMiddleware（request_id 追踪）
     │   └── sse.py        # SSE 事件流封装
-    ├── services/         # 业务服务层（~35 个模块）
+    ├── services/         # 业务服务层（~35 个模块，包括 notification_service）
     ├── workers/          # 后台任务 Worker（Redis Stream 消费者）
     ├── config/
     │   ├── settings.py   # Pydantic Settings（环境变量驱动，sqlite/postgresql 双模式）
@@ -109,7 +109,7 @@ apps/
 | `market/` | 行情、龙虎榜、北向资金、解禁、跨资产、全球指数、替代数据 | 市场数据 |
 | `analysis/` | Agent 分析(SSE)、宏观、情绪、央行NLP、政策、反思、模型竞赛、视觉、供应链 | 分析决策 |
 | `trading/` | 自选股、组合、发现、对话、记忆、新闻、回测 | 交易执行 |
-| `system/` | 认证(JWT/OAuth/Passkey)、AI配置、Prompt管理、健康、管理、设置、TTS | 系统服务 |
+| `system/` | 认证(JWT/OAuth/Passkey)、AI配置、Prompt管理、通知、健康、管理、设置、TTS | 系统服务 |
 
 ### 核心数据流
 
@@ -131,6 +131,10 @@ TradingAgentsGraph (LangGraph StateGraph)
 SSE 实时推送 → GET /api/analyze/stream/{task_id}
     ↓
 前端 useStreamingAnalysis() hook → 更新 TanStack Query 缓存
+    ↓
+分析完成触发 → notification_service.notify_analysis_complete()
+    ↓
+根据用户配置推送通知 → Telegram/企业微信/钉钉
 ```
 
 ### 分析分级 (L1/L2)

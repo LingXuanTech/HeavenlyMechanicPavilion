@@ -1,6 +1,6 @@
 # 股票 Agents 监控大屏 系统架构文档 (ARCH.md)
 
-> 最后更新: 2026-02-02
+> 最后更新: 2026-02-09
 
 ## 1. 系统概述
 
@@ -12,6 +12,7 @@
 - ⚡ **分级分析**: L1 快速扫描 (15-20s) / L2 深度研究 (30-60s)
 - 🔐 **企业级认证**: JWT + OAuth 2.0 + WebAuthn/Passkey
 - 📊 **实时可视化**: SSE 推送 + TradingView 图表
+- 🔔 **智能推送**: 多渠道通知系统（Telegram/企业微信/钉钉）
 
 ## 2. 总体架构图
 
@@ -55,11 +56,18 @@ graph TD
             Cache[(Redis Cache)]
         end
 
-        subgraph "Services Layer (34 Services)"
+        subgraph "Services Layer (35 Services)"
             Core[Core Services]
             AI[AI Config Service]
             Auth[Auth Service<br/>JWT/OAuth/Passkey]
+            Notification[Notification Service<br/>多渠道推送]
         end
+    end
+
+    subgraph "Notification Channels"
+        Telegram[Telegram Bot]
+        WeChat[企业微信]
+        DingTalk[钉钉]
     end
 
     subgraph "External Services"
@@ -89,6 +97,10 @@ graph TD
     API_Layer --> Cache
     Auth --> OAuth_Providers
     Graph -.-> SSE_Client
+    Notification --> Telegram
+    Notification --> WeChat
+    Notification --> DingTalk
+    Graph -.-> Notification
 ```
 
 ## 3. 核心分层设计
@@ -120,6 +132,7 @@ graph TD
 | **认证** | `auth` | JWT 认证 |
 | | `oauth` | OAuth 2.0（Google/GitHub） |
 | | `passkey` | WebAuthn 免密认证 |
+| **通知** | `notifications` | 推送通知配置与日志 |
 | **系统** | `health` | 系统健康 + 指标 |
 | | `admin` | 管理接口（需 API Key） |
 | | `settings` | 系统设置 |
@@ -280,6 +293,8 @@ if market == "CN":
 | `ChatHistory` | id, thread_id, role, content, created_at | 对话历史 |
 | `User` | id, username, email, hashed_password, oauth_provider, passkey_credential | 用户 |
 | `AIProvider` | id, name, type, base_url, api_key_encrypted, is_enabled | AI 提供商 |
+| `NotificationConfig` | id, user_id, channel, channel_user_id, is_enabled, signal_threshold, quiet_hours_start, quiet_hours_end | 通知配置 |
+| `NotificationLog` | id, user_id, channel, title, body, signal, symbol, sent_at, delivered, error | 通知日志 |
 
 **向量数据库 (ChromaDB) 分层记忆**:
 
@@ -358,7 +373,29 @@ metadata = {
 | POST | `/api/passkey/authenticate/begin` | Passkey 认证开始 |
 | POST | `/api/passkey/authenticate/complete` | Passkey 认证完成 |
 
-### 4.4 健康检查接口
+### 4.4 通知接口
+
+| 方法 | 端点 | 功能 |
+|------|------|------|
+| GET | `/api/notifications/config` | 获取当前用户的通知配置列表 |
+| PUT | `/api/notifications/config` | 创建或更新通知配置 |
+| DELETE | `/api/notifications/config/{channel}` | 删除指定渠道的通知配置 |
+| GET | `/api/notifications/logs` | 获取通知发送日志（支持 limit 参数） |
+| POST | `/api/notifications/test` | 发送测试通知 |
+
+**通知配置参数**:
+```json
+{
+  "channel": "telegram",
+  "channel_user_id": "123456789",
+  "is_enabled": true,
+  "signal_threshold": "STRONG_BUY",  // STRONG_BUY | BUY | ALL
+  "quiet_hours_start": 22,           // 0-23, 可选
+  "quiet_hours_end": 8               // 0-23, 可选
+}
+```
+
+### 4.5 健康检查接口
 
 | 方法 | 端点 | 功能 |
 |------|------|------|
@@ -434,9 +471,159 @@ interface AgentAnalysis {
 - **请求追踪**: 每个请求注入唯一 `request_id`
 - **结构化日志**: JSON 格式 + ISO 时间戳
 
-## 7. 部署方案
+## 7. 通知系统架构
 
-### 7.1 Docker Compose
+### 7.1 系统概述
+
+通知系统支持多渠道推送（Telegram、企业微信、钉钉），具备信号阈值过滤、静默时段管理和发送日志追踪功能。
+
+### 7.2 架构设计
+
+```mermaid
+graph LR
+    subgraph "触发源"
+        Analysis[分析完成]
+        Schedule[定时任务]
+        Manual[手动测试]
+    end
+
+    subgraph "通知服务层"
+        Service[NotificationService<br/>单例服务]
+        Filter[信号阈值过滤]
+        QuietCheck[静默时段检查]
+    end
+
+    subgraph "Provider 层"
+        TelegramProvider[Telegram Provider]
+        WeChatProvider[企业微信 Provider]
+        DingTalkProvider[钉钉 Provider]
+    end
+
+    subgraph "存储层"
+        ConfigDB[(NotificationConfig<br/>用户配置)]
+        LogDB[(NotificationLog<br/>发送日志)]
+    end
+
+    Analysis --> Service
+    Schedule --> Service
+    Manual --> Service
+    Service --> Filter
+    Filter --> QuietCheck
+    QuietCheck --> TelegramProvider
+    QuietCheck --> WeChatProvider
+    QuietCheck --> DingTalkProvider
+    Service --> ConfigDB
+    Service --> LogDB
+```
+
+### 7.3 核心组件
+
+**NotificationService** (单例模式):
+- 管理多个 Provider 实例
+- 信号阈值过滤逻辑
+- 静默时段检查（支持跨午夜）
+- 发送日志记录
+
+**NotificationProvider** (抽象基类):
+```python
+class NotificationProvider(ABC):
+    @abstractmethod
+    async def send(self, channel_user_id: str, title: str, body: str) -> bool:
+        """发送通知，返回是否成功"""
+        ...
+```
+
+**已实现的 Provider**:
+- `TelegramProvider`: Telegram Bot API 推送
+
+**计划中的 Provider**:
+- `WeChatProvider`: 企业微信应用消息
+- `DingTalkProvider`: 钉钉机器人
+
+### 7.4 信号阈值过滤
+
+**信号优先级映射**:
+```python
+SIGNAL_PRIORITY = {
+    "STRONG_BUY": 5,
+    "STRONG_SELL": 5,
+    "BUY": 4,
+    "SELL": 4,
+    "HOLD": 3,
+}
+```
+
+**阈值配置**:
+- `STRONG_BUY`: 仅推送 STRONG_BUY/STRONG_SELL 信号
+- `BUY`: 推送 BUY/SELL 及以上信号
+- `ALL`: 推送所有信号（包括 HOLD）
+
+### 7.5 静默时段
+
+支持配置静默时段（如 22:00-08:00），在此期间不发送通知。
+
+**跨午夜支持**:
+```python
+# 示例：22:00-08:00
+if start <= end:
+    # 不跨午夜：如 09:00-18:00
+    return start <= current_hour < end
+else:
+    # 跨午夜：如 22:00-08:00
+    return current_hour >= start or current_hour < end
+```
+
+### 7.6 触发场景
+
+| 场景 | 触发点 | 代码位置 |
+|------|--------|----------|
+| 分析完成 | Agent 分析结束后 | `api/routes/analysis/analyze.py` |
+| 定时分析 | 每日自动分析完成 | `services/scheduler.py` |
+| 手动测试 | 用户点击测试按钮 | `api/routes/system/notifications.py` |
+
+### 7.7 数据流
+
+```
+用户配置通知 → NotificationConfig 表
+    ↓
+分析完成触发 → NotificationService.notify_analysis_complete()
+    ↓
+查询启用的配置 → 过滤信号阈值 → 检查静默时段
+    ↓
+调用 Provider.send() → Telegram Bot API
+    ↓
+记录发送日志 → NotificationLog 表
+    ↓
+前端查询日志 → GET /api/notifications/logs
+```
+
+### 7.8 Telegram Bot 配置
+
+**1. 创建 Bot**:
+- 与 [@BotFather](https://t.me/BotFather) 对话
+- 发送 `/newbot` 并按提示操作
+- 获取 Bot Token（格式：`123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11`）
+
+**2. 获取 Chat ID**:
+- 与你的 Bot 对话，发送任意消息
+- 访问 `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
+- 在返回的 JSON 中找到 `message.chat.id`
+
+**3. 配置环境变量**:
+```bash
+TELEGRAM_BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11
+TELEGRAM_API_BASE=https://api.telegram.org  # 可选，默认值
+```
+
+**4. 前端配置**:
+- 登录系统 → 设置页面 → 通知配置
+- 输入 Chat ID
+- 选择信号阈值和静默时段
+- 点击"测试通知"验证配置
+
+## 8. 部署方案
+
+### 8.1 Docker Compose
 
 ```yaml
 services:
@@ -463,7 +650,7 @@ services:
     profiles: [cache]
 ```
 
-### 7.2 生产环境配置
+### 8.2 生产环境配置
 
 ```bash
 # 启用 PostgreSQL
@@ -479,7 +666,7 @@ python -m workers.analysis_worker --name worker-1 &
 python -m workers.analysis_worker --name worker-2 &
 ```
 
-### 7.3 Kubernetes 探针
+### 8.3 Kubernetes 探针
 
 ```yaml
 livenessProbe:
@@ -497,9 +684,9 @@ readinessProbe:
   periodSeconds: 10
 ```
 
-## 8. 可观测性
+## 9. 可观测性
 
-### 8.1 日志格式
+### 9.1 日志格式
 
 ```json
 {
@@ -514,7 +701,7 @@ readinessProbe:
 }
 ```
 
-### 8.2 LangSmith 追踪
+### 9.2 LangSmith 追踪
 
 ```bash
 LANGSMITH_ENABLED=true
@@ -523,7 +710,7 @@ LANGSMITH_PROJECT=stock-agents
 LANGSMITH_TRACE_SAMPLING_RATE=1.0
 ```
 
-### 8.3 健康指标
+### 9.3 健康指标
 
 | 指标 | 警告阈值 | 严重阈值 |
 |------|----------|----------|
@@ -533,7 +720,7 @@ LANGSMITH_TRACE_SAMPLING_RATE=1.0
 | API 错误率 | > 1% | > 5% |
 | 平均响应时间 | > 500ms | > 2000ms |
 
-## 9. 目录结构
+## 10. 目录结构
 
 ```
 apps/server/
@@ -543,7 +730,7 @@ apps/server/
 │   ├── middleware.py   # 中间件
 │   ├── exceptions.py   # 自定义异常
 │   └── sse.py          # SSE 封装
-├── services/           # 34 个服务模块
+├── services/           # 35 个服务模块
 ├── workers/
 │   └── analysis_worker.py  # Redis Stream Worker
 ├── config/
@@ -568,7 +755,7 @@ apps/server/
 └── main.py             # 服务入口
 ```
 
-## 10. 依赖清单
+## 11. 依赖清单
 
 ### 后端核心 (56+)
 
