@@ -138,6 +138,19 @@ class WatchlistScheduler:
                     completed += 1
                     logger.info("Daily analysis completed", symbol=item.symbol, elapsed_seconds=elapsed_seconds)
 
+                    # 触发推送通知（不影响主流程）
+                    try:
+                        from services.notification_service import notification_service
+                        summary_text = final_json.get("recommendation", {}).get("reasoning", "")[:300]
+                        await notification_service.notify_analysis_complete(
+                            symbol=item.symbol,
+                            signal=final_json.get("signal", "Hold"),
+                            confidence=final_json.get("confidence", 50),
+                            summary=summary_text,
+                        )
+                    except Exception as notif_err:
+                        logger.warning("Failed to send notification", error=str(notif_err))
+
                 except Exception as e:
                     failed += 1
                     elapsed_seconds = round(time.time() - start_time, 2)

@@ -94,6 +94,10 @@ class Settings(BaseSettings):
     SUBGRAPH_ROLLOUT_PERCENTAGE: int = int(os.getenv("SUBGRAPH_ROLLOUT_PERCENTAGE", "0"))
     SUBGRAPH_FORCE_ENABLED_USERS: List[str] = os.getenv("SUBGRAPH_FORCE_ENABLED_USERS", "").split(",") if os.getenv("SUBGRAPH_FORCE_ENABLED_USERS") else []
 
+    # Telegram 推送通知
+    TELEGRAM_BOT_TOKEN: Optional[str] = os.getenv("TELEGRAM_BOT_TOKEN")
+    TELEGRAM_API_BASE: str = os.getenv("TELEGRAM_API_BASE", "https://api.telegram.org")
+
     @property
     def database_url(self) -> str:
         """动态生成数据库连接 URL"""

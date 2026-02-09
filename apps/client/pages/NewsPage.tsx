@@ -21,6 +21,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import PageLayout from '../components/layout/PageLayout';
+import VirtualList from '../components/common/VirtualList';
 import {
   useAggregatedNews,
   useNewsFlash,
@@ -289,11 +290,17 @@ const NewsPage: React.FC = () => {
               <p className="text-sm mt-1">尝试刷新或切换筛选条件</p>
             </div>
           ) : (
-            <div className="grid gap-4 pb-10">
-              {filteredNews.map((news) => (
+            <VirtualList
+              items={filteredNews}
+              estimateSize={160}
+              maxHeight={800}
+              overscan={3}
+              emptyText="暂无新闻数据"
+              className="pb-10"
+              renderItem={(news) => (
                 <NewsCard key={news.id} news={news} />
-              ))}
-            </div>
+              )}
+            />
           )}
         </div>
 

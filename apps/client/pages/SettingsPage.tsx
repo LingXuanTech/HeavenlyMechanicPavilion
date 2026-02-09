@@ -4,7 +4,7 @@
  * 完整功能的应用程序设置，包含账户、通知、安全、系统健康等模块
  * 使用 narrow 布局变体适合配置类页面
  */
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Settings,
@@ -27,6 +27,8 @@ import {
   Mail,
   Key,
   Loader2,
+  Send,
+  MessageCircle,
 } from 'lucide-react';
 import PageLayout from '../components/layout/PageLayout';
 import { useAuth } from '../contexts/AuthContext';
@@ -39,6 +41,11 @@ import {
   useSystemUptime,
   useSubgraphComparison,
   useUpdateRollout,
+  useNotificationConfigs,
+  useUpsertNotificationConfig,
+  useDeleteNotificationConfig,
+  useNotificationLogs,
+  useTestNotification,
 } from '../hooks';
 import type * as T from '../src/types/schema';
 
@@ -213,14 +220,218 @@ const SettingsPage: React.FC = () => {
     </div>
   );
 
-  const renderNotificationsSection = () => (
-    <div className="space-y-3">
-      <NotificationToggle label="分析完成通知" description="当 AI 分析完成时发送通知" defaultChecked />
-      <NotificationToggle label="价格预警" description="股价达到设定阈值时提醒" defaultChecked />
-      <NotificationToggle label="市场动态推送" description="重要市场新闻实时推送" />
-      <NotificationToggle label="定时报告" description="每日/每周分析报告汇总" />
-    </div>
-  );
+  const renderNotificationsSection = () => {
+    const { accessToken } = useAuth();
+    const { data: configs, isLoading: configsLoading } = useNotificationConfigs(accessToken);
+    const upsertMutation = useUpsertNotificationConfig(accessToken);
+    const deleteMutation = useDeleteNotificationConfig(accessToken);
+    const testMutation = useTestNotification(accessToken);
+    const { data: logs } = useNotificationLogs(accessToken, 20);
+
+    const telegramConfig = configs?.find((c) => c.channel === 'telegram');
+
+    const [chatId, setChatId] = useState(telegramConfig?.channel_user_id ?? '');
+    const [threshold, setThreshold] = useState(telegramConfig?.signal_threshold ?? 'STRONG_BUY');
+    const [quietStart, setQuietStart] = useState<number | null>(telegramConfig?.quiet_hours_start ?? null);
+    const [quietEnd, setQuietEnd] = useState<number | null>(telegramConfig?.quiet_hours_end ?? null);
+    const [enabled, setEnabled] = useState(telegramConfig?.is_enabled ?? true);
+
+    // 当配置加载完成后同步本地状态
+    const syncedRef = React.useRef(false);
+    React.useEffect(() => {
+      if (telegramConfig && !syncedRef.current) {
+        setChatId(telegramConfig.channel_user_id ?? '');
+        setThreshold(telegramConfig.signal_threshold);
+        setQuietStart(telegramConfig.quiet_hours_start);
+        setQuietEnd(telegramConfig.quiet_hours_end);
+        setEnabled(telegramConfig.is_enabled);
+        syncedRef.current = true;
+      }
+    }, [telegramConfig]);
+
+    const handleSave = useCallback(() => {
+      upsertMutation.mutate({
+        channel: 'telegram',
+        channel_user_id: chatId || null,
+        is_enabled: enabled,
+        signal_threshold: threshold,
+        quiet_hours_start: quietStart,
+        quiet_hours_end: quietEnd,
+      });
+    }, [chatId, enabled, threshold, quietStart, quietEnd, upsertMutation]);
+
+    const handleTest = useCallback(() => {
+      if (!chatId) return;
+      testMutation.mutate({ channel: 'telegram', channel_user_id: chatId });
+    }, [chatId, testMutation]);
+
+    if (configsLoading) {
+      return (
+        <div className="flex items-center justify-center py-8">
+          <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4">
+        {/* Telegram 配置 */}
+        <div className="p-4 bg-surface-overlay/30 rounded-lg border border-border-strong">
+          <div className="flex items-center gap-3 mb-4">
+            <MessageCircle className="w-5 h-5 text-blue-400" />
+            <div className="flex-1">
+              <h4 className="text-white font-medium">Telegram 推送</h4>
+              <p className="text-xs text-stone-500">通过 Telegram Bot 接收分析通知</p>
+            </div>
+            <button
+              onClick={() => { setEnabled(!enabled); }}
+              className={`relative w-11 h-6 rounded-full transition-colors ${
+                enabled ? 'bg-accent' : 'bg-surface-muted'
+              }`}
+            >
+              <span
+                className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                  enabled ? 'translate-x-6' : 'translate-x-1'
+                }`}
+              />
+            </button>
+          </div>
+
+          {/* Chat ID */}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs text-stone-400 mb-1">Chat ID</label>
+              <input
+                type="text"
+                value={chatId}
+                onChange={(e) => setChatId(e.target.value)}
+                placeholder="输入 Telegram Chat ID"
+                className="w-full px-3 py-2 bg-surface-muted rounded-lg text-sm text-white border border-border focus:border-accent focus:outline-none"
+              />
+            </div>
+
+            {/* 信号阈值 */}
+            <div>
+              <label className="block text-xs text-stone-400 mb-1">信号阈值</label>
+              <div className="flex gap-2">
+                {(['STRONG_BUY', 'BUY', 'ALL'] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setThreshold(t)}
+                    className={`flex-1 py-1.5 text-xs rounded-lg border transition-colors ${
+                      threshold === t
+                        ? 'bg-accent/20 border-accent text-accent'
+                        : 'bg-surface-muted border-border text-stone-400 hover:text-stone-300'
+                    }`}
+                  >
+                    {t === 'STRONG_BUY' ? '强烈信号' : t === 'BUY' ? '买卖信号' : '全部'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 静默时段 */}
+            <div>
+              <label className="block text-xs text-stone-400 mb-1">静默时段（不推送）</label>
+              <div className="flex items-center gap-2">
+                <select
+                  value={quietStart ?? ''}
+                  onChange={(e) => setQuietStart(e.target.value ? Number(e.target.value) : null)}
+                  className="flex-1 px-2 py-1.5 bg-surface-muted rounded-lg text-sm text-white border border-border focus:border-accent focus:outline-none"
+                >
+                  <option value="">不设置</option>
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>
+                  ))}
+                </select>
+                <span className="text-stone-500 text-xs">至</span>
+                <select
+                  value={quietEnd ?? ''}
+                  onChange={(e) => setQuietEnd(e.target.value ? Number(e.target.value) : null)}
+                  className="flex-1 px-2 py-1.5 bg-surface-muted rounded-lg text-sm text-white border border-border focus:border-accent focus:outline-none"
+                >
+                  <option value="">不设置</option>
+                  {Array.from({ length: 24 }, (_, i) => (
+                    <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* 操作按钮 */}
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={handleSave}
+                disabled={upsertMutation.isPending}
+                className="flex-1 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm transition-colors disabled:opacity-50"
+              >
+                {upsertMutation.isPending ? '保存中...' : '保存配置'}
+              </button>
+              <button
+                onClick={handleTest}
+                disabled={!chatId || testMutation.isPending}
+                className="px-4 py-2 bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 rounded-lg text-sm transition-colors border border-blue-600/30 disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Send className="w-3.5 h-3.5" />
+                {testMutation.isPending ? '发送中...' : '测试'}
+              </button>
+              {telegramConfig && (
+                <button
+                  onClick={() => deleteMutation.mutate('telegram')}
+                  disabled={deleteMutation.isPending}
+                  className="px-3 py-2 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded-lg text-sm transition-colors border border-red-600/30 disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* 状态反馈 */}
+            {upsertMutation.isSuccess && (
+              <p className="text-xs text-green-400 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" /> 配置已保存
+              </p>
+            )}
+            {testMutation.isSuccess && (
+              <p className="text-xs text-green-400 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" /> 测试通知已发送
+              </p>
+            )}
+            {testMutation.isError && (
+              <p className="text-xs text-red-400 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" /> 发送失败，请检查 Bot Token 和 Chat ID
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* 发送日志 */}
+        {logs && logs.length > 0 && (
+          <div className="p-4 bg-surface-overlay/30 rounded-lg border border-border-strong">
+            <h4 className="text-white font-medium text-sm mb-3">发送日志</h4>
+            <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+              {logs.map((log) => (
+                <div
+                  key={log.id}
+                  className="flex items-center justify-between text-xs py-1.5 border-b border-border/50 last:border-0"
+                >
+                  <div className="flex-1 min-w-0">
+                    <span className="text-stone-300 truncate block">{log.title}</span>
+                    <span className="text-stone-500">
+                      {new Date(log.sent_at).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <span className={`ml-2 shrink-0 ${log.delivered ? 'text-green-400' : 'text-red-400'}`}>
+                    {log.delivered ? '✓ 已送达' : '✗ 失败'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderSecuritySection = () => (
     <div className="space-y-4">
@@ -621,35 +832,6 @@ const SettingsPage: React.FC = () => {
 };
 
 // === 辅助组件 ===
-
-const NotificationToggle: React.FC<{
-  label: string;
-  description: string;
-  defaultChecked?: boolean;
-}> = ({ label, description, defaultChecked = false }) => {
-  const [checked, setChecked] = useState(defaultChecked);
-
-  return (
-    <div className="flex items-center justify-between p-3 bg-surface-overlay/30 rounded-lg">
-      <div>
-        <p className="text-sm text-stone-200">{label}</p>
-        <p className="text-xs text-stone-500">{description}</p>
-      </div>
-      <button
-        onClick={() => setChecked(!checked)}
-        className={`relative w-11 h-6 rounded-full transition-colors ${
-          checked ? 'bg-accent' : 'bg-surface-muted'
-        }`}
-      >
-        <span
-          className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-            checked ? 'translate-x-6' : 'translate-x-1'
-          }`}
-        />
-      </button>
-    </div>
-  );
-};
 
 const OAuthBindingRow: React.FC<{ provider: string; connected: boolean }> = ({ provider, connected }) => (
   <div className="flex items-center justify-between py-2">

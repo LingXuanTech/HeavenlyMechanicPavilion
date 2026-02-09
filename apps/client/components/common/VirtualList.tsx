@@ -22,6 +22,8 @@ interface VirtualListProps<T> {
   overscan?: number;
   /** 空列表占位 */
   emptyText?: string;
+  /** 为 true 时使用 height: 100% 替代 maxHeight，适配 flex 布局容器 */
+  fillHeight?: boolean;
 }
 
 function VirtualList<T>({
@@ -32,6 +34,7 @@ function VirtualList<T>({
   className = '',
   overscan = 5,
   emptyText = '暂无数据',
+  fillHeight = false,
 }: VirtualListProps<T>) {
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -54,7 +57,7 @@ function VirtualList<T>({
     <div
       ref={parentRef}
       className={`overflow-y-auto custom-scrollbar ${className}`}
-      style={{ maxHeight }}
+      style={fillHeight ? { height: '100%' } : { maxHeight }}
     >
       <div
         style={{

@@ -286,6 +286,19 @@ async def run_analysis_task(
             session.refresh(analysis_result)
             logger.info("Analysis result saved to database", symbol=symbol, task_id=task_id)
 
+        # 触发推送通知（不影响主流程）
+        try:
+            from services.notification_service import notification_service
+            summary_text = final_json.get("recommendation", {}).get("reasoning", "")[:300]
+            await notification_service.notify_analysis_complete(
+                symbol=symbol,
+                signal=final_json.get("signal", "Hold"),
+                confidence=final_json.get("confidence", 50),
+                summary=summary_text,
+            )
+        except Exception as notif_err:
+            logger.warning("Failed to send notification", error=str(notif_err))
+
         # 记录预测到反思闭环追踪
         try:
             recommendation = final_json.get("recommendation", {})

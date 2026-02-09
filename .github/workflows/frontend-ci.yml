@@ -7,11 +7,13 @@ on:
     branches: [main]
     paths:
       - "apps/client/**"
+      - "apps/server/api/**"
       - ".github/workflows/frontend-ci.yml"
   pull_request:
     branches: [main]
     paths:
       - "apps/client/**"
+      - "apps/server/api/**"
       - ".github/workflows/frontend-ci.yml"
 
 # 取消同一 PR 的旧运行
@@ -64,6 +66,21 @@ jobs:
       # 安装依赖
       - name: 安装依赖
         run: pnpm install --frozen-lockfile
+
+      # OpenAPI 类型同步检查
+      - name: 设置 Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: 导出 OpenAPI Schema
+        working-directory: apps/server
+        run: |
+          pip install fastapi pydantic pydantic-settings sqlmodel structlog python-dotenv uvicorn
+          python scripts/export_openapi_schema.py
+
+      - name: 校验前端类型是否同步
+        run: pnpm gen:types -- --check --input ../../apps/server/openapi.json
 
       # Lint 检查 (ESLint)
       - name: Lint 检查 (ESLint)

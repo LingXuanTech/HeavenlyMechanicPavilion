@@ -12,6 +12,7 @@
 """
 import json
 import asyncio
+import threading
 from datetime import datetime, timedelta
 from typing import Optional, Any, Dict
 from abc import ABC, abstractmethod
@@ -82,6 +83,28 @@ class MemoryCacheBackend(CacheBackend):
         super().__init__()
         self._cache: Dict[str, tuple[str, Optional[datetime]]] = {}
         self._lock = asyncio.Lock()
+        self._sync_lock = threading.Lock()
+
+    def get_sync(self, key: str) -> Optional[str]:
+        """线程安全的同步读取（用于非异步上下文）"""
+        with self._sync_lock:
+            if key not in self._cache:
+                self.misses += 1
+                return None
+            value, expires_at = self._cache[key]
+            if expires_at and datetime.now() > expires_at:
+                del self._cache[key]
+                self.misses += 1
+                return None
+            self.hits += 1
+            return value
+
+    def set_sync(self, key: str, value: str, ttl: Optional[int] = None) -> bool:
+        """线程安全的同步写入（用于非异步上下文）"""
+        with self._sync_lock:
+            expires_at = datetime.now() + timedelta(seconds=ttl) if ttl else None
+            self._cache[key] = (value, expires_at)
+            return True
 
     async def get(self, key: str) -> Optional[str]:
         async with self._lock:
@@ -268,20 +291,8 @@ class CacheService:
             if self._initialized:
                 logger.warning("get_sync called but backend is not MemoryCacheBackend")
             return None
-        
-        # MemoryCacheBackend.get 是异步的，但我们可以尝试直接访问其内部字典
-        # 注意：这破坏了封装，但在迁移 TTLCache 时是必要的权宜之计
-        # 更好的做法是让所有调用者都变成异步
-        try:
-            # 这是一个 hack，因为 MemoryCacheBackend 使用了 asyncio.Lock
-            # 在同步上下文中，我们只能祈祷没有竞争，或者只在初始化时使用
-            value, expires_at = self._backend._cache.get(key, (None, None))
-            if value and expires_at and datetime.now() > expires_at:
-                del self._backend._cache[key]
-                return None
-            return value
-        except Exception:
-            return None
+
+        return self._backend.get_sync(key)
 
     async def get_json(self, key: str) -> Optional[Any]:
         """获取 JSON 缓存"""
@@ -304,10 +315,8 @@ class CacheService:
         """
         if not self._initialized or not isinstance(self._backend, MemoryCacheBackend):
             return False
-        
-        expires_at = datetime.now() + timedelta(seconds=ttl) if ttl else None
-        self._backend._cache[key] = (value, expires_at)
-        return True
+
+        return self._backend.set_sync(key, value, ttl)
 
     async def set_json(self, key: str, value: Any, ttl: Optional[int] = None) -> bool:
         """设置 JSON 缓存"""

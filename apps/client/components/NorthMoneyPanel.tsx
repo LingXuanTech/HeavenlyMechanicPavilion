@@ -36,6 +36,7 @@ import {
   useNorthMoneyRotationSignal,
 } from '../hooks';
 import type * as T from '../src/types/schema';
+import VirtualList from './common/VirtualList';
 
 interface NorthMoneyPanelProps {
   compact?: boolean;
@@ -708,33 +709,20 @@ const NorthMoneyPanel: React.FC<NorthMoneyPanelProps> = ({
                 </div>
 
                 {/* Stock List */}
-                <div className="max-h-64 overflow-y-auto">
-                  {stockTab === 'buys' ? (
-                    summary.top_buys.length > 0 ? (
-                      summary.top_buys.slice(0, 10).map((stock) => (
-                        <TopStockRow
-                          key={stock.symbol}
-                          stock={stock}
-                          onClick={() => onStockClick?.(stock.symbol)}
-                        />
-                      ))
-                    ) : (
-                      <div className="text-center py-4 text-stone-500 text-sm">暂无数据</div>
-                    )
-                  ) : (
-                    summary.top_sells.length > 0 ? (
-                      summary.top_sells.slice(0, 10).map((stock) => (
-                        <TopStockRow
-                          key={stock.symbol}
-                          stock={stock}
-                          onClick={() => onStockClick?.(stock.symbol)}
-                        />
-                      ))
-                    ) : (
-                      <div className="text-center py-4 text-stone-500 text-sm">暂无数据</div>
-                    )
+                <VirtualList
+                  items={stockTab === 'buys' ? summary.top_buys : summary.top_sells}
+                  estimateSize={48}
+                  maxHeight={256}
+                  overscan={3}
+                  emptyText="暂无数据"
+                  renderItem={(stock) => (
+                    <TopStockRow
+                      key={stock.symbol}
+                      stock={stock}
+                      onClick={() => onStockClick?.(stock.symbol)}
+                    />
                   )}
-                </div>
+                />
               </>
             )}
           </>

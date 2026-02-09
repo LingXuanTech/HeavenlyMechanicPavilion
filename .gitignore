@@ -55,3 +55,6 @@ build/
 
 # Logs
 *.log
+
+# CI 临时产物
+apps/server/openapi.json

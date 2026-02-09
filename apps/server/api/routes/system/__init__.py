@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from . import auth, oauth, passkey, admin, settings, health, prompts, ai_config, tts, subgraph_metrics
+from . import auth, oauth, passkey, admin, settings, health, prompts, ai_config, tts, subgraph_metrics, notifications
 
 router = APIRouter()
 
@@ -13,3 +13,4 @@ router.include_router(prompts.router)
 router.include_router(ai_config.router)
 router.include_router(tts.router)
 router.include_router(subgraph_metrics.router)
+router.include_router(notifications.router)
