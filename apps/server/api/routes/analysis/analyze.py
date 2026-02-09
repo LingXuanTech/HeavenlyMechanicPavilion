@@ -27,6 +27,7 @@ from services.memory_service import memory_service, layered_memory, AnalysisMemo
 from services.cache_service import cache_service
 from services.data_router import MarketRouter
 from services.market_analyst_router import MarketAnalystRouter
+from services.graph_executor import collect_agent_reports
 from tradingagents.graph.trading_graph import TradingAgentsGraph
 from tradingagents.default_config import DEFAULT_CONFIG
 from config.settings import settings
@@ -199,22 +200,8 @@ async def run_analysis_task(
 
                 current_stage = stage_map.get(node_name, "progress")
 
-                # Collect reports for synthesis
-                if "macro_report" in node_data:
-                    agent_reports["macro"] = node_data["macro_report"]
-                if "market_report" in node_data:
-                    agent_reports["market"] = node_data["market_report"]
-                if "news_report" in node_data:
-                    agent_reports["news"] = node_data["news_report"]
-                if "fundamentals_report" in node_data:
-                    agent_reports["fundamentals"] = node_data["fundamentals_report"]
-                if "portfolio_report" in node_data:
-                    agent_reports["portfolio"] = node_data["portfolio_report"]
-                # A股专用报告
-                if "retail_sentiment_report" in node_data:
-                    agent_reports["retail_sentiment"] = node_data["retail_sentiment_report"]
-                if "policy_report" in node_data:
-                    agent_reports["policy"] = node_data["policy_report"]
+                # 使用统一的报告收集函数
+                collect_agent_reports(node_data, agent_reports)
 
                 event_data = {
                     "node": node_name,

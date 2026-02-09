@@ -31,21 +31,37 @@ class WatchlistScheduler:
             logger.error("Failed to update market indices", error=str(e))
 
     async def update_watchlist_prices(self):
-        """定时更新关注列表中所有股票的价格"""
+        """定时更新关注列表中所有股票的价格（批量并发）"""
         logger.info("Starting scheduled watchlist price update")
         with Session(engine) as session:
             statement = select(Watchlist)
             items = session.exec(statement).all()
 
-            for item in items:
+            if not items:
+                logger.info("No stocks in watchlist")
+                return
+
+            # 批量并发获取价格，使用 asyncio.gather
+            async def fetch_price(item):
                 try:
                     price_info = await MarketRouter.get_stock_price(item.symbol)
                     logger.info("Updated price for watchlist item", symbol=item.symbol, price=price_info.price)
+                    return {"symbol": item.symbol, "success": True, "price": price_info.price}
                 except Exception as e:
                     logger.error("Failed to update price for watchlist item", symbol=item.symbol, error=str(e))
+                    return {"symbol": item.symbol, "success": False, "error": str(e)}
 
-                # Avoid hitting rate limits
-                await asyncio.sleep(1)
+            # 并发获取所有价格（无需 sleep，MarketRouter 内部有缓存和限流）
+            results = await asyncio.gather(*[fetch_price(item) for item in items], return_exceptions=True)
+
+            # 统计结果
+            success_count = sum(1 for r in results if isinstance(r, dict) and r.get("success"))
+            logger.info(
+                "Watchlist price update completed",
+                total=len(items),
+                success=success_count,
+                failed=len(items) - success_count
+            )
 
     async def run_daily_analysis(self):
         """每日自动对 Watchlist 中所有股票进行分析"""
@@ -59,8 +75,7 @@ class WatchlistScheduler:
         try:
             # 延迟导入避免循环依赖
             from services.synthesizer import synthesizer, SynthesisContext
-            from tradingagents.graph.trading_graph import TradingAgentsGraph
-            from tradingagents.default_config import DEFAULT_CONFIG
+            from services.graph_executor import execute_trading_graph
 
             with Session(engine) as session:
                 statement = select(Watchlist)
@@ -82,41 +97,26 @@ class WatchlistScheduler:
                 try:
                     logger.info("Starting daily analysis", symbol=item.symbol, task_id=task_id, progress=f"{completed+1}/{total}")
 
-                    # 初始化图
-                    config = DEFAULT_CONFIG.copy()
-                    ta = TradingAgentsGraph(debug=False, config=config)
-
-                    # 执行分析
-                    init_state = ta.propagator.create_initial_state(item.symbol, trade_date)
-                    args = ta.propagator.get_graph_args()
-
-                    agent_reports = {}
-
-                    for chunk in ta.graph.stream(init_state, **args):
-                        for node_name, node_data in chunk.items():
-                            if "macro_report" in node_data:
-                                agent_reports["macro"] = node_data["macro_report"]
-                            if "market_report" in node_data:
-                                agent_reports["market"] = node_data["market_report"]
-                            if "news_report" in node_data:
-                                agent_reports["news"] = node_data["news_report"]
-                            if "fundamentals_report" in node_data:
-                                agent_reports["fundamentals"] = node_data["fundamentals_report"]
-                            if "portfolio_report" in node_data:
-                                agent_reports["portfolio"] = node_data["portfolio_report"]
+                    # 使用统一的图执行器
+                    result = await execute_trading_graph(
+                        symbol=item.symbol,
+                        trade_date=trade_date,
+                        analysis_level="L2",
+                        use_planner=True,
+                        debug=False,
+                    )
 
                     # 构建合成上下文
-                    elapsed_seconds = round(time.time() - start_time, 2)
                     synthesis_context = SynthesisContext(
                         analysis_level="L2",
                         task_id=task_id,
-                        elapsed_seconds=elapsed_seconds,
-                        analysts_used=["market", "news", "fundamentals", "macro"],
+                        elapsed_seconds=result.elapsed_seconds,
+                        analysts_used=list(result.agent_reports.keys()),
                         market=MarketRouter.get_market(item.symbol),
                     )
 
                     # 合成结果
-                    final_json = await synthesizer.synthesize(item.symbol, agent_reports, synthesis_context)
+                    final_json = await synthesizer.synthesize(item.symbol, result.agent_reports, synthesis_context)
                     elapsed_seconds = round(time.time() - start_time, 2)
 
                     # 保存到数据库
@@ -184,47 +184,33 @@ class WatchlistScheduler:
     async def trigger_single_analysis(self, symbol: str):
         """手动触发单个股票的分析（供管理 API 调用）"""
         from services.synthesizer import synthesizer, SynthesisContext
-        from tradingagents.graph.trading_graph import TradingAgentsGraph
-        from tradingagents.default_config import DEFAULT_CONFIG
+        from services.graph_executor import execute_trading_graph
 
         task_id = f"manual_{symbol}_{uuid.uuid4().hex[:8]}"
         trade_date = date.today().isoformat()
         start_time = time.time()
 
         try:
-            config = DEFAULT_CONFIG.copy()
-            market = MarketRouter.get_market(symbol)
-            ta = TradingAgentsGraph(debug=False, config=config, market=market)
-
-            init_state = ta.propagator.create_initial_state(symbol, trade_date, market=market)
-            args = ta.propagator.get_graph_args()
-
-            agent_reports = {}
-
-            for chunk in ta.graph.stream(init_state, **args):
-                for node_name, node_data in chunk.items():
-                    if "macro_report" in node_data:
-                        agent_reports["macro"] = node_data["macro_report"]
-                    if "market_report" in node_data:
-                        agent_reports["market"] = node_data["market_report"]
-                    if "news_report" in node_data:
-                        agent_reports["news"] = node_data["news_report"]
-                    if "fundamentals_report" in node_data:
-                        agent_reports["fundamentals"] = node_data["fundamentals_report"]
-                    if "portfolio_report" in node_data:
-                        agent_reports["portfolio"] = node_data["portfolio_report"]
+            # 使用统一的图执行器
+            result = await execute_trading_graph(
+                symbol=symbol,
+                trade_date=trade_date,
+                analysis_level="L2",
+                use_planner=True,
+                debug=False,
+            )
 
             # 构建合成上下文
-            elapsed_seconds = round(time.time() - start_time, 2)
+            market = MarketRouter.get_market(symbol)
             synthesis_context = SynthesisContext(
                 analysis_level="L2",
                 task_id=task_id,
-                elapsed_seconds=elapsed_seconds,
-                analysts_used=["market", "news", "fundamentals", "macro"],
+                elapsed_seconds=result.elapsed_seconds,
+                analysts_used=list(result.agent_reports.keys()),
                 market=market,
             )
 
-            final_json = await synthesizer.synthesize(symbol, agent_reports, synthesis_context)
+            final_json = await synthesizer.synthesize(symbol, result.agent_reports, synthesis_context)
             elapsed_seconds = round(time.time() - start_time, 2)
 
             with Session(engine) as session:
