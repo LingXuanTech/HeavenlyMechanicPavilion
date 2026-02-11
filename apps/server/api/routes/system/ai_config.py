@@ -7,14 +7,12 @@ AI 配置 API 路由
 - 连接测试
 - 配置刷新
 """
-from fastapi import APIRouter, HTTPException, Query
-from typing import List, Optional, Any, Dict
+from fastapi import APIRouter, HTTPException
 import structlog
 
 from services.ai_config_service import ai_config_service
 from api.schemas.ai_config import (
     AIProvider,
-    AIModelConfig,
     AIConfigStatus,
     TestProviderResult,
     ProviderListResponse,
@@ -82,21 +80,18 @@ async def delete_provider(provider_id: int):
     return {"deleted": True}
 
 
-@router.post("/providers/{provider_id}/test")
+@router.post("/providers/{provider_id}/test", response_model=TestProviderResult)
 async def test_provider(provider_id: int):
     """测试提供商连接"""
-    result = await ai_config_service.test_provider(provider_id)
-    return result
+    try:
+        result = await ai_config_service.test_provider(provider_id)
+        return result
+    except Exception as e:
+        logger.error("Failed to test provider", provider_id=provider_id, error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============ 模型配置 API ============
-
-@router.get("/models")
-async def get_model_configs():
-    """获取所有模型配置"""
-    configs = await ai_config_service.get_model_configs()
-    return {"configs": configs}
-
 
 @router.get("/models", response_model=ModelConfigListResponse)
 async def list_model_configs():
@@ -118,17 +113,6 @@ async def update_model_config(config_key: str, data: ModelConfigUpdateRequest):
         model_name=data.model_name,
     )
     return result
-
-
-@router.post("/providers/{provider_id}/test", response_model=TestProviderResult)
-async def test_provider(provider_id: int):
-    """测试提供商连接"""
-    try:
-        result = await ai_config_service.test_provider(provider_id)
-        return result
-    except Exception as e:
-        logger.error("Failed to test provider", provider_id=provider_id, error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============ 管理 API ============

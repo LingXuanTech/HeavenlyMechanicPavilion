@@ -498,6 +498,8 @@ class TestTaskQueueService:
             trade_date="2026-02-02",
             analysis_level="L2",
             use_planner=True,
+            user_id=42,
+            use_subgraphs=True,
         )
 
         assert message_id == "msg-123"
@@ -509,6 +511,8 @@ class TestTaskQueueService:
         assert task.task_id == "task-001"
         assert task.symbol == "AAPL"
         assert task.analysis_level == "L2"
+        assert task.user_id == 42
+        assert task.use_subgraphs is True
 
     @pytest.mark.asyncio
     async def test_dequeue(self, service):
@@ -617,3 +621,22 @@ class TestTaskStatus:
         """从字符串创建状态"""
         assert TaskStatus("pending") == TaskStatus.PENDING
         assert TaskStatus("completed") == TaskStatus.COMPLETED
+
+class TestAnalysisTaskAuditFields:
+    """AnalysisTask 审计字段序列化测试"""
+
+    def test_from_dict_parses_user_id_and_use_subgraphs(self):
+        data = {
+            "task_id": "task-audit",
+            "symbol": "AAPL",
+            "trade_date": "2026-02-02",
+            "analysis_level": "L2",
+            "use_planner": "true",
+            "user_id": "7",
+            "use_subgraphs": "false",
+        }
+
+        task = AnalysisTask.from_dict(data)
+
+        assert task.user_id == 7
+        assert task.use_subgraphs is False

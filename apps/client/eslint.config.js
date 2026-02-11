@@ -1,10 +1,29 @@
 import js from '@eslint/js';
-import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-plugin-prettier';
 import eslintConfigPrettier from 'eslint-config-prettier';
+
+const browserGlobals = {
+  window: 'readonly',
+  document: 'readonly',
+  navigator: 'readonly',
+  localStorage: 'readonly',
+  sessionStorage: 'readonly',
+  fetch: 'readonly',
+  EventSource: 'readonly',
+  URL: 'readonly',
+  URLSearchParams: 'readonly',
+  Blob: 'readonly',
+  FormData: 'readonly',
+  Request: 'readonly',
+  Response: 'readonly',
+  Headers: 'readonly',
+  setTimeout: 'readonly',
+  clearTimeout: 'readonly',
+  console: 'readonly',
+};
 
 export default tseslint.config(
   { ignores: ['dist'] },
@@ -17,7 +36,7 @@ export default tseslint.config(
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
       ecmaVersion: 2020,
-      globals: globals.browser,
+      globals: browserGlobals,
     },
     plugins: {
       'react-hooks': reactHooks,

@@ -10,8 +10,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "gen:types": "tsx scripts/generate-types.ts",
-    "gen:types:check": "tsx scripts/generate-types.ts --check"
+    "gen:types": "node --import tsx scripts/generate-types.ts",
+    "gen:types:check": "node --import tsx scripts/generate-types.ts --check"
   },
   "dependencies": {
     "@google/genai": "^1.38.0",

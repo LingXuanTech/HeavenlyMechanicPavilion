@@ -46,6 +46,8 @@ class AnalysisTask:
     use_planner: bool
     override_analysts: Optional[List[str]] = None
     exclude_analysts: Optional[List[str]] = None
+    user_id: Optional[int] = None
+    use_subgraphs: Optional[bool] = None
     created_at: Optional[str] = None
     retry_count: int = 0
     max_retries: int = 3
@@ -69,6 +71,10 @@ class AnalysisTask:
         data["retry_count"] = int(data.get("retry_count", 0))
         data["max_retries"] = int(data.get("max_retries", 3))
         data["use_planner"] = data.get("use_planner", "true").lower() == "true" if isinstance(data.get("use_planner"), str) else data.get("use_planner", True)
+        if isinstance(data.get("use_subgraphs"), str):
+            data["use_subgraphs"] = data["use_subgraphs"].lower() == "true"
+        if data.get("user_id") not in (None, "", "null"):
+            data["user_id"] = int(data["user_id"])
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 
 
@@ -326,6 +332,8 @@ class TaskQueueService:
         use_planner: bool = True,
         override_analysts: Optional[List[str]] = None,
         exclude_analysts: Optional[List[str]] = None,
+        user_id: Optional[int] = None,
+        use_subgraphs: Optional[bool] = None,
     ) -> str:
         """入队分析任务"""
         await self._ensure_initialized()
@@ -338,6 +346,8 @@ class TaskQueueService:
             use_planner=use_planner,
             override_analysts=override_analysts,
             exclude_analysts=exclude_analysts,
+            user_id=user_id,
+            use_subgraphs=use_subgraphs,
             created_at=datetime.utcnow().isoformat(),
         )
 

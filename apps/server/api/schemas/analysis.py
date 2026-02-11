@@ -218,6 +218,7 @@ class UIHints(BaseModel):
 class AnalysisDiagnostics(BaseModel):
     """分析诊断信息"""
     task_id: Optional[str] = Field(None, description="任务 ID")
+    user_id: Optional[int] = Field(None, description="任务所属用户 ID（审计字段）")
     elapsed_seconds: Optional[float] = Field(None, description="耗时（秒）")
     analysts_used: Optional[List[str]] = Field(None, description="使用的分析师列表")
     planner_decision: Optional[str] = Field(None, description="Planner 决策说明")
@@ -257,6 +258,7 @@ class AgentAnalysisResponse(BaseModel):
     anchor_script: Optional[str] = Field(None, description="TTS 播报脚本")
     created_at: str = Field(..., description="创建时间")
     task_id: Optional[str] = Field(None, description="任务 ID")
+    user_id: Optional[int] = Field(None, description="任务所属用户 ID（审计字段）")
     diagnostics: Optional[AnalysisDiagnostics] = Field(None, description="诊断信息")
     ui_hints: Optional[UIHints] = Field(None, description="UI 展示提示")
 
@@ -306,6 +308,7 @@ class AnalysisHistoryItem(BaseModel):
     status: str = Field(..., description="状态: completed/failed/pending")
     created_at: str = Field(..., description="创建时间")
     task_id: Optional[str] = Field(None, description="任务 ID")
+    user_id: Optional[int] = Field(None, description="任务所属用户 ID（审计字段）")
 
 
 class AnalysisHistoryResponse(BaseModel):
@@ -330,6 +333,7 @@ class AnalysisDetailResponse(BaseModel):
     created_at: str = Field(..., description="创建时间")
     task_id: Optional[str] = Field(None, description="任务 ID")
     elapsed_seconds: Optional[float] = Field(None, description="耗时（秒）")
+    user_id: Optional[int] = Field(None, description="任务所属用户 ID（审计字段）")
 
 
 class AnalysisTaskStatus(BaseModel):
@@ -342,3 +346,4 @@ class AnalysisTaskStatus(BaseModel):
     error_message: Optional[str] = Field(None, description="错误信息")
     created_at: str = Field(..., description="创建时间")
     updated_at: str = Field(..., description="更新时间")
+    user_id: Optional[int] = Field(None, description="任务所属用户 ID（审计字段）")

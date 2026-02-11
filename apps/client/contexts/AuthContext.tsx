@@ -4,6 +4,7 @@
  * 管理用户认证状态和令牌
  */
 import React, { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
+import { API_BASE } from '../config/api';
 
 // ============ 类型定义 ============
 
@@ -42,8 +43,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 // ============ API 函数 ============
-
-const API_BASE = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000/api';
 
 async function apiRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_BASE}${endpoint}`, {

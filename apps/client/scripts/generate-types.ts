@@ -20,7 +20,7 @@ import openapiTS, { astToString, COMMENT_HEADER } from 'openapi-typescript';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CLIENT_ROOT = path.resolve(__dirname, '..');
 const GENERATED_DIR = path.resolve(CLIENT_ROOT, 'src/types/generated');
-const DEFAULT_API_URL = 'http://localhost:8000/api/v1/openapi.json';
+const DEFAULT_API_URL = 'http://localhost:8000/api/openapi.json';
 
 /** 模块名称 */
 const MODULES = ['market', 'analysis', 'trading', 'system'] as const;
@@ -29,43 +29,94 @@ type ModuleName = (typeof MODULES)[number];
 /** Tag → 模块映射 */
 const TAG_MODULE_MAP: Record<string, ModuleName> = {
   // market
-  Market: 'market',
-  'North Money': 'market',
-  龙虎榜: 'market',
-  限售解禁: 'market',
-  跨资产联动分析: 'market',
-  'Market Watcher': 'market',
-  'Alternative Data': 'market',
+  Market: "market",
+  "North Money": "market",
+  龙虎榜: "market",
+  限售解禁: "market",
+  跨资产联动分析: "market",
+  "Market Watcher": "market",
+  "Alternative Data": "market",
   // analysis
-  Analysis: 'analysis',
-  Sentiment: 'analysis',
-  Macro: 'analysis',
-  '央行 NLP 分析': 'analysis',
-  Policy: 'analysis',
-  Reflection: 'analysis',
-  'Model Racing': 'analysis',
-  'Vision Analysis': 'analysis',
-  'Supply Chain': 'analysis',
+  Analysis: "analysis",
+  Sentiment: "analysis",
+  Macro: "analysis",
+  "央行 NLP 分析": "analysis",
+  Policy: "analysis",
+  Reflection: "analysis",
+  "Model Racing": "analysis",
+  "Vision Analysis": "analysis",
+  "Supply Chain": "analysis",
   // trading
-  Watchlist: 'trading',
-  News: 'trading',
-  'News Aggregator': 'trading',
-  Chat: 'trading',
-  Memory: 'trading',
-  Portfolio: 'trading',
-  Discovery: 'trading',
-  Backtest: 'trading',
+  Watchlist: "trading",
+  News: "trading",
+  "News Aggregator": "trading",
+  Chat: "trading",
+  Memory: "trading",
+  Portfolio: "trading",
+  Discovery: "trading",
+  Backtest: "trading",
+  "Risk Modeling": "trading",
   // system
-  Authentication: 'system',
-  OAuth: 'system',
-  Passkey: 'system',
-  'Health Monitor': 'system',
-  'AI Configuration': 'system',
-  'Prompt Config': 'system',
-  Settings: 'system',
-  TTS: 'system',
-  Admin: 'system',
+  Authentication: "system",
+  OAuth: "system",
+  Passkey: "system",
+  "Health Monitor": "system",
+  "AI Configuration": "system",
+  "Prompt Config": "system",
+  Settings: "system",
+  TTS: "system",
+  Admin: "system",
+  notifications: "system",
+  "SubGraph Metrics": "system",
 };
+
+/** 标准化 tag（忽略大小写/首尾空格） */
+const TAG_MODULE_MAP_NORMALIZED: Record<string, ModuleName> = Object.fromEntries(
+  Object.entries(TAG_MODULE_MAP).map(([tag, mod]) => [tag.trim().toLowerCase(), mod]),
+);
+
+/** path 前缀兜底映射（用于无 tag 或 tag 异常的场景） */
+const PATH_PREFIX_MODULE_MAP: Array<{ prefix: string; module: ModuleName }> = [
+  // market
+  { prefix: "/api/market", module: "market" },
+  { prefix: "/api/north-money", module: "market" },
+  { prefix: "/api/lhb", module: "market" },
+  { prefix: "/api/jiejin", module: "market" },
+  { prefix: "/api/unlock", module: "market" },
+  { prefix: "/api/cross-asset", module: "market" },
+  { prefix: "/api/market-watcher", module: "market" },
+  { prefix: "/api/alternative", module: "market" },
+  // analysis
+  { prefix: "/api/analyze", module: "analysis" },
+  { prefix: "/api/sentiment", module: "analysis" },
+  { prefix: "/api/macro", module: "analysis" },
+  { prefix: "/api/central-bank", module: "analysis" },
+  { prefix: "/api/policy", module: "analysis" },
+  { prefix: "/api/reflection", module: "analysis" },
+  { prefix: "/api/model-racing", module: "analysis" },
+  { prefix: "/api/vision", module: "analysis" },
+  { prefix: "/api/supply-chain", module: "analysis" },
+  // trading
+  { prefix: "/api/watchlist", module: "trading" },
+  { prefix: "/api/news", module: "trading" },
+  { prefix: "/api/news-aggregator", module: "trading" },
+  { prefix: "/api/chat", module: "trading" },
+  { prefix: "/api/memory", module: "trading" },
+  { prefix: "/api/portfolio", module: "trading" },
+  { prefix: "/api/discover", module: "trading" },
+  { prefix: "/api/backtest", module: "trading" },
+  { prefix: "/api/risk", module: "trading" },
+  // system
+  { prefix: "/api/auth", module: "system" },
+  { prefix: "/api/health", module: "system" },
+  { prefix: "/api/ai", module: "system" },
+  { prefix: "/api/prompts", module: "system" },
+  { prefix: "/api/settings", module: "system" },
+  { prefix: "/api/tts", module: "system" },
+  { prefix: "/api/admin", module: "system" },
+  { prefix: "/api/subgraph-metrics", module: "system" },
+  { prefix: "/api/notifications", module: "system" },
+];
 
 // ============ 类型 ============
 
@@ -113,17 +164,30 @@ async function fetchSchema(input?: string): Promise<OpenAPISchema> {
   return response.json();
 }
 
-/** 根据 tag 确定 path 所属模块 */
-function resolveModule(pathItem: Record<string, unknown>): ModuleName | null {
-  const methods = ['get', 'post', 'put', 'delete', 'patch', 'options', 'head'];
+/** 根据 tag/path 确定 path 所属模块 */
+function resolveModule(pathKey: string, pathItem: Record<string, unknown>): ModuleName | null {
+  const methods = ["get", "post", "put", "delete", "patch", "options", "head"];
   for (const method of methods) {
     const operation = pathItem[method] as Record<string, unknown> | undefined;
     if (operation?.tags && Array.isArray(operation.tags) && operation.tags.length > 0) {
-      const tag = operation.tags[0] as string;
-      const mod = TAG_MODULE_MAP[tag];
+      const tag = String(operation.tags[0]).trim().toLowerCase();
+      const mod = TAG_MODULE_MAP_NORMALIZED[tag];
       if (mod) return mod;
     }
   }
+
+  // 无 tag 或 tag 未收录时，按 path 前缀兜底
+  for (const { prefix, module } of PATH_PREFIX_MODULE_MAP) {
+    if (pathKey === prefix || pathKey.startsWith(`${prefix}/`)) {
+      return module;
+    }
+  }
+
+  // 健康/根路径兜底
+  if (pathKey === "/" || pathKey === "/health") {
+    return "system";
+  }
+
   return null;
 }
 
@@ -141,7 +205,7 @@ function splitPathsByModule(
   const unmapped: string[] = [];
 
   for (const [pathKey, pathItem] of Object.entries(paths)) {
-    const mod = resolveModule(pathItem);
+    const mod = resolveModule(pathKey, pathItem);
     if (mod) {
       result[mod][pathKey] = pathItem;
     } else {
@@ -250,21 +314,20 @@ async function main(): Promise<void> {
   const files: GeneratedFile[] = [];
 
   // 3a. 生成 common.ts（仅 components）
+  // 注意：openapi-typescript 在并行调用时输出可能非确定性（顺序抖动），
+  // 这里改为串行生成，保证 gen:types 与 gen:types:check 稳定一致。
   const commonSchema = buildComponentsOnlySchema(schema);
-  const commonPromise = generateTypeString(commonSchema).then((content) => {
-    files.push({ name: 'common.ts', content: COMMENT_HEADER + content });
-    console.log(`   ✅ common.ts (components)`);
-  });
+  const commonContent = await generateTypeString(commonSchema);
+  files.push({ name: 'common.ts', content: COMMENT_HEADER + commonContent });
+  console.log(`   ✅ common.ts (components)`);
 
-  // 3b. 并行生成各模块
-  const modulePromises = MODULES.map(async (mod) => {
+  // 3b. 串行生成各模块（避免并发导致结果不稳定）
+  for (const mod of MODULES) {
     const subSchema = buildSubSchema(schema, modulePathsMap[mod]);
     const content = await generateTypeString(subSchema);
     files.push({ name: `${mod}.ts`, content: COMMENT_HEADER + content });
     console.log(`   ✅ ${mod}.ts`);
-  });
-
-  await Promise.all([commonPromise, ...modulePromises]);
+  }
 
   // 3c. 生成 index.ts
   const indexContent = generateIndexContent();

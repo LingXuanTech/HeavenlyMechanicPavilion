@@ -49,6 +49,14 @@ export {
   PORTFOLIO_KEY,
 } from './usePortfolio';
 
+// Backtest
+export {
+  useRunBacktest,
+  useRunBacktestInBackground,
+  useBacktestHistory,
+  BACKTEST_KEY,
+} from './useBacktest';
+
 // 宏观经济分析
 export {
   useMacroOverview,

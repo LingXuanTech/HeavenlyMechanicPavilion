@@ -6,7 +6,7 @@ import time
 import uuid
 import structlog
 from concurrent.futures import ThreadPoolExecutor
-from datetime import date
+from datetime import date, datetime
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from typing import AsyncGenerator, Optional, Iterator, Any, List, Literal, Dict
 from pydantic import BaseModel, Field, validator
@@ -82,7 +82,7 @@ async def run_analysis_task(
     analysis_level: Literal["L1", "L2"] = "L2",
     use_planner: bool = True,
     use_subgraphs: Optional[bool] = None,
-    user_id: Optional[str] = None,
+    user_id: Optional[int] = None,
 ):
     """执行分析任务并将结果保存到数据库
 
@@ -105,7 +105,7 @@ async def run_analysis_task(
     start_time = time.time()
 
     # 初始化任务状态（缓存层）和 SSE 事件队列（分布式）
-    await cache_service.set_task(task_id, {"status": "running", "symbol": symbol, "progress": 0})
+    await cache_service.set_task(task_id, {"status": "running", "symbol": symbol, "progress": 0, "user_id": user_id})
     await cache_service.init_sse_task(task_id, symbol)
 
     try:
@@ -269,6 +269,7 @@ async def run_analysis_task(
                 full_report_json=json.dumps(final_json, ensure_ascii=False),
                 anchor_script=final_json.get("anchor_script", ""),
                 task_id=task_id,
+                user_id=user_id,
                 status="completed",
                 elapsed_seconds=elapsed_seconds,
                 architecture_mode=architecture_mode,
@@ -339,6 +340,7 @@ async def run_analysis_task(
         if "diagnostics" not in final_json:
             final_json["diagnostics"] = {
                 "task_id": task_id,
+                "user_id": user_id,
                 "elapsed_seconds": elapsed_seconds,
                 "analysts_used": selected_analysts,
                 "architecture_mode": architecture_mode,
@@ -346,7 +348,7 @@ async def run_analysis_task(
 
         await cache_service.push_sse_event(task_id, "stage_final", final_json)
         await cache_service.set_sse_status(task_id, "completed")
-        await cache_service.set_task(task_id, {"status": "completed", "symbol": symbol})
+        await cache_service.set_task(task_id, {"status": "completed", "symbol": symbol, "user_id": user_id})
 
     except Exception as e:
         logger.error("Analysis task failed", task_id=task_id, error=str(e))
@@ -362,6 +364,7 @@ async def run_analysis_task(
                 full_report_json="{}",
                 anchor_script="",
                 task_id=task_id,
+                user_id=user_id,
                 status="failed",
                 error_message=str(e),
                 elapsed_seconds=elapsed_seconds,
@@ -372,7 +375,7 @@ async def run_analysis_task(
 
         await cache_service.push_sse_event(task_id, "error", {"message": str(e)})
         await cache_service.set_sse_status(task_id, "failed")
-        await cache_service.set_task(task_id, {"status": "failed", "symbol": symbol, "error": str(e)})
+        await cache_service.set_task(task_id, {"status": "failed", "symbol": symbol, "error": str(e), "user_id": user_id})
 
 
 class AnalyzeRequest(BaseModel):
@@ -399,7 +402,7 @@ class AnalyzeRequest(BaseModel):
         if v is None:
             return v
         try:
-            from datetime import datetime
+            from datetime import date, datetimetime
             datetime.fromisoformat(v.replace('Z', '+00:00'))
             return v
         except ValueError:
@@ -443,7 +446,7 @@ async def trigger_analysis(
     task_id = f"task_{symbol}_{uuid.uuid4().hex[:8]}"
 
     # 从可选 JWT 认证中提取 user_id
-    user_id = str(current_user.id) if current_user else None
+    user_id = current_user.id if current_user else None
 
     # 返回将使用的分析师配置供前端展示
     market_config = MarketAnalystRouter.get_market_config(symbol)
@@ -486,6 +489,7 @@ async def trigger_analysis(
     return {
         "task_id": task_id,
         "symbol": symbol,
+        "user_id": user_id,
         "status": "accepted",
         "market": market_config["market"],
         "analysts": effective_analysts,
@@ -560,6 +564,7 @@ async def get_latest_analysis(symbol: str, session: Session = Depends(get_sessio
         anchor_script=result.anchor_script,
         created_at=result.created_at.isoformat(),
         task_id=result.task_id,
+        user_id=result.user_id,
         diagnostics=AnalysisDiagnostics(
             elapsed_seconds=result.elapsed_seconds,
         ),
@@ -628,6 +633,7 @@ async def get_analysis_history(
                 status=r.status,
                 created_at=r.created_at.isoformat(),
                 task_id=r.task_id,
+                user_id=r.user_id,
             )
             for r in results
         ],
@@ -636,19 +642,6 @@ async def get_analysis_history(
         limit=limit,
         next_cursor=next_cursor if cursor is not None else None,
         has_more=has_more,
-    )
-                date=r.date,
-                signal=r.signal,
-                confidence=r.confidence,
-                status=r.status,
-                created_at=r.created_at.isoformat(),
-                task_id=r.task_id,
-            )
-            for r in results
-        ],
-        total=total,
-        offset=offset,
-        limit=limit,
     )
 
 
@@ -675,6 +668,7 @@ async def get_analysis_detail(analysis_id: int, session: Session = Depends(get_s
         created_at=result.created_at.isoformat(),
         task_id=result.task_id,
         elapsed_seconds=result.elapsed_seconds,
+        user_id=result.user_id,
     )
 
 
@@ -689,7 +683,8 @@ async def get_task_status(task_id: str, session: Session = Depends(get_session))
             status=cached_task.get("status", "unknown"),
             symbol=cached_task.get("symbol") or "",
             created_at=datetime.now().isoformat(),
-            updated_at=datetime.now().isoformat()
+            updated_at=datetime.now().isoformat(),
+            user_id=cached_task.get("user_id")
         )
 
     # 再检查数据库
@@ -704,7 +699,8 @@ async def get_task_status(task_id: str, session: Session = Depends(get_session))
         status=result.status,
         symbol=result.symbol,
         created_at=result.created_at.isoformat(),
-        updated_at=result.created_at.isoformat()
+        updated_at=result.created_at.isoformat(),
+        user_id=result.user_id
     )
 
 
@@ -725,7 +721,11 @@ async def get_available_analysts():
 
 
 @router.post("/quick/{symbol}")
-async def quick_scan(symbol: str, background_tasks: BackgroundTasks):
+async def quick_scan(
+    symbol: str,
+    background_tasks: BackgroundTasks,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+):
     """快速扫描（L1 模式）
 
     便捷端点，等同于 POST /{symbol} with analysis_level=L1。
@@ -745,6 +745,7 @@ async def quick_scan(symbol: str, background_tasks: BackgroundTasks):
 
     task_id = f"quick_{symbol}_{uuid.uuid4().hex[:8]}"
     trade_date = date.today().isoformat()
+    user_id = current_user.id if current_user else None
 
     if USE_TASK_QUEUE:
         await task_queue.enqueue_analysis(
@@ -754,6 +755,7 @@ async def quick_scan(symbol: str, background_tasks: BackgroundTasks):
             analysis_level="L1",
             use_planner=False,
             override_analysts=["market", "news", "macro"],
+            user_id=user_id,
         )
     else:
         background_tasks.add_task(
@@ -765,12 +767,14 @@ async def quick_scan(symbol: str, background_tasks: BackgroundTasks):
             exclude_analysts=None,
             analysis_level="L1",
             use_planner=False,
+            user_id=user_id,
         )
 
     return {
         "task_id": task_id,
         "symbol": symbol,
         "status": "accepted",
+        "user_id": user_id,
         "analysis_level": "L1",
         "analysts": ["market", "news", "macro"],
         "estimated_time_seconds": 20,

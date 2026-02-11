@@ -106,6 +106,7 @@ export type KlineData = Schemas['KlineData'];
 export type NewsCategory = Schemas['NewsCategory'];
 export type NewsSentiment = Schemas['NewsSentiment'];
 export type NewsAggregateResult = Schemas['NewsAggregateResult'];
+export type AggregatedNewsItem = Schemas['NewsItem'];
 
 // --- 健康检查 ---
 
@@ -144,7 +145,8 @@ export type ReflectionReport = Schemas['ReflectionReport'];
 
 // --- 投资组合 ---
 export type PortfolioAnalysis = Schemas['PortfolioAnalysis'];
-export type CorrelationResult = Schemas['CorrelationResult'];
+export type CorrelationResult = Schemas['api__routes__trading__portfolio__CorrelationResult'];
+export type QuickPortfolioCheck = Schemas['QuickPortfolioCheckResponse'];
 
 // --- 宏观 ---
 export type MacroOverview = Schemas['MacroOverview'];
@@ -196,10 +198,7 @@ export type {
   MarketStatus,
   FlashNews,
   MarketOpportunity,
-  PortfolioAnalysisResult,
-  QuickPortfolioCheck,
   MarketSentiment,
-  AggregatedNewsItem,
   RolloutSettings,
 } from './frontend-types';
 
@@ -236,4 +235,6 @@ export type AgentAnalysis = AgentAnalysisResponse;
 
 /** @deprecated 使用 MacroAnalysisResult */
 export type MacroImpactAnalysis = MacroAnalysisResult;
+/** @deprecated 使用 PortfolioAnalysis */
+export type PortfolioAnalysisResult = PortfolioAnalysis;
 

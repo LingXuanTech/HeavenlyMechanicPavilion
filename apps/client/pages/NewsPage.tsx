@@ -126,7 +126,7 @@ const NewsCard: React.FC<{ news: T.AggregatedNewsItem }> = ({ news }) => (
         </div>
         {news.symbols.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
-            {news.symbols.slice(0, 5).map((symbol) => (
+            {news.symbols.slice(0, 5).map((symbol: string) => (
               <span key={symbol} className="text-[10px] px-1.5 py-0.5 bg-surface-muted text-stone-300 rounded">
                 {symbol}
               </span>

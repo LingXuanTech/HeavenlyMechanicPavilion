@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, memo, useCallback } from 'react';
 import { logger } from '../utils/logger';
+import { API_BASE } from '../config/api';
 import {
   Volume2,
   VolumeX,
@@ -9,8 +10,6 @@ import {
   Loader2,
   Settings,
 } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
 /**
  * TTS 状态
@@ -105,8 +104,8 @@ export const AudioBriefing: React.FC<AudioBriefingProps> = memo(({
     const fetchStatus = async () => {
       try {
         const [statusRes, voicesRes] = await Promise.all([
-          fetch(`${API_URL}/tts/status`),
-          fetch(`${API_URL}/tts/voices`),
+          fetch(`${API_BASE}/tts/status`),
+          fetch(`${API_BASE}/tts/voices`),
         ]);
 
         if (statusRes.ok) {
@@ -146,7 +145,7 @@ export const AudioBriefing: React.FC<AudioBriefingProps> = memo(({
 
       if (text) {
         // 使用自定义文本
-        url = `${API_URL}/tts/synthesize`;
+        url = `${API_BASE}/tts/synthesize`;
         options = {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -161,7 +160,7 @@ export const AudioBriefing: React.FC<AudioBriefingProps> = memo(({
         const params = new URLSearchParams();
         if (selectedVoice) params.set('voice', selectedVoice);
         params.set('speed', speed.toString());
-        url = `${API_URL}/tts/briefing/${symbol}?${params}`;
+        url = `${API_BASE}/tts/briefing/${symbol}?${params}`;
         options = { method: 'POST' };
       }
 

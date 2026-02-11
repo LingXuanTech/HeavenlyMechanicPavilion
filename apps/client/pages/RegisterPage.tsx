@@ -4,9 +4,8 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { API_BASE } from '../config/api';
 import { Mail, User, Eye, EyeOff, AlertCircle, ArrowRight, Sparkles, Check, X, Shield } from 'lucide-react';
-
-const API_BASE = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000/api';
 
 const RegisterPage: React.FC = () => {
   const [email, setEmail] = useState('');

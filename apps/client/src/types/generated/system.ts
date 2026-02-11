@@ -900,6 +900,49 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/health/provider-history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Provider History
+         * @description 获取数据源调用历史
+         *
+         *     返回指定数据源在时间范围内的调用记录、统计摘要和熔断事件。
+         *     用于 HealthPage 的延迟趋势折线图和熔断事件时间线。
+         */
+        get: operations["get_provider_history_api_health_provider_history_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health/provider-history/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Tracked Providers
+         * @description 获取所有有调用记录的数据源名称列表
+         */
+        get: operations["get_tracked_providers_api_health_provider_history_providers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/prompts/": {
         parameters: {
             query?: never;
@@ -1359,6 +1402,139 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/subgraph-metrics/comparison": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Comparison
+         * @description 获取 SubGraph vs Monolith 的 A/B 对比数据
+         *
+         *     返回两种架构模式在指定时间段内的统计指标：
+         *     - count: 分析任务总数
+         *     - avg_elapsed_seconds: 平均耗时
+         *     - success_rate: 成功率
+         *     - avg_confidence: 平均置信度
+         *     - recommendation: 灰度推荐（needs_more_data / subgraph_ready / monolith_better）
+         */
+        get: operations["get_comparison_api_subgraph_metrics_comparison_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subgraph-metrics/rollout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Update Rollout
+         * @description 更新 SubGraph 灰度比例
+         *
+         *     修改运行时灰度比例（0-100%），重启后恢复为环境变量值。
+         */
+        post: operations["update_rollout_api_subgraph_metrics_rollout_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Notification Configs
+         * @description 获取当前用户的所有通知配置
+         */
+        get: operations["get_notification_configs_api_notifications_config_get"];
+        /**
+         * Upsert Notification Config
+         * @description 创建或更新通知配置（按 user_id + channel 唯一）
+         */
+        put: operations["upsert_notification_config_api_notifications_config_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/config/{channel}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Notification Config
+         * @description 删除指定渠道的通知配置
+         */
+        delete: operations["delete_notification_config_api_notifications_config__channel__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Notification Logs
+         * @description 获取当前用户的通知发送日志
+         */
+        get: operations["get_notification_logs_api_notifications_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Test Notification
+         * @description 发送测试通知
+         */
+        post: operations["send_test_notification_api_notifications_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 };
 export type webhooks = Record<string, never>;
 export type components = {
@@ -1667,6 +1843,11 @@ export type components = {
              * @description 任务 ID
              */
             task_id?: string | null;
+            /**
+             * User Id
+             * @description 任务所属用户 ID（审计字段）
+             */
+            user_id?: number | null;
             /** @description 诊断信息 */
             diagnostics?: components["schemas"]["AnalysisDiagnostics"] | null;
             /** @description UI 展示提示 */
@@ -1810,6 +1991,11 @@ export type components = {
              * @description 耗时（秒）
              */
             elapsed_seconds?: number | null;
+            /**
+             * User Id
+             * @description 任务所属用户 ID（审计字段）
+             */
+            user_id?: number | null;
         };
         /**
          * AnalysisDiagnostics
@@ -1821,6 +2007,11 @@ export type components = {
              * @description 任务 ID
              */
             task_id?: string | null;
+            /**
+             * User Id
+             * @description 任务所属用户 ID（审计字段）
+             */
+            user_id?: number | null;
             /**
              * Elapsed Seconds
              * @description 耗时（秒）
@@ -1882,6 +2073,11 @@ export type components = {
              * @description 任务 ID
              */
             task_id?: string | null;
+            /**
+             * User Id
+             * @description 任务所属用户 ID（审计字段）
+             */
+            user_id?: number | null;
         };
         /**
          * AnalysisHistoryResponse
@@ -1895,19 +2091,30 @@ export type components = {
             items: components["schemas"]["AnalysisHistoryItem"][];
             /**
              * Total
-             * @description 总记录数
+             * @description 总记录数（仅 offset 分页时返回）
              */
-            total: number;
+            total?: number | null;
             /**
              * Offset
-             * @description 偏移量
+             * @description 偏移量（offset 分页）
              */
-            offset: number;
+            offset?: number | null;
             /**
              * Limit
              * @description 每页数量
              */
             limit: number;
+            /**
+             * Next Cursor
+             * @description 下一页游标（cursor 分页）
+             */
+            next_cursor?: number | null;
+            /**
+             * Has More
+             * @description 是否有更多数据
+             * @default false
+             */
+            has_more: boolean;
         };
         /**
          * AnalysisMemory
@@ -1988,6 +2195,11 @@ export type components = {
              * @description 更新时间
              */
             updated_at: string;
+            /**
+             * User Id
+             * @description 任务所属用户 ID（审计字段）
+             */
+            user_id?: number | null;
         };
         /**
          * AnalyzeRequest
@@ -2135,6 +2347,18 @@ export type components = {
             change_20d: number;
         };
         /**
+         * BacktestPayloadHint
+         * @description 组合分析生成的回测入参建议。
+         */
+        BacktestPayloadHint: {
+            /** Strategy Name */
+            strategy_name: string;
+            /** Generated At */
+            generated_at: string;
+            /** Requests */
+            requests: components["schemas"]["BacktestRequestHint"][];
+        };
+        /**
          * BacktestRequest
          * @description 回测请求
          */
@@ -2175,6 +2399,86 @@ export type components = {
              * @default 180
              */
             days_back: number;
+        };
+        /**
+         * BacktestRequestHint
+         * @description 回测请求提示。
+         */
+        BacktestRequestHint: {
+            /** Symbol */
+            symbol: string;
+            /** Signals */
+            signals: components["schemas"]["BacktestSignalHint"][];
+            /**
+             * Initial Capital
+             * @default 100000
+             */
+            initial_capital: number;
+            /**
+             * Holding Days
+             * @default 5
+             */
+            holding_days: number;
+            /**
+             * Stop Loss Pct
+             * @default -5
+             */
+            stop_loss_pct: number;
+            /**
+             * Take Profit Pct
+             * @default 10
+             */
+            take_profit_pct: number;
+            /**
+             * Use Historical Signals
+             * @default false
+             */
+            use_historical_signals: boolean;
+            /**
+             * Days Back
+             * @default 180
+             */
+            days_back: number;
+        };
+        /**
+         * BacktestSignalHint
+         * @description 回测信号提示。
+         */
+        BacktestSignalHint: {
+            /** Date */
+            date: string;
+            /**
+             * Signal
+             * @enum {string}
+             */
+            signal: "bullish" | "bearish" | "neutral";
+            /** Confidence */
+            confidence: number;
+            /**
+             * Source
+             * @default portfolio_rebalance
+             */
+            source: string;
+        };
+        /** Body_analyze_batch_api_vision_analyze_batch_post */
+        Body_analyze_batch_api_vision_analyze_batch_post: {
+            /**
+             * Files
+             * @description 多个图片文件
+             */
+            files: string[];
+            /**
+             * Description
+             * @description 共享的用户描述
+             * @default
+             */
+            description: string;
+            /**
+             * Symbol
+             * @description 关联股票代码
+             * @default
+             */
+            symbol: string;
         };
         /** Body_analyze_image_api_vision_analyze_post */
         Body_analyze_image_api_vision_analyze_post: {
@@ -2571,6 +2875,26 @@ export type components = {
             };
         };
         /**
+         * ConstraintViolation
+         * @description 约束触发说明。
+         */
+        ConstraintViolation: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /** Actual */
+            actual: number;
+            /** Limit */
+            limit: number;
+            /**
+             * Severity
+             * @default warning
+             * @enum {string}
+             */
+            severity: "warning" | "critical";
+        };
+        /**
          * CorrelationAnalysis
          * @description 北向资金与指数相关性分析
          */
@@ -2584,7 +2908,7 @@ export type components = {
              * Correlations
              * @description 各指数相关性结果
              */
-            correlations: components["schemas"]["services__north_money_service__CorrelationResult"][];
+            correlations: components["schemas"]["CorrelationResult"][];
             /**
              * Summary
              * @description 综合分析结论
@@ -2606,24 +2930,64 @@ export type components = {
             /**
              * Period
              * @default 1mo
+             * @enum {string}
              */
-            period: string;
+            period: "1d" | "5d" | "1mo" | "3mo" | "6mo" | "1y";
+            /**
+             * Cluster Threshold
+             * @description 风险聚类相关性阈值
+             * @default 0.7
+             */
+            cluster_threshold: number;
+            /**
+             * Weights
+             * @description 组合权重（与 symbols 顺序一致，可为任意非负数，将自动归一化）
+             */
+            weights?: number[] | null;
+            /** @description 再平衡约束 */
+            constraints?: components["schemas"]["RebalanceConstraints"] | null;
+            /**
+             * Enable Backtest Hint
+             * @description 是否返回回测请求提示
+             * @default true
+             */
+            enable_backtest_hint: boolean;
         };
         /**
          * CorrelationResult
-         * @description 相关性矩阵结果
+         * @description 相关性计算结果
          */
         CorrelationResult: {
-            /** Symbols */
-            symbols: string[];
-            /** Matrix */
-            matrix: number[][];
-            /** Returns Summary */
-            returns_summary: {
-                [key: string]: {
-                    [key: string]: number;
-                };
-            };
+            /**
+             * Index Name
+             * @description 指数名称
+             */
+            index_name: string;
+            /**
+             * Window
+             * @description 计算窗口（天数）
+             */
+            window: number;
+            /**
+             * Correlation
+             * @description 相关系数 (-1 到 1)
+             */
+            correlation: number;
+            /**
+             * P Value
+             * @description P值（统计显著性）
+             */
+            p_value?: number | null;
+            /**
+             * Sample Size
+             * @description 样本数量
+             */
+            sample_size: number;
+            /**
+             * Interpretation
+             * @description 相关性解读
+             */
+            interpretation: string;
         };
         /**
          * CredentialResponse
@@ -4275,6 +4639,81 @@ export type components = {
              */
             holding_ratio: number;
         };
+        /** NotificationConfigRequest */
+        NotificationConfigRequest: {
+            /**
+             * Channel
+             * @default telegram
+             */
+            channel: string;
+            /** Channel User Id */
+            channel_user_id?: string | null;
+            /**
+             * Is Enabled
+             * @default true
+             */
+            is_enabled: boolean;
+            /**
+             * Signal Threshold
+             * @default STRONG_BUY
+             */
+            signal_threshold: string;
+            /** Quiet Hours Start */
+            quiet_hours_start?: number | null;
+            /** Quiet Hours End */
+            quiet_hours_end?: number | null;
+        };
+        /** NotificationConfigResponse */
+        NotificationConfigResponse: {
+            /** Id */
+            id: number;
+            /** Channel */
+            channel: string;
+            /** Channel User Id */
+            channel_user_id: string | null;
+            /** Is Enabled */
+            is_enabled: boolean;
+            /** Signal Threshold */
+            signal_threshold: string;
+            /** Quiet Hours Start */
+            quiet_hours_start: number | null;
+            /** Quiet Hours End */
+            quiet_hours_end: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** NotificationLogResponse */
+        NotificationLogResponse: {
+            /** Id */
+            id: number;
+            /** Channel */
+            channel: string;
+            /** Title */
+            title: string;
+            /** Body */
+            body: string;
+            /** Signal */
+            signal: string | null;
+            /** Symbol */
+            symbol: string | null;
+            /**
+             * Sent At
+             * Format: date-time
+             */
+            sent_at: string;
+            /** Delivered */
+            delivered: boolean;
+            /** Error */
+            error: string | null;
+        };
         /**
          * PatentAnalysisResponse
          * @description 专利分析响应
@@ -4529,13 +4968,23 @@ export type components = {
          * @description 组合分析结果
          */
         PortfolioAnalysis: {
-            correlation: components["schemas"]["CorrelationResult"];
+            correlation: components["schemas"]["api__routes__trading__portfolio__CorrelationResult"];
             /** Diversification Score */
             diversification_score: number;
             /** Risk Clusters */
             risk_clusters: components["schemas"]["RiskCluster"][];
             /** Recommendations */
             recommendations: string[];
+            /** Rebalance Suggestions */
+            rebalance_suggestions?: components["schemas"]["RebalanceSuggestion"][];
+            /**
+             * Recommended Turnover
+             * @default 0
+             */
+            recommended_turnover: number;
+            /** Constraint Violations */
+            constraint_violations?: components["schemas"]["ConstraintViolation"][];
+            backtest_payload_hint?: components["schemas"]["BacktestPayloadHint"] | null;
         };
         /**
          * PriceLevels
@@ -4736,6 +5185,20 @@ export type components = {
             priority?: number | null;
         };
         /**
+         * QuickPortfolioCheckResponse
+         * @description 快速组合检查响应
+         */
+        QuickPortfolioCheckResponse: {
+            /** Diversification Score */
+            diversification_score: number;
+            /** Risk Clusters Count */
+            risk_clusters_count: number;
+            /** Top Recommendation */
+            top_recommendation?: string | null;
+            /** Message */
+            message?: string | null;
+        };
+        /**
          * RacingAnalysisRequest
          * @description 赛马分析请求
          */
@@ -4787,6 +5250,62 @@ export type components = {
             model_details: {
                 [key: string]: unknown;
             }[];
+        };
+        /**
+         * RebalanceConstraints
+         * @description 再平衡约束条件。
+         */
+        RebalanceConstraints: {
+            /**
+             * Max Single Weight
+             * @default 0.45
+             */
+            max_single_weight: number;
+            /**
+             * Max Top2 Weight
+             * @default 0.65
+             */
+            max_top2_weight: number;
+            /**
+             * Max Turnover
+             * @default 0.35
+             */
+            max_turnover: number;
+            /**
+             * Risk Profile
+             * @default balanced
+             * @enum {string}
+             */
+            risk_profile: "conservative" | "balanced" | "aggressive";
+        };
+        /**
+         * RebalanceSuggestion
+         * @description 再平衡建议条目
+         */
+        RebalanceSuggestion: {
+            /** Symbol */
+            symbol: string;
+            /** Current Weight */
+            current_weight: number;
+            /** Target Weight */
+            target_weight: number;
+            /** Delta Weight */
+            delta_weight: number;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "increase" | "decrease" | "hold";
+            /** Confidence */
+            confidence: number;
+            /** Rationale */
+            rationale: string;
+            /** Volatility */
+            volatility: number;
+            /** Avg Abs Correlation */
+            avg_abs_correlation: number;
+            /** Total Return */
+            total_return: number;
         };
         /**
          * RecordPredictionRequest
@@ -5006,6 +5525,22 @@ export type components = {
             risk_level: string;
         };
         /**
+         * RiskMetricsRequest
+         * @description 综合风险指标请求
+         */
+        RiskMetricsRequest: {
+            /** Symbols */
+            symbols: string[];
+            /** Weights */
+            weights?: number[] | null;
+            /**
+             * Lookback Days
+             * @description 历史回看天数
+             * @default 252
+             */
+            lookback_days: number;
+        };
+        /**
          * RiskVerdict
          * @description 风险评估结论
          * @enum {string}
@@ -5020,6 +5555,17 @@ export type components = {
             subgraph_rollout_percentage: number;
             /** Subgraph Force Enabled Users */
             subgraph_force_enabled_users: string[];
+        };
+        /**
+         * RolloutUpdateRequest
+         * @description 灰度比例更新请求
+         */
+        RolloutUpdateRequest: {
+            /**
+             * Percentage
+             * @description 灰度比例 (0-100)
+             */
+            percentage: number;
         };
         /**
          * SectorPolicyResponse
@@ -5277,6 +5823,21 @@ export type components = {
             market: string;
         };
         /**
+         * StressTestRequest
+         * @description 压力测试请求
+         */
+        StressTestRequest: {
+            /** Symbols */
+            symbols: string[];
+            /** Weights */
+            weights?: number[] | null;
+            /**
+             * Scenario
+             * @description 场景 ID（为空则运行所有场景）
+             */
+            scenario?: string | null;
+        };
+        /**
          * SupplyChainImpact
          * @description 产业链传导效应
          */
@@ -5473,6 +6034,16 @@ export type components = {
              */
             macd: string;
             trend: components["schemas"]["TrendDirection"];
+        };
+        /** TestNotificationRequest */
+        TestNotificationRequest: {
+            /**
+             * Channel
+             * @default telegram
+             */
+            channel: string;
+            /** Channel User Id */
+            channel_user_id: string;
         };
         /**
          * TestProviderResult
@@ -5784,6 +6355,40 @@ export type components = {
             /** Created At */
             created_at: string;
         };
+        /**
+         * VaRRequest
+         * @description VaR 计算请求
+         */
+        VaRRequest: {
+            /**
+             * Symbols
+             * @description 股票代码列表
+             */
+            symbols: string[];
+            /**
+             * Weights
+             * @description 权重列表（默认等权）
+             */
+            weights?: number[] | null;
+            /**
+             * Confidence
+             * @description 置信水平
+             * @default 0.95
+             */
+            confidence: number;
+            /**
+             * Days
+             * @description 持有期（天）
+             * @default 1
+             */
+            days: number;
+            /**
+             * Simulations
+             * @description 模拟次数
+             * @default 10000
+             */
+            simulations: number;
+        };
         /** ValidationError */
         ValidationError: {
             /** Location */
@@ -5986,6 +6591,22 @@ export type components = {
             yaml_content: string;
         };
         /**
+         * CorrelationResult
+         * @description 相关性矩阵结果
+         */
+        api__routes__trading__portfolio__CorrelationResult: {
+            /** Symbols */
+            symbols: string[];
+            /** Matrix */
+            matrix: number[][];
+            /** Returns Summary */
+            returns_summary: {
+                [key: string]: {
+                    [key: string]: number;
+                };
+            };
+        };
+        /**
          * NewsItem
          * @description 新闻条目
          */
@@ -6020,42 +6641,6 @@ export type components = {
              * @description 发布时间
              */
             published_at?: string | null;
-        };
-        /**
-         * CorrelationResult
-         * @description 相关性计算结果
-         */
-        services__north_money_service__CorrelationResult: {
-            /**
-             * Index Name
-             * @description 指数名称
-             */
-            index_name: string;
-            /**
-             * Window
-             * @description 计算窗口（天数）
-             */
-            window: number;
-            /**
-             * Correlation
-             * @description 相关系数 (-1 到 1)
-             */
-            correlation: number;
-            /**
-             * P Value
-             * @description P值（统计显著性）
-             */
-            p_value?: number | null;
-            /**
-             * Sample Size
-             * @description 样本数量
-             */
-            sample_size: number;
-            /**
-             * Interpretation
-             * @description 相关性解读
-             */
-            interpretation: string;
         };
     };
     responses: never;
@@ -7300,6 +7885,60 @@ export interface operations {
             };
         };
     };
+    get_provider_history_api_health_provider_history_get: {
+        parameters: {
+            query: {
+                /** @description 数据源名称 (akshare/yfinance/alpha_vantage) */
+                provider: string;
+                /** @description 查询最近 N 分钟 */
+                minutes?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_tracked_providers_api_health_provider_history_providers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     list_prompts_api_prompts__get: {
         parameters: {
             query?: {
@@ -7991,6 +8630,218 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_comparison_api_subgraph_metrics_comparison_get: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_rollout_api_subgraph_metrics_rollout_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RolloutUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_notification_configs_api_notifications_config_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationConfigResponse"][];
+                };
+            };
+        };
+    };
+    upsert_notification_config_api_notifications_config_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NotificationConfigRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationConfigResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_notification_config_api_notifications_config__channel__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_notification_logs_api_notifications_logs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationLogResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_test_notification_api_notifications_test_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestNotificationRequest"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

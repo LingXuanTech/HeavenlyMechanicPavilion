@@ -5,7 +5,7 @@
 
 import json
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel
 from sqlmodel import Session, select
@@ -60,6 +60,63 @@ class WinRateResponse(BaseModel):
     signal_breakdown: dict
 
 
+def _normalize_signal_for_backtest(signal: str) -> str:
+    """将前端/分析信号统一映射为回测引擎支持的信号值。"""
+    normalized = signal.strip().lower()
+
+    if normalized in {"strong buy", "strong_buy", "strong-buy"}:
+        return "Strong Buy"
+    if normalized in {"buy", "bullish", "long"}:
+        return "Buy"
+    if normalized in {"hold", "neutral", "flat"}:
+        return "Hold"
+    if normalized in {"sell", "bearish", "short"}:
+        return "Sell"
+    if normalized in {"strong sell", "strong_sell", "strong-sell"}:
+        return "Strong Sell"
+
+    return signal
+
+
+def _normalize_backtest_signals(signals: Optional[List[dict]]) -> List[Dict[str, Any]]:
+    """规范化回测信号字段，兼容 hint 与历史信号格式。"""
+    normalized_signals: List[Dict[str, Any]] = []
+
+    for raw in signals or []:
+        if not isinstance(raw, dict):
+            continue
+
+        date = str(raw.get("date", "")).strip()
+        if not date:
+            continue
+
+        if "T" in date:
+            date = date.split("T", 1)[0]
+        if len(date) > 10:
+            date = date[:10]
+
+        signal = str(raw.get("signal", "")).strip()
+        if not signal:
+            continue
+
+        confidence = raw.get("confidence", 50)
+        try:
+            confidence_number = float(confidence)
+            if confidence_number <= 1:
+                confidence_number *= 100
+            confidence_value = int(round(confidence_number))
+        except (TypeError, ValueError):
+            confidence_value = 50
+
+        normalized_signals.append({
+            "date": date,
+            "signal": _normalize_signal_for_backtest(signal),
+            "confidence": max(0, min(100, confidence_value)),
+        })
+
+    return normalized_signals
+
+
 # ============ 回测端点 ============
 
 
@@ -70,11 +127,13 @@ async def run_backtest(request: BacktestRequest):
     可以使用手动提供的信号，或自动从历史分析记录获取。
     """
     try:
-        signals = request.signals or []
+        signals = _normalize_backtest_signals(request.signals)
 
         # 从历史分析获取信号
         if request.use_historical_signals and not signals:
-            signals = _get_historical_signals(request.symbol, request.days_back)
+            signals = _normalize_backtest_signals(
+                _get_historical_signals(request.symbol, request.days_back)
+            )
 
         if not signals:
             raise HTTPException(
@@ -119,9 +178,11 @@ async def run_backtest_background(
 
     async def _run():
         try:
-            signals = request.signals or []
+            signals = _normalize_backtest_signals(request.signals)
             if request.use_historical_signals and not signals:
-                signals = _get_historical_signals(request.symbol, request.days_back)
+                signals = _normalize_backtest_signals(
+                    _get_historical_signals(request.symbol, request.days_back)
+                )
 
             if signals:
                 result = await backtest_engine.run_signal_backtest(

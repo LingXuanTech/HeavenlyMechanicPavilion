@@ -26,7 +26,7 @@ export function useGlobalMarket() {
 export function useFlashNews() {
   return useQuery({
     queryKey: FLASH_NEWS_KEY,
-    queryFn: async (): Promise<T.NewsItem[]> => {
+    queryFn: async (): Promise<T.AggregatedNewsItem[]> => {
       const result = await api.getAggregatedNews();
       return result.news;
     },

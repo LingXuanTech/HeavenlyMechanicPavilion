@@ -60,15 +60,6 @@ export interface PortfolioAnalysisResult {
 }
 
 /**
- * 快速投资组合检查
- */
-export interface QuickPortfolioCheck {
-  summary: string;
-  risk_level: string;
-  top_risks: string[];
-}
-
-/**
  * 市场情绪数据
  */
 export interface MarketSentiment {

@@ -47,6 +47,10 @@ const alertConfig: Record<T.AlertLevel, { bg: string; border: string; text: stri
   },
 };
 
+type DiagnosticsData = NonNullable<T.AgentAnalysisResponse["diagnostics"]> & {
+  architecture_mode?: "monolith" | "subgraph" | string | null;
+};
+
 export const AlertBanner: React.FC<{ hints: T.UIHints }> = ({ hints }) => {
   if (hints.alert_level === 'none' || !hints.alert_message) return null;
 
@@ -279,7 +283,7 @@ export const AnalysisLevelBadge: React.FC<{ level: 'L1' | 'L2' }> = ({ level }) 
 
 // ============ Diagnostics Panel ============
 
-export const DiagnosticsPanel: React.FC<{ diagnostics?: T.AgentAnalysisResponse['diagnostics'] }> = ({ diagnostics }) => {
+export const DiagnosticsPanel: React.FC<{ diagnostics?: DiagnosticsData | null }> = ({ diagnostics }) => {
   const [expanded, setExpanded] = useState(false);
 
   if (!diagnostics) return null;

@@ -8,6 +8,7 @@
  */
 
 import { logger } from '../utils/logger';
+import { API_BASE as SHARED_API_BASE } from '../config/api';
 
 import type * as T from '../src/types/schema';
 
@@ -18,7 +19,7 @@ export type SSEEventData = Record<string, unknown>;
 
 // ============ 基础配置 ============
 
-export const API_BASE = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000/api';
+export const API_BASE = SHARED_API_BASE;
 
 /**
  * API 错误类
@@ -448,20 +449,276 @@ export const reloadPrompts = () =>
 
 // ============ Portfolio 分析 API ============
 
-export const getPortfolioCorrelation = (symbols: string[], period: string = '1mo') =>
-  request<T.CorrelationResult>('/portfolio/correlation', {
+export type PortfolioPeriod = '1d' | '5d' | '1mo' | '3mo' | '6mo' | '1y';
+export type PortfolioRiskProfile = 'conservative' | 'balanced' | 'aggressive';
+
+export interface PortfolioRebalanceConstraints {
+  maxSingleWeight?: number;
+  maxTop2Weight?: number;
+  maxTurnover?: number;
+  riskProfile?: PortfolioRiskProfile;
+}
+
+export interface PortfolioAnalysisOptions {
+  period?: PortfolioPeriod;
+  clusterThreshold?: number;
+  weights?: number[];
+  constraints?: PortfolioRebalanceConstraints;
+  enableBacktestHint?: boolean;
+}
+
+export interface BacktestSignalPayload {
+  date: string;
+  signal: string;
+  confidence?: number;
+  source?: string;
+}
+
+export interface BacktestRunRequest {
+  symbol: string;
+  signals?: BacktestSignalPayload[];
+  initial_capital?: number;
+  holding_days?: number;
+  stop_loss_pct?: number;
+  take_profit_pct?: number;
+  use_historical_signals?: boolean;
+  days_back?: number;
+}
+
+export interface BacktestRunResult {
+  symbol: string;
+  start_date: string;
+  end_date: string;
+  initial_capital: number;
+  final_capital: number;
+  total_return_pct: number;
+  annualized_return_pct: number;
+  max_drawdown_pct: number;
+  sharpe_ratio: number | null;
+  win_rate: number;
+  total_trades: number;
+  winning_trades: number;
+  losing_trades: number;
+  avg_win_pct: number;
+  avg_loss_pct: number;
+  profit_factor: number | null;
+  benchmark_return_pct: number | null;
+  alpha: number | null;
+  error: string | null;
+  trades: Array<Record<string, unknown>>;
+}
+
+export interface BacktestRunResponse {
+  status: string;
+  result: BacktestRunResult;
+}
+
+export interface BacktestBackgroundResponse {
+  status: string;
+  symbol: string;
+  message: string;
+}
+
+export interface BacktestHistoryItem {
+  id: number;
+  period: string;
+  total_return_pct: number;
+  win_rate: string;
+  total_trades: number;
+  max_drawdown_pct: number;
+  sharpe_ratio: number | null;
+  alpha: number | null;
+  created_at: string;
+}
+
+export interface BacktestHistoryResponse {
+  status: string;
+  symbol: string;
+  count: number;
+  history: BacktestHistoryItem[];
+}
+
+export interface BacktestDetailTrade {
+  entry_date: string;
+  entry_price: number;
+  signal: string;
+  confidence: number;
+  exit_date?: string | null;
+  exit_price?: number | null;
+  return_pct?: number | null;
+  is_winner?: boolean | null;
+  holding_days?: number | null;
+  notes?: string;
+}
+
+export interface BacktestDetailResponse {
+  status: string;
+  symbol: string;
+  period: string;
+  initial_capital: number;
+  final_capital: number;
+  total_return_pct: number;
+  annualized_return_pct: number;
+  max_drawdown_pct: number;
+  sharpe_ratio: number | null;
+  win_rate: number;
+  total_trades: number;
+  winning_trades: number;
+  losing_trades: number;
+  avg_win_pct: number;
+  avg_loss_pct: number;
+  profit_factor: number | null;
+  benchmark_return_pct: number | null;
+  alpha: number | null;
+  trades: BacktestDetailTrade[];
+  config: {
+    holding_days: number;
+    stop_loss_pct: number;
+    take_profit_pct: number;
+  };
+  created_at: string;
+}
+
+interface NormalizedPortfolioAnalysisOptions {
+  period: PortfolioPeriod;
+  clusterThreshold: number;
+  weights?: number[];
+  constraints?: {
+    max_single_weight: number;
+    max_top2_weight: number;
+    max_turnover: number;
+    risk_profile: PortfolioRiskProfile;
+  };
+  enableBacktestHint: boolean;
+}
+
+const DEFAULT_PORTFOLIO_PERIOD: PortfolioPeriod = '1mo';
+const DEFAULT_CLUSTER_THRESHOLD = 0.7;
+const DEFAULT_PORTFOLIO_CONSTRAINTS = {
+  maxSingleWeight: 0.45,
+  maxTop2Weight: 0.65,
+  maxTurnover: 0.35,
+  riskProfile: 'balanced' as PortfolioRiskProfile,
+};
+
+const clampValue = (value: number, min: number, max: number): number =>
+  Math.min(max, Math.max(min, value));
+
+const normalizePortfolioOptions = (
+  options: PortfolioAnalysisOptions = {}
+): NormalizedPortfolioAnalysisOptions => {
+  const normalizedWeights =
+    options.weights
+      ?.map((weight) => Number(weight))
+      .filter((weight) => Number.isFinite(weight)) ?? undefined;
+
+  const constraints = options.constraints
+    ? {
+        max_single_weight: clampValue(
+          Number(options.constraints.maxSingleWeight ?? DEFAULT_PORTFOLIO_CONSTRAINTS.maxSingleWeight),
+          0.1,
+          0.9
+        ),
+        max_top2_weight: clampValue(
+          Number(options.constraints.maxTop2Weight ?? DEFAULT_PORTFOLIO_CONSTRAINTS.maxTop2Weight),
+          0.2,
+          1
+        ),
+        max_turnover: clampValue(
+          Number(options.constraints.maxTurnover ?? DEFAULT_PORTFOLIO_CONSTRAINTS.maxTurnover),
+          0,
+          1
+        ),
+        risk_profile: options.constraints.riskProfile ?? DEFAULT_PORTFOLIO_CONSTRAINTS.riskProfile,
+      }
+    : undefined;
+
+  return {
+    period: options.period ?? DEFAULT_PORTFOLIO_PERIOD,
+    clusterThreshold: options.clusterThreshold ?? DEFAULT_CLUSTER_THRESHOLD,
+    weights: normalizedWeights?.length ? normalizedWeights : undefined,
+    constraints,
+    enableBacktestHint: options.enableBacktestHint ?? true,
+  };
+};
+
+export const getPortfolioCorrelation = (
+  symbols: string[],
+  options: PortfolioAnalysisOptions = {}
+) => {
+  const { period, weights } = normalizePortfolioOptions(options);
+
+  return request<T.CorrelationResult>('/portfolio/correlation', {
     method: 'POST',
-    body: JSON.stringify({ symbols, period }),
+    body: JSON.stringify({
+      symbols,
+      period,
+      ...(weights ? { weights } : {}),
+    }),
+  });
+};
+
+export const getPortfolioAnalysis = (
+  symbols: string[],
+  options: PortfolioAnalysisOptions = {}
+) => {
+  const { period, clusterThreshold, weights, constraints, enableBacktestHint } =
+    normalizePortfolioOptions(options);
+
+  return request<T.PortfolioAnalysis>('/portfolio/analyze', {
+    method: 'POST',
+    body: JSON.stringify({
+      symbols,
+      period,
+      cluster_threshold: clusterThreshold,
+      ...(weights ? { weights } : {}),
+      ...(constraints ? { constraints } : {}),
+      enable_backtest_hint: enableBacktestHint,
+    }),
+  });
+};
+
+export const getQuickPortfolioCheck = (
+  symbols: string[],
+  options: PortfolioAnalysisOptions = {}
+) => {
+  const { period, clusterThreshold, weights } = normalizePortfolioOptions(options);
+  const query = new URLSearchParams({
+    symbols: symbols.join(','),
+    period,
+    cluster_threshold: clusterThreshold.toString(),
   });
 
-export const getPortfolioAnalysis = (symbols: string[], period: string = '1mo') =>
-  request<T.PortfolioAnalysisResult>('/portfolio/analyze', {
+  if (weights?.length) {
+    query.set('weights', weights.join(','));
+  }
+
+  return request<T.QuickPortfolioCheck>(`/portfolio/quick-check?${query.toString()}`);
+};
+
+// ============ Backtest API ============
+
+export const runBacktest = (payload: BacktestRunRequest) =>
+  request<BacktestRunResponse>('/backtest/run', {
     method: 'POST',
-    body: JSON.stringify({ symbols, period }),
+    body: JSON.stringify(payload),
   });
 
-export const getQuickPortfolioCheck = (symbols: string[]) =>
-  request<T.QuickPortfolioCheck>(`/portfolio/quick-check?symbols=${symbols.join(',')}`);
+export const runBacktestInBackground = (payload: BacktestRunRequest) =>
+  request<BacktestBackgroundResponse>('/backtest/run/background', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+export const getBacktestHistory = (symbol: string, limit: number = 10) =>
+  request<BacktestHistoryResponse>(
+    `/backtest/history/${encodeURIComponent(symbol)}?limit=${limit}`
+  );
+
+export const getBacktestDetail = (symbol: string, recordId: number) =>
+  request<BacktestDetailResponse>(
+    `/backtest/history/${encodeURIComponent(symbol)}/${recordId}`
+  );
 
 // ============ 宏观经济 API ============
 
@@ -545,13 +802,13 @@ export const getAggregatedNews = (forceRefresh: boolean = false) =>
   );
 
 export const getNewsFlashAggregated = (limit: number = 10) =>
-  request<T.NewsItem[]>(`/news-aggregator/flash?limit=${limit}`);
+  request<T.AggregatedNewsItem[]>(`/news-aggregator/flash?limit=${limit}`);
 
 export const getNewsByCategory = (category: T.NewsCategory, limit: number = 20) =>
-  request<T.NewsItem[]>(`/news-aggregator/category/${category}?limit=${limit}`);
+  request<T.AggregatedNewsItem[]>(`/news-aggregator/category/${category}?limit=${limit}`);
 
 export const getNewsBySymbol = (symbol: string, limit: number = 20) =>
-  request<T.NewsItem[]>(`/news-aggregator/symbol/${symbol}?limit=${limit}`);
+  request<T.AggregatedNewsItem[]>(`/news-aggregator/symbol/${symbol}?limit=${limit}`);
 
 export const refreshAggregatedNews = () =>
   request<T.ApiResponse<'/api/news-aggregator/refresh', 'post'>>('/news-aggregator/refresh', { method: 'POST' });
@@ -940,4 +1197,3 @@ export const previewPrompt = (agentKey: string, variables?: Record<string, unkno
 /** 获取所有 Agent 分类 */
 export const getPromptCategories = () =>
   request<{ categories: { value: string; label: string }[] }>('/prompts/categories');
-

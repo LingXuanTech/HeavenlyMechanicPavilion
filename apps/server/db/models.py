@@ -40,6 +40,7 @@ class AnalysisResult(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.now)
     # 新增字段用于任务追踪
     task_id: Optional[str] = Field(default=None, index=True)
+    user_id: Optional[int] = Field(default=None, index=True)
     status: str = Field(default="completed")  # pending/running/completed/failed
     error_message: Optional[str] = Field(default=None)
     # 诊断信息

@@ -81,7 +81,7 @@ class AnalysisWorker:
         )
 
         # 初始化任务状态
-        await cache_service.set_task(task_id, {"status": "running", "symbol": symbol, "progress": 0})
+        await cache_service.set_task(task_id, {"status": "running", "symbol": symbol, "progress": 0, "user_id": task.user_id})
         await cache_service.init_sse_task(task_id, symbol)
 
         try:
@@ -231,6 +231,7 @@ class AnalysisWorker:
                     full_report_json=json.dumps(final_json, ensure_ascii=False),
                     anchor_script=final_json.get("anchor_script", ""),
                     task_id=task_id,
+                    user_id=task.user_id,
                     status="completed",
                     elapsed_seconds=elapsed_seconds,
                     architecture_mode=architecture_mode,
@@ -284,13 +285,14 @@ class AnalysisWorker:
             # 添加诊断信息
             final_json["diagnostics"] = {
                 "task_id": task_id,
+                "user_id": task.user_id,
                 "elapsed_seconds": elapsed_seconds,
                 "worker": self.name,
             }
 
             await cache_service.push_sse_event(task_id, "stage_final", final_json)
             await cache_service.set_sse_status(task_id, "completed")
-            await cache_service.set_task(task_id, {"status": "completed", "symbol": symbol})
+            await cache_service.set_task(task_id, {"status": "completed", "symbol": symbol, "user_id": task.user_id})
 
             logger.info(
                 "Analysis task completed",
@@ -323,6 +325,7 @@ class AnalysisWorker:
                     full_report_json="{}",
                     anchor_script="",
                     task_id=task_id,
+                    user_id=task.user_id,
                     status="failed",
                     error_message=str(e),
                     elapsed_seconds=elapsed_seconds,
@@ -333,7 +336,7 @@ class AnalysisWorker:
 
             await cache_service.push_sse_event(task_id, "error", {"message": str(e)})
             await cache_service.set_sse_status(task_id, "failed")
-            await cache_service.set_task(task_id, {"status": "failed", "symbol": symbol, "error": str(e)})
+            await cache_service.set_task(task_id, {"status": "failed", "symbol": symbol, "error": str(e), "user_id": task.user_id})
 
             return False
 
