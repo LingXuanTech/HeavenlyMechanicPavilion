@@ -61,15 +61,15 @@ async def get_full_health_report(force_refresh: bool = Query(False)):
         report = await health_monitor.get_health_report(force_refresh)
         uptime_info = health_monitor.get_uptime()
 
-        # 转换为 API Schema
+        # 转换为 API Schema（service 层和 schema 层是独立的 Pydantic 模型，需 model_dump 桥接）
         return HealthReport(
             overall_status=report.overall_status,
             uptime_seconds=int(report.uptime_seconds),
             uptime_formatted=uptime_info["uptime_formatted"],
-            components=report.components,
-            metrics=report.system_metrics,
-            data_providers=report.data_providers,
-            recent_errors=report.recent_errors,
+            components=[c.model_dump() for c in report.components],
+            metrics=report.system_metrics.model_dump(),
+            data_providers={k: v.model_dump() for k, v in report.data_providers.items()},
+            recent_errors=[e.model_dump() for e in report.recent_errors],
             timestamp=report.checked_at
         )
 

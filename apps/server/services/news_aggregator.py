@@ -28,6 +28,7 @@ except ImportError:
     httpx = None
 
 from config.settings import settings
+from services.cache_service import cache_service
 
 logger = structlog.get_logger()
 
