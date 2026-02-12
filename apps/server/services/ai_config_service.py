@@ -500,6 +500,44 @@ class AIConfigService:
 
             return {"config_key": config_key, "updated": True}
 
+    def get_openai_client_config(self) -> Optional[Dict[str, str]]:
+        """获取 OpenAI 兼容的客户端配置（base_url + api_key）
+
+        供 embedding、TTS、Responses API 等需要原生 OpenAI 客户端的场景使用。
+        优先返回 OpenAI/OpenAI-Compatible/DeepSeek 类型的 provider。
+
+        Returns:
+            {"base_url": "...", "api_key": "..."} 或 None
+        """
+        if not self._providers_cache:
+            self.refresh_config()
+
+        openai_compatible_types = {
+            AIProviderType.OPENAI,
+            AIProviderType.OPENAI_COMPATIBLE,
+            AIProviderType.DEEPSEEK,
+        }
+
+        # 按 priority 排序，找到第一个可用的 OpenAI 兼容 provider
+        for provider in sorted(self._providers_cache.values(), key=lambda p: p.priority):
+            if provider.provider_type in openai_compatible_types and provider.is_enabled:
+                api_key = self._decrypt_key(provider.api_key)
+                if api_key:
+                    return {
+                        "base_url": provider.base_url or "https://api.openai.com/v1",
+                        "api_key": api_key,
+                    }
+
+        # 降级：检查环境变量
+        if settings.OPENAI_API_KEY:
+            return {
+                "base_url": "https://api.openai.com/v1",
+                "api_key": settings.OPENAI_API_KEY,
+            }
+
+        logger.debug("No OpenAI-compatible provider available")
+        return None
+
     def get_status(self) -> Dict[str, Any]:
         """获取服务状态"""
         return {

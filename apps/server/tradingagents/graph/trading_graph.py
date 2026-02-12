@@ -93,18 +93,10 @@ class TradingAgentsGraph:
             self.deep_thinking_llm = ai_config_service.get_llm("deep_think")
             self.quick_thinking_llm = ai_config_service.get_llm("quick_think")
         except Exception as e:
-            # 降级到原有的 config 方式（兼容 CLI 模式等）
-            if self.config["llm_provider"].lower() in ["openai", "ollama", "openrouter"]:
-                self.deep_thinking_llm = ChatOpenAI(model=self.config["deep_think_llm"], base_url=self.config["backend_url"])
-                self.quick_thinking_llm = ChatOpenAI(model=self.config["quick_think_llm"], base_url=self.config["backend_url"])
-            elif self.config["llm_provider"].lower() == "anthropic":
-                self.deep_thinking_llm = ChatAnthropic(model=self.config["deep_think_llm"], base_url=self.config["backend_url"])
-                self.quick_thinking_llm = ChatAnthropic(model=self.config["quick_think_llm"], base_url=self.config["backend_url"])
-            elif self.config["llm_provider"].lower() == "google":
-                self.deep_thinking_llm = ChatGoogleGenerativeAI(model=self.config["deep_think_llm"])
-                self.quick_thinking_llm = ChatGoogleGenerativeAI(model=self.config["quick_think_llm"])
-            else:
-                raise ValueError(f"Unsupported LLM provider: {self.config['llm_provider']}")
+            # 降级：兼容 CLI 模式（ai_config_service 不可用时使用环境变量）
+            logger.warning("ai_config_service unavailable, using fallback LLM config", error=str(e))
+            self.deep_thinking_llm = self._create_fallback_llm(self.config, "deep_think")
+            self.quick_thinking_llm = self._create_fallback_llm(self.config, "quick_think")
         
         # Initialize memories
         self.bull_memory = FinancialSituationMemory("bull_memory", self.config)
@@ -159,6 +151,42 @@ class TradingAgentsGraph:
                 analysis_level=analysis_level
             )
         
+    @staticmethod
+    def _create_fallback_llm(config: Dict[str, Any], config_key: str):
+        """CLI 模式降级：根据环境变量创建 LLM 实例
+
+        与 ai_config_service._fallback_llm() 逻辑一致，
+        优先 Google → OpenAI → 最后使用 config 字典中的 llm_provider。
+        """
+        import os
+
+        google_key = os.getenv("GOOGLE_API_KEY")
+        openai_key = os.getenv("OPENAI_API_KEY")
+
+        if google_key:
+            model = "gemini-1.5-flash" if config_key == "quick_think" else "gemini-1.5-pro"
+            return ChatGoogleGenerativeAI(model=model, google_api_key=google_key)
+        elif openai_key:
+            model = "gpt-4o-mini" if config_key == "quick_think" else "gpt-4o"
+            return ChatOpenAI(model=model, api_key=openai_key)
+        else:
+            # 最终降级：使用 config 字典（兼容 CLI --provider 参数）
+            provider = config.get("llm_provider", "openai").lower()
+            model_name = config.get(
+                "quick_think_llm" if config_key == "quick_think" else "deep_think_llm"
+            )
+            if provider in ("openai", "ollama", "openrouter"):
+                return ChatOpenAI(model=model_name, base_url=config.get("backend_url"))
+            elif provider == "anthropic":
+                return ChatAnthropic(model=model_name)
+            elif provider == "google":
+                return ChatGoogleGenerativeAI(model=model_name)
+            else:
+                raise ValueError(
+                    f"No AI provider configured. Set GOOGLE_API_KEY/OPENAI_API_KEY "
+                    f"or configure providers via AI Config UI."
+                )
+
     def _get_default_analysts(self, market: str) -> List[str]:
         """Get default analyst list based on market using MarketAnalystRouter.
 

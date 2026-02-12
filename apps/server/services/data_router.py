@@ -344,7 +344,9 @@ class MarketRouter:
     async def _get_price_yfinance(cls, symbol: str, market: str) -> StockPrice:
         """通过 yfinance 获取价格"""
         try:
-            ticker = yf.Ticker(symbol)
+            # yfinance 对上交所使用 .SS 后缀（非 .SH）
+            yf_symbol = re.sub(r'\.SH$', '.SS', symbol, flags=re.IGNORECASE)
+            ticker = yf.Ticker(yf_symbol)
             info = ticker.fast_info
 
             if info['last_price'] is None:
@@ -561,7 +563,8 @@ class MarketRouter:
     @classmethod
     async def _get_history_yfinance(cls, symbol: str, period: str) -> List[KlineData]:
         """通过 yfinance 获取历史数据"""
-        ticker = yf.Ticker(symbol)
+        yf_symbol = re.sub(r'\.SH$', '.SS', symbol, flags=re.IGNORECASE)
+        ticker = yf.Ticker(yf_symbol)
         hist = ticker.history(period=period)
 
         klines = []

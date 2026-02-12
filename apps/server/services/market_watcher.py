@@ -120,7 +120,12 @@ class MarketWatcherService:
         now = datetime.now()
 
         try:
-            # 使用 akshare 获取实时指数
+            # 使用 asyncio.to_thread 避免阻塞事件循环，并设置超时
+            df = await asyncio.wait_for(
+                asyncio.to_thread(ak.stock_zh_index_spot_sina),
+                timeout=15.0
+            )
+
             for code, config in MARKET_INDICES.items():
                 if config["region"] != MarketRegion.CN:
                     continue
@@ -130,9 +135,8 @@ class MarketWatcherService:
                     if not ak_code:
                         continue
 
-                    # 获取实时行情
-                    df = ak.stock_zh_index_spot()
-                    row = df[df['代码'] == ak_code.replace('sh', '').replace('sz', '')]
+                    # stock_zh_index_spot_sina 代码列含前缀如 sh000001
+                    row = df[df['代码'] == ak_code]
 
                     if not row.empty:
                         row = row.iloc[0]
@@ -176,8 +180,12 @@ class MarketWatcherService:
         for code in global_codes:
             try:
                 config = MARKET_INDICES[code]
+                # yfinance 的 ticker.info 是阻塞调用，使用 to_thread + 超时保护
                 ticker = yf.Ticker(code)
-                info = ticker.info
+                info = await asyncio.wait_for(
+                    asyncio.to_thread(lambda t=ticker: t.info),
+                    timeout=10.0
+                )
 
                 current = info.get('regularMarketPrice') or info.get('previousClose', 0)
                 prev_close = info.get('previousClose', current)

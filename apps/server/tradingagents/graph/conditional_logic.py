@@ -11,59 +11,57 @@ class ConditionalLogic:
         self.max_debate_rounds = max_debate_rounds
         self.max_risk_discuss_rounds = max_risk_discuss_rounds
 
+    @staticmethod
+    def _has_tool_calls(state: AgentState) -> bool:
+        """安全检查最后一条消息是否包含 tool_calls。
+
+        防御 HumanMessage / 降级空消息等无 tool_calls 属性的情况。
+        """
+        messages = state.get("messages", [])
+        if not messages:
+            return False
+        last_message = messages[-1]
+        return bool(getattr(last_message, "tool_calls", None))
+
     def should_continue_market(self, state: AgentState):
         """Determine if market analysis should continue."""
-        messages = state["messages"]
-        last_message = messages[-1]
-        if last_message.tool_calls:
+        if self._has_tool_calls(state):
             return "tools_market"
         return "Msg Clear Market"
 
     def should_continue_social(self, state: AgentState):
         """Determine if social media analysis should continue."""
-        messages = state["messages"]
-        last_message = messages[-1]
-        if last_message.tool_calls:
+        if self._has_tool_calls(state):
             return "tools_social"
         return "Msg Clear Social"
 
     def should_continue_news(self, state: AgentState):
         """Determine if news analysis should continue."""
-        messages = state["messages"]
-        last_message = messages[-1]
-        if last_message.tool_calls:
+        if self._has_tool_calls(state):
             return "tools_news"
         return "Msg Clear News"
 
     def should_continue_fundamentals(self, state: AgentState):
         """Determine if fundamentals analysis should continue."""
-        messages = state["messages"]
-        last_message = messages[-1]
-        if last_message.tool_calls:
+        if self._has_tool_calls(state):
             return "tools_fundamentals"
         return "Msg Clear Fundamentals"
 
     def should_continue_sentiment(self, state: AgentState):
         """Determine if retail sentiment analysis should continue."""
-        messages = state["messages"]
-        last_message = messages[-1]
-        if last_message.tool_calls:
+        if self._has_tool_calls(state):
             return "tools_sentiment"
         return "Msg Clear Sentiment"
 
     def should_continue_policy(self, state: AgentState):
         """Determine if policy analysis should continue."""
-        messages = state["messages"]
-        last_message = messages[-1]
-        if last_message.tool_calls:
+        if self._has_tool_calls(state):
             return "tools_policy"
         return "Msg Clear Policy"
 
     def should_continue_fund_flow(self, state: AgentState):
         """Determine if fund flow analysis should continue."""
-        messages = state["messages"]
-        last_message = messages[-1]
-        if last_message.tool_calls:
+        if self._has_tool_calls(state):
             return "tools_fund_flow"
         return "Msg Clear Fund_flow"
 

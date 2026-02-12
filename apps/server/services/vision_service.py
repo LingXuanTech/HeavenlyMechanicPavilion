@@ -29,29 +29,14 @@ class VisionService:
         self._llm = None
 
     def _get_llm(self):
-        """延迟创建支持 Vision 的 LLM"""
+        """延迟创建支持 Vision 的 LLM（通过 ai_config_service 统一管理）"""
         if self._llm is not None:
             return self._llm
 
-        from config.settings import settings
+        from services.ai_config_service import ai_config_service
 
-        # 优先使用支持 Vision 的模型
-        if settings.OPENAI_API_KEY:
-            from langchain_openai import ChatOpenAI
-            self._llm = ChatOpenAI(
-                model="gpt-4o",
-                api_key=settings.OPENAI_API_KEY,
-                max_tokens=4096,
-            )
-        elif settings.GOOGLE_API_KEY:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            self._llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",
-                google_api_key=settings.GOOGLE_API_KEY,
-            )
-        else:
-            raise RuntimeError("No Vision-capable LLM API key configured (OPENAI_API_KEY or GOOGLE_API_KEY)")
-
+        # Vision 需要强模型（gpt-4o / gemini-2.0-flash 等均支持多模态）
+        self._llm = ai_config_service.get_llm("deep_think")
         return self._llm
 
     async def analyze_image(

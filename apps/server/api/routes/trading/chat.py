@@ -5,25 +5,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from typing import List, Dict, Any, Optional
 from db.models import ChatHistory, AnalysisResult, Watchlist, get_session
-from config.settings import settings
 from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 from services.prompt_manager import prompt_manager
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 logger = structlog.get_logger()
-
-
-def _create_llm():
-    """延迟创建 LLM 实例，优雅处理 API key 缺失"""
-    if settings.GOOGLE_API_KEY:
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        return ChatGoogleGenerativeAI(model="gemini-1.5-flash", google_api_key=settings.GOOGLE_API_KEY)
-    elif settings.OPENAI_API_KEY:
-        from langchain_openai import ChatOpenAI
-        return ChatOpenAI(model="gpt-4o-mini", api_key=settings.OPENAI_API_KEY)
-    else:
-        logger.warning("No LLM API key configured (OPENAI_API_KEY or GOOGLE_API_KEY)")
-        return None
 
 
 def _build_context(session: Session, message: str) -> str:
@@ -126,9 +112,14 @@ class ChatService:
 
     @property
     def llm(self):
-        """延迟初始化 LLM"""
+        """延迟初始化 LLM（通过 ai_config_service 统一管理）"""
         if self._llm is None:
-            self._llm = _create_llm()
+            from services.ai_config_service import ai_config_service
+            try:
+                self._llm = ai_config_service.get_llm("quick_think")
+            except Exception as e:
+                logger.warning("Failed to create LLM via ai_config_service", error=str(e))
+                return None
         return self._llm
 
     async def get_response(

@@ -1,3 +1,4 @@
+import re
 import yaml
 import os
 from typing import Dict, Any, Optional
@@ -46,10 +47,20 @@ class PromptManager:
 
         if context:
             try:
-                system_prompt = system_tmpl.format(**context)
-                user_prompt = user_tmpl.format(**context)
-            except KeyError as e:
-                logger.warning("Missing context variable for prompt", role=role, missing=str(e))
+                # 使用 regex 安全替换：只替换 {key} 中 key 为合法标识符且存在于 context 中的变量
+                # 避免误匹配 JSON 中的 {"symbol": ...} 等文本
+                def _safe_sub(template: str) -> str:
+                    def replacer(m: re.Match) -> str:
+                        key = m.group(1)
+                        if key in context:
+                            return str(context[key])
+                        return m.group(0)  # 不在 context 中则原样保留
+                    return re.sub(r'\{([a-zA-Z_]\w*)\}', replacer, template)
+
+                system_prompt = _safe_sub(system_tmpl)
+                user_prompt = _safe_sub(user_tmpl)
+            except Exception as e:
+                logger.warning("Failed to render prompt", role=role, error=str(e))
                 system_prompt = system_tmpl
                 user_prompt = user_tmpl
         else:

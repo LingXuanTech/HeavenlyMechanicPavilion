@@ -4,7 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from typing import List, Dict, Any
 from services.prompt_manager import prompt_manager
 from services.ai_config_service import ai_config_service
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import SystemMessage, HumanMessage
 import json
 
 router = APIRouter(prefix="/discover", tags=["Discovery"])
@@ -21,16 +21,16 @@ class DiscoveryService:
 
     async def discover_stocks(self, query: str) -> List[Dict[str, Any]]:
         logger.info("Discovering stocks", query=query)
-        
+
         prompt_data = prompt_manager.get_prompt("scout_agent", {"query": query})
-        
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", prompt_data["system"] + "\n请输出严格的 JSON 数组格式，每个对象包含 symbol, name, reason, confidence (0-100)。不要包含 Markdown 代码块。"),
-            ("user", prompt_data["user"])
-        ])
-        
-        chain = prompt | self.llm
-        response = await chain.ainvoke({})
+
+        # prompt_manager 已完成变量渲染，直接构造 Message 对象（避免 ChatPromptTemplate 二次解析）
+        messages = [
+            SystemMessage(content=prompt_data["system"] + "\n请输出严格的 JSON 数组格式，每个对象包含 symbol, name, reason, confidence (0-100)。不要包含 Markdown 代码块。"),
+            HumanMessage(content=prompt_data["user"]),
+        ]
+
+        response = await self.llm.ainvoke(messages)
         content = response.content.strip()
         
         # Clean up potential markdown blocks

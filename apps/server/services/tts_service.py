@@ -101,15 +101,30 @@ class OpenAITTSProvider(BaseTTSProvider):
         if self._client is None:
             try:
                 from openai import AsyncOpenAI
-                self._client = AsyncOpenAI()
+                from services.ai_config_service import ai_config_service
+                client_config = ai_config_service.get_openai_client_config()
+                if client_config:
+                    self._client = AsyncOpenAI(
+                        base_url=client_config["base_url"],
+                        api_key=client_config["api_key"],
+                    )
+                else:
+                    logger.warning("No OpenAI-compatible provider configured for TTS")
+                    return None
             except ImportError:
                 logger.warning("OpenAI package not installed")
+                return None
+            except Exception as e:
+                logger.warning("Failed to create OpenAI TTS client", error=str(e))
                 return None
         return self._client
 
     def is_available(self) -> bool:
-        import os
-        return bool(os.getenv("OPENAI_API_KEY"))
+        try:
+            from services.ai_config_service import ai_config_service
+            return ai_config_service.get_openai_client_config() is not None
+        except Exception:
+            return False
 
     async def synthesize(self, text: str, config: TTSConfig) -> TTSResult:
         client = self._get_client()

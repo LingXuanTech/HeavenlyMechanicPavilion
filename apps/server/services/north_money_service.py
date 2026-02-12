@@ -205,17 +205,22 @@ class NorthMoneyService:
             return cached
 
         try:
-            # 使用 AkShare 获取北向资金数据
-            df = await asyncio.to_thread(ak.stock_hsgt_north_net_flow_in_em)
+            # 使用 AkShare 获取北向资金数据（stock_hsgt_fund_flow_summary_em 替代已废弃的 stock_hsgt_north_net_flow_in_em）
+            df = await asyncio.wait_for(
+                asyncio.to_thread(ak.stock_hsgt_fund_flow_summary_em),
+                timeout=15.0
+            )
 
             if df.empty:
                 raise ValueError("No north money data available")
 
-            # 获取最新一行数据
-            latest = df.iloc[-1]
+            # 筛选北向资金行（沪股通 + 深股通）
+            sh_row = df[(df['板块'] == '沪股通') & (df['资金方向'] == '北向')]
+            sz_row = df[(df['板块'] == '深股通') & (df['资金方向'] == '北向')]
 
-            # 计算市场情绪
-            total = float(latest.get('北向资金', 0) or latest.get('合计', 0))
+            sh_net = float(sh_row['成交净买额'].values[0]) if not sh_row.empty else 0
+            sz_net = float(sz_row['成交净买额'].values[0]) if not sz_row.empty else 0
+            total = sh_net + sz_net
             if total > 50:
                 sentiment = "Strong Inflow"
             elif total > 0:
@@ -227,8 +232,8 @@ class NorthMoneyService:
 
             flow = NorthMoneyFlow(
                 date=datetime.now().date(),
-                sh_connect=float(latest.get('沪股通', 0) or 0),
-                sz_connect=float(latest.get('深股通', 0) or 0),
+                sh_connect=sh_net,
+                sz_connect=sz_net,
                 total=total,
                 market_sentiment=sentiment,
             )
@@ -256,22 +261,35 @@ class NorthMoneyService:
             return cached
 
         try:
-            df = await asyncio.to_thread(ak.stock_hsgt_north_net_flow_in_em)
+            # 分别获取沪股通和深股通历史数据，合并为北向资金总量
+            df_sh = await asyncio.wait_for(
+                asyncio.to_thread(ak.stock_hsgt_hist_em, symbol="沪股通"),
+                timeout=15.0
+            )
+            df_sz = await asyncio.wait_for(
+                asyncio.to_thread(ak.stock_hsgt_hist_em, symbol="深股通"),
+                timeout=15.0
+            )
 
-            if df.empty:
+            if df_sh.empty and df_sz.empty:
                 return []
 
-            # 取最近 N 天
+            # 按日期对齐合并
+            df_sh = df_sh[['日期', '当日成交净买额']].rename(columns={'当日成交净买额': 'sh'}).tail(days)
+            df_sz = df_sz[['日期', '当日成交净买额']].rename(columns={'当日成交净买额': 'sz'}).tail(days)
+            df = pd.merge(df_sh, df_sz, on='日期', how='outer').fillna(0)
             df = df.tail(days)
 
             history = []
             for _, row in df.iterrows():
                 try:
+                    sh_val = float(row.get('sh', 0) or 0)
+                    sz_val = float(row.get('sz', 0) or 0)
                     history.append(NorthMoneyHistory(
-                        date=pd.to_datetime(row.get('日期', row.name)).date() if '日期' in row else datetime.now().date(),
-                        total=float(row.get('北向资金', 0) or row.get('合计', 0)),
-                        sh_connect=float(row.get('沪股通', 0) or 0),
-                        sz_connect=float(row.get('深股通', 0) or 0),
+                        date=pd.to_datetime(row['日期']).date(),
+                        total=sh_val + sz_val,
+                        sh_connect=sh_val,
+                        sz_connect=sz_val,
                     ))
                 except Exception:
                     continue
@@ -652,35 +670,56 @@ class NorthMoneyService:
         try:
             date_str = (target_date or datetime.now().date()).strftime("%Y-%m-%d")
             
-            # 1. 获取北向资金数据
-            df_north = await asyncio.to_thread(ak.stock_hsgt_north_net_flow_in_em)
-            if df_north.empty:
+            # 1. 获取北向资金数据（通过沪股通+深股通历史合并）
+            df_sh = await asyncio.wait_for(
+                asyncio.to_thread(ak.stock_hsgt_hist_em, symbol="沪股通"),
+                timeout=15.0
+            )
+            df_sz = await asyncio.wait_for(
+                asyncio.to_thread(ak.stock_hsgt_hist_em, symbol="深股通"),
+                timeout=15.0
+            )
+            if df_sh.empty and df_sz.empty:
                 logger.warning("No north money data from AkShare")
                 return False
-            
-            # 匹配日期
-            df_north['日期'] = pd.to_datetime(df_north['日期']).dt.strftime("%Y-%m-%d")
-            day_data = df_north[df_north['日期'] == date_str]
-            
-            if day_data.empty:
+
+            df_sh['日期'] = pd.to_datetime(df_sh['日期']).dt.strftime("%Y-%m-%d")
+            df_sz['日期'] = pd.to_datetime(df_sz['日期']).dt.strftime("%Y-%m-%d")
+
+            sh_day = df_sh[df_sh['日期'] == date_str]
+            sz_day = df_sz[df_sz['日期'] == date_str]
+
+            if sh_day.empty and sz_day.empty:
                 logger.info("No north money data for date", date=date_str)
                 return False
+
+            sh_net = float(sh_day['当日成交净买额'].values[0]) if not sh_day.empty else 0
+            sz_net = float(sz_day['当日成交净买额'].values[0]) if not sz_day.empty else 0
+            sh_cumulative = float(sh_day['历史累计净买额'].values[0]) if not sh_day.empty else 0
+            sz_cumulative = float(sz_day['历史累计净买额'].values[0]) if not sz_day.empty else 0
             
-            row = day_data.iloc[0]
-            
-            # 2. 获取指数数据
+            # 2. 获取指数数据（加超时保护）
             # 上证指数
-            df_sh = await asyncio.to_thread(ak.stock_zh_index_daily, symbol="sh000001")
+            df_sh = await asyncio.wait_for(
+                asyncio.to_thread(ak.stock_zh_index_daily, symbol="sh000001"),
+                timeout=15.0
+            )
             df_sh.index = pd.to_datetime(df_sh.index).strftime("%Y-%m-%d")
             sh_price = float(df_sh.loc[date_str, 'close']) if date_str in df_sh.index else None
             
             # 沪深300
-            df_hs300 = await asyncio.to_thread(ak.stock_zh_index_daily, symbol="sh000300")
+            df_hs300 = await asyncio.wait_for(
+                asyncio.to_thread(ak.stock_zh_index_daily, symbol="sh000300"),
+                timeout=15.0
+            )
             df_hs300.index = pd.to_datetime(df_hs300.index).strftime("%Y-%m-%d")
             hs300_price = float(df_hs300.loc[date_str, 'close']) if date_str in df_hs300.index else None
             
             # 创业板
-            df_cyb = await asyncio.to_thread(ak.stock_zh_index_daily, symbol="sz399006")
+            df_cyb = await asyncio.wait_for(
+                asyncio.to_thread(ak.stock_zh_index_daily, symbol="sz399006"),
+                timeout=15.0
+            )
             df_cyb.index = pd.to_datetime(df_cyb.index).strftime("%Y-%m-%d")
             cyb_price = float(df_cyb.loc[date_str, 'close']) if date_str in df_cyb.index else None
             
@@ -697,10 +736,10 @@ class NorthMoneyService:
                 else:
                     record = NorthMoneyHistoryRecord(date=date_str)
                 
-                record.north_inflow = float(row.get('北向资金', 0) or row.get('合计', 0))
-                record.sh_inflow = float(row.get('沪股通', 0) or 0)
-                record.sz_inflow = float(row.get('深股通', 0) or 0)
-                record.cumulative_inflow = float(row.get('累计净流入', 0) or 0)
+                record.north_inflow = sh_net + sz_net
+                record.sh_inflow = sh_net
+                record.sz_inflow = sz_net
+                record.cumulative_inflow = sh_cumulative + sz_cumulative
                 record.market_index = sh_price
                 record.hs300_index = hs300_price
                 record.cyb_index = cyb_price
@@ -1004,8 +1043,11 @@ class NorthMoneyService:
             return cached
 
         try:
-            # 尝试获取分时数据
-            df = await asyncio.to_thread(ak.stock_hsgt_north_min_em)
+            # 获取分时数据（stock_hsgt_fund_min_em 替代已废弃的 stock_hsgt_north_min_em）
+            df = await asyncio.wait_for(
+                asyncio.to_thread(ak.stock_hsgt_fund_min_em),
+                timeout=15.0
+            )
 
             flow_points = []
             cumulative = 0.0
