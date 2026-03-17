@@ -2345,6 +2345,13 @@ export type components = {
          * @enum {string}
          */
         DebateWinner: "Bull" | "Bear" | "Neutral";
+        /** DeleteLogsResponse */
+        DeleteLogsResponse: {
+            /** Ok */
+            ok: boolean;
+            /** Deleted */
+            deleted: number;
+        };
         /**
          * ErrorRecord
          * @description 错误记录
@@ -3866,8 +3873,9 @@ export type components = {
             /**
              * Channel
              * @default telegram
+             * @constant
              */
-            channel: string;
+            channel: "telegram";
             /** Channel User Id */
             channel_user_id?: string | null;
             /**
@@ -3878,8 +3886,9 @@ export type components = {
             /**
              * Signal Threshold
              * @default STRONG_BUY
+             * @enum {string}
              */
-            signal_threshold: string;
+            signal_threshold: "STRONG_BUY" | "BUY" | "ALL";
             /** Quiet Hours Start */
             quiet_hours_start?: number | null;
             /** Quiet Hours End */
@@ -3935,6 +3944,37 @@ export type components = {
             delivered: boolean;
             /** Error */
             error: string | null;
+        };
+        /** NotificationLogsPageResponse */
+        NotificationLogsPageResponse: {
+            /** Items */
+            items: components["schemas"]["NotificationLogResponse"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** NotificationStatsResponse */
+        NotificationStatsResponse: {
+            /** Total Sent */
+            total_sent: number;
+            /** Total Failed */
+            total_failed: number;
+            /** Success Rate */
+            success_rate: number;
+            /** Channels Count */
+            channels_count: number;
+            /** Enabled Channels Count */
+            enabled_channels_count: number;
+            /** Last Sent At */
+            last_sent_at: string | null;
+        };
+        /** OperationOkResponse */
+        OperationOkResponse: {
+            /** Ok */
+            ok: boolean;
         };
         /**
          * PatentAnalysisResponse
@@ -5257,15 +5297,41 @@ export type components = {
             macd: string;
             trend: components["schemas"]["TrendDirection"];
         };
+        /** TestAllResponse */
+        TestAllResponse: {
+            /** Total */
+            total: number;
+            /** Delivered */
+            delivered: number;
+            /** Results */
+            results: components["schemas"]["TestAllResultItem"][];
+        };
+        /** TestAllResultItem */
+        TestAllResultItem: {
+            /** Channel */
+            channel: string;
+            /** Channel User Id */
+            channel_user_id: string;
+            /** Delivered */
+            delivered: boolean;
+        };
         /** TestNotificationRequest */
         TestNotificationRequest: {
             /**
              * Channel
              * @default telegram
+             * @constant
              */
-            channel: string;
+            channel: "telegram";
             /** Channel User Id */
             channel_user_id: string;
+        };
+        /** TestNotificationResponse */
+        TestNotificationResponse: {
+            /** Ok */
+            ok: boolean;
+            /** Message */
+            message: string;
         };
         /**
          * TestProviderResult

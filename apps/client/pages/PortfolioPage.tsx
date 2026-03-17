@@ -3,19 +3,10 @@
  *
  * 展示投资组合相关性分析和分散化建议
  */
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { useQuery, useQueries, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
+import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { logger } from '../utils/logger';
-import {
-  AlertTriangle,
-  CheckCircle,
-  RefreshCw,
-  Info,
-  PieChart,
-  Link2,
-  Play,
-  X,
-} from 'lucide-react';
+import { AlertTriangle, CheckCircle, RefreshCw, Info, PieChart, Link2, Play } from 'lucide-react';
 import PageLayout, { LoadingState, EmptyState } from '../components/layout/PageLayout';
 import {
   useWatchlist,
@@ -23,10 +14,11 @@ import {
   useQuickPortfolioCheck,
   useRunBacktest,
   BACKTEST_KEY,
+  useAutoClear,
+  useLocalStoragePersistence,
 } from '../hooks';
-import { getBacktestDetail, getBacktestHistory } from '../services/api';
+import { getBacktestHistory } from '../services/api';
 import type {
-  BacktestDetailResponse,
   BacktestHistoryItem,
   BacktestRunRequest,
   PortfolioPeriod,
@@ -123,6 +115,10 @@ interface BacktestExecutionSummary {
   failed: number;
 }
 
+interface BacktestBatchExecutionSummary extends BacktestExecutionSummary {
+  cancelled: boolean;
+}
+
 type PortfolioAnalysisExtended = T.PortfolioAnalysis & {
   constraint_violations?: ConstraintViolationItem[];
   backtest_payload_hint?: BacktestPayloadHintItem | null;
@@ -170,6 +166,7 @@ const MAX_WEIGHT_PRESETS = 12;
 const MAX_PRESET_NAME_LENGTH = 32;
 const PRESET_FEEDBACK_DURATION_MS = 3200;
 const BACKTEST_FEEDBACK_DURATION_MS = 4800;
+const MAX_CONCURRENT_BACKTEST_RUNNERS = 3;
 
 const isPortfolioPeriod = (value: string): value is PortfolioPeriod =>
   PERIOD_OPTIONS.some((option) => option.value === value);
@@ -222,7 +219,7 @@ const loadPersistedPortfolioSettings = (): PersistedPortfolioSettings => {
               }
               return accumulator;
             },
-            {}
+            {},
           )
         : {};
 
@@ -296,7 +293,7 @@ const parseWeightPresets = (input: unknown): WeightPreset[] => {
           }
           return accumulator;
         },
-        {}
+        {},
       );
 
       if (Object.keys(weights).length === 0) {
@@ -347,8 +344,12 @@ const getPresetCompatibility = (symbols: string[], preset: WeightPreset): Preset
   const symbolSet = new Set(symbols);
   const presetSymbols = Object.keys(preset.weights);
 
-  const matchedSymbols = symbols.filter((symbol) => Object.prototype.hasOwnProperty.call(preset.weights, symbol));
-  const missingSymbols = symbols.filter((symbol) => !Object.prototype.hasOwnProperty.call(preset.weights, symbol));
+  const matchedSymbols = symbols.filter((symbol) =>
+    Object.prototype.hasOwnProperty.call(preset.weights, symbol),
+  );
+  const missingSymbols = symbols.filter(
+    (symbol) => !Object.prototype.hasOwnProperty.call(preset.weights, symbol),
+  );
   const extraSymbols = presetSymbols.filter((symbol) => !symbolSet.has(symbol));
 
   return {
@@ -409,7 +410,10 @@ const normalizeBacktestDate = (value: string): string => {
   return normalized.length > 10 ? normalized.slice(0, 10) : normalized;
 };
 
-const normalizeBacktestSignal = (value: 'bullish' | 'bearish' | 'neutral', confidence: number): string => {
+const normalizeBacktestSignal = (
+  value: 'bullish' | 'bearish' | 'neutral',
+  confidence: number,
+): string => {
   if (value === 'bullish') {
     return confidence >= 0.75 ? 'Strong Buy' : 'Buy';
   }
@@ -456,26 +460,28 @@ const HeatmapCell: React.FC<{
 
 const PortfolioPage: React.FC = () => {
   const queryClient = useQueryClient();
-  const persistedSettings = useMemo(loadPersistedPortfolioSettings, []);
+  const persistedSettings = useMemo(() => loadPersistedPortfolioSettings(), []);
 
   const { data: stocks = [] } = useWatchlist();
   const portfolioMutation = usePortfolioAnalysis();
   const backtestMutation = useRunBacktest();
   const [analysis, setAnalysis] = useState<T.PortfolioAnalysis | null>(null);
   const [period, setPeriod] = useState<PortfolioPeriod>(persistedSettings.period);
-  const [clusterThreshold, setClusterThreshold] = useState<number>(persistedSettings.clusterThreshold);
+  const [clusterThreshold, setClusterThreshold] = useState<number>(
+    persistedSettings.clusterThreshold,
+  );
   const [weightMode, setWeightMode] = useState<WeightMode>(persistedSettings.weightMode);
   const [customWeightInputs, setCustomWeightInputs] = useState<Record<string, string>>(
-    persistedSettings.customWeightInputs
+    persistedSettings.customWeightInputs,
   );
-  const [rebalanceConstraints, setRebalanceConstraints] = useState<Required<PortfolioRebalanceConstraints>>(
-    persistedSettings.rebalanceConstraints
-  );
+  const [rebalanceConstraints, setRebalanceConstraints] = useState<
+    Required<PortfolioRebalanceConstraints>
+  >(persistedSettings.rebalanceConstraints);
   const [enableBacktestHint, setEnableBacktestHint] = useState<boolean>(
-    persistedSettings.enableBacktestHint
+    persistedSettings.enableBacktestHint,
   );
   const [savedWeightPresets, setSavedWeightPresets] = useState<WeightPreset[]>(() =>
-    loadPersistedWeightPresets()
+    loadPersistedWeightPresets(),
   );
   const [presetNameInput, setPresetNameInput] = useState<string>('');
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
@@ -483,13 +489,17 @@ const PortfolioPage: React.FC = () => {
   const [presetImportMode, setPresetImportMode] = useState<PresetImportMode>('merge');
   const [presetFeedback, setPresetFeedback] = useState<PresetFeedback | null>(null);
   const [backtestFeedback, setBacktestFeedback] = useState<PresetFeedback | null>(null);
-  const [backtestExecutionMap, setBacktestExecutionMap] = useState<Record<string, BacktestExecutionSnapshot>>({});
+  const [backtestExecutionMap, setBacktestExecutionMap] = useState<
+    Record<string, BacktestExecutionSnapshot>
+  >({});
   const [isRunningAllBacktests, setIsRunningAllBacktests] = useState(false);
-  const [selectedBacktestRecord, setSelectedBacktestRecord] = useState<{
-    symbol: string;
-    recordId: number;
+  const [isStoppingAllBacktests, setIsStoppingAllBacktests] = useState(false);
+  const [backtestBatchProgress, setBacktestBatchProgress] = useState<{
+    completed: number;
+    total: number;
   } | null>(null);
   const importPresetsInputRef = useRef<HTMLInputElement | null>(null);
+  const backtestBatchAbortRef = useRef(false);
   const [latestAnalysisRequestKey, setLatestAnalysisRequestKey] = useState<string>('');
 
   const symbols = useMemo(() => stocks.map((stock) => stock.symbol).filter(Boolean), [stocks]);
@@ -498,71 +508,53 @@ const PortfolioPage: React.FC = () => {
   const presetCompatibilityMap = useMemo(
     () =>
       new Map<string, PresetCompatibility>(
-        savedWeightPresets.map((preset) => [preset.id, getPresetCompatibility(symbols, preset)])
+        savedWeightPresets.map((preset) => [preset.id, getPresetCompatibility(symbols, preset)]),
       ),
-    [savedWeightPresets, symbols]
+    [savedWeightPresets, symbols],
   );
 
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const payload: PersistedPortfolioSettings = {
+  const persistedSettingsPayload = useMemo<PersistedPortfolioSettings>(
+    () => ({
       period,
       clusterThreshold,
       weightMode,
       customWeightInputs,
       rebalanceConstraints,
       enableBacktestHint,
-    };
+    }),
+    [
+      period,
+      clusterThreshold,
+      weightMode,
+      customWeightInputs,
+      rebalanceConstraints,
+      enableBacktestHint,
+    ],
+  );
 
-    window.localStorage.setItem(PORTFOLIO_SETTINGS_STORAGE_KEY, JSON.stringify(payload));
-  }, [period, clusterThreshold, weightMode, customWeightInputs, rebalanceConstraints, enableBacktestHint]);
+  useLocalStoragePersistence(PORTFOLIO_SETTINGS_STORAGE_KEY, persistedSettingsPayload);
+  useLocalStoragePersistence(WEIGHT_PRESETS_STORAGE_KEY, savedWeightPresets);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
+  const clearPresetFeedback = useCallback(() => {
+    setPresetFeedback(null);
+  }, []);
+  const clearBacktestFeedback = useCallback(() => {
+    setBacktestFeedback(null);
+  }, []);
 
-    window.localStorage.setItem(WEIGHT_PRESETS_STORAGE_KEY, JSON.stringify(savedWeightPresets));
-  }, [savedWeightPresets]);
+  useAutoClear(presetFeedback, clearPresetFeedback, PRESET_FEEDBACK_DURATION_MS);
+  useAutoClear(backtestFeedback, clearBacktestFeedback, BACKTEST_FEEDBACK_DURATION_MS);
 
-  useEffect(() => {
-    if (!presetFeedback || typeof window === 'undefined') {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setPresetFeedback(null);
-    }, PRESET_FEEDBACK_DURATION_MS);
-
-    return () => window.clearTimeout(timer);
-  }, [presetFeedback]);
-
-  useEffect(() => {
-    if (!backtestFeedback || typeof window === 'undefined') {
-      return;
-    }
-
-    const timer = window.setTimeout(() => {
-      setBacktestFeedback(null);
-    }, BACKTEST_FEEDBACK_DURATION_MS);
-
-    return () => window.clearTimeout(timer);
-  }, [backtestFeedback]);
-
-  useEffect(() => {
+  const customWeightInputsWithDefaults = useMemo(() => {
+    const next: Record<string, string> = {};
     const equalWeight = symbols.length > 0 ? 100 / symbols.length : 0;
 
-    setCustomWeightInputs((previous) => {
-      const next: Record<string, string> = {};
-      for (const symbol of symbols) {
-        next[symbol] = previous[symbol] ?? equalWeight.toFixed(2);
-      }
-      return next;
-    });
-  }, [symbolFingerprint]);
+    for (const symbol of symbols) {
+      next[symbol] = customWeightInputs[symbol] ?? equalWeight.toFixed(2);
+    }
+
+    return next;
+  }, [symbols, customWeightInputs]);
 
   const returnsSummaryMap = useMemo(() => {
     const summary = analysis?.correlation.returns_summary;
@@ -580,7 +572,7 @@ const PortfolioPage: React.FC = () => {
             volatility: metrics.volatility ?? 0,
           },
         ];
-      })
+      }),
     );
   }, [analysis]);
 
@@ -620,11 +612,11 @@ const PortfolioPage: React.FC = () => {
       const aggressiveWeights = normalizeWeightScores(aggressiveScores);
       const defensiveWeights = normalizeWeightScores(defensiveScores);
       const balancedScores = aggressiveWeights.map(
-        (value, index) => value * 0.45 + defensiveWeights[index] * 0.55
+        (value, index) => value * 0.45 + defensiveWeights[index] * 0.55,
       );
       return normalizeWeightScores(balancedScores);
     },
-    [symbols, returnsSummaryMap]
+    [symbols, returnsSummaryMap],
   );
 
   const applyNormalizedWeights = useCallback(
@@ -638,10 +630,10 @@ const PortfolioPage: React.FC = () => {
         symbols.reduce<Record<string, string>>((accumulator, symbol, index) => {
           accumulator[symbol] = (weights[index] * 100).toFixed(2);
           return accumulator;
-        }, {})
+        }, {}),
       );
     },
-    [symbols]
+    [symbols],
   );
 
   const handleApplyTemplate = useCallback(
@@ -653,7 +645,7 @@ const PortfolioPage: React.FC = () => {
 
       applyNormalizedWeights(weights);
     },
-    [buildTemplateWeights, symbols, applyNormalizedWeights]
+    [buildTemplateWeights, symbols, applyNormalizedWeights],
   );
 
   const handleApplySavedPreset = useCallback(
@@ -688,7 +680,7 @@ const PortfolioPage: React.FC = () => {
         message: `已应用预设「${preset.name}」。`,
       });
     },
-    [symbols, applyNormalizedWeights]
+    [symbols, applyNormalizedWeights],
   );
 
   const handleDeleteSavedPreset = useCallback(
@@ -703,7 +695,7 @@ const PortfolioPage: React.FC = () => {
         setPresetFeedback({ type: 'info', message: `已删除预设「${preset.name}」。` });
       }
     },
-    [editingPresetId, savedWeightPresets]
+    [editingPresetId, savedWeightPresets],
   );
 
   const handleMoveSavedPreset = useCallback((presetId: string, direction: 'up' | 'down') => {
@@ -745,10 +737,14 @@ const PortfolioPage: React.FC = () => {
 
       const hasDuplicateName = savedWeightPresets.some(
         (preset) =>
-          preset.id !== presetId && normalizePresetName(preset.name) === normalizePresetName(nextName)
+          preset.id !== presetId &&
+          normalizePresetName(preset.name) === normalizePresetName(nextName),
       );
       if (hasDuplicateName) {
-        setPresetFeedback({ type: 'error', message: `已存在同名预设「${nextName}」，请使用其他名称。` });
+        setPresetFeedback({
+          type: 'error',
+          message: `已存在同名预设「${nextName}」，请使用其他名称。`,
+        });
         return;
       }
 
@@ -759,14 +755,14 @@ const PortfolioPage: React.FC = () => {
                 ...preset,
                 name: nextName,
               }
-            : preset
-        )
+            : preset,
+        ),
       );
       setEditingPresetId(null);
       setEditingPresetName('');
       setPresetFeedback({ type: 'success', message: `预设已重命名为「${nextName}」。` });
     },
-    [editingPresetName, savedWeightPresets]
+    [editingPresetName, savedWeightPresets],
   );
 
   const handleExportPresets = useCallback(() => {
@@ -856,7 +852,7 @@ const PortfolioPage: React.FC = () => {
         setPresetFeedback({ type: 'error', message: '导入失败：请确认 JSON 格式正确。' });
       }
     },
-    [presetImportMode, savedWeightPresets]
+    [presetImportMode, savedWeightPresets],
   );
 
   const weightConfig = useMemo(() => {
@@ -882,7 +878,7 @@ const PortfolioPage: React.FC = () => {
     }
 
     const parsedWeights = symbols.map((symbol) => {
-      const rawValue = customWeightInputs[symbol];
+      const rawValue = customWeightInputsWithDefaults[symbol];
       if (rawValue === undefined || rawValue.trim() === '') {
         return Number.NaN;
       }
@@ -933,7 +929,7 @@ const PortfolioPage: React.FC = () => {
       totalInputPercent,
       weightsForRequest,
     };
-  }, [weightMode, symbols, customWeightInputs]);
+  }, [weightMode, symbols, customWeightInputsWithDefaults]);
 
   const constraintConfig = useMemo(() => {
     const maxSingleWeight = clamp(rebalanceConstraints.maxSingleWeight, 0.1, 0.9);
@@ -985,11 +981,15 @@ const PortfolioPage: React.FC = () => {
               : clamp(parsed, 0.1, 0.9),
       }));
     },
-    []
+    [],
   );
 
   const handleSaveWeightPreset = useCallback(() => {
-    if (!weightConfig.isValid || weightConfig.weightsForRequest.length !== symbols.length || symbols.length === 0) {
+    if (
+      !weightConfig.isValid ||
+      weightConfig.weightsForRequest.length !== symbols.length ||
+      symbols.length === 0
+    ) {
       return;
     }
 
@@ -1004,7 +1004,7 @@ const PortfolioPage: React.FC = () => {
       finalName = `方案 ${index}`;
       while (
         savedWeightPresets.some(
-          (preset) => normalizePresetName(preset.name) === normalizePresetName(finalName)
+          (preset) => normalizePresetName(preset.name) === normalizePresetName(finalName),
         )
       ) {
         index += 1;
@@ -1013,7 +1013,7 @@ const PortfolioPage: React.FC = () => {
     }
 
     const existingPreset = savedWeightPresets.find(
-      (preset) => normalizePresetName(preset.name) === normalizePresetName(finalName)
+      (preset) => normalizePresetName(preset.name) === normalizePresetName(finalName),
     );
 
     if (existingPreset) {
@@ -1042,7 +1042,13 @@ const PortfolioPage: React.FC = () => {
     }
 
     setPresetNameInput('');
-  }, [weightConfig.isValid, weightConfig.weightsForRequest, symbols, presetNameInput, savedWeightPresets]);
+  }, [
+    weightConfig.isValid,
+    weightConfig.weightsForRequest,
+    symbols,
+    presetNameInput,
+    savedWeightPresets,
+  ]);
 
   const effectiveWeights = useMemo(() => {
     if (!weightConfig.isValid || weightConfig.weightsForRequest.length !== symbols.length) {
@@ -1068,7 +1074,10 @@ const PortfolioPage: React.FC = () => {
   const weightsForRequest = weightConfig.isValid ? weightConfig.weightsForRequest : undefined;
   const constraintsForRequest = constraintConfig.constraintsForRequest;
   const isAnalysisReady =
-    symbols.length >= 2 && weightConfig.isValid && constraintConfig.isValid && Boolean(constraintsForRequest);
+    symbols.length >= 2 &&
+    weightConfig.isValid &&
+    constraintConfig.isValid &&
+    Boolean(constraintsForRequest);
   const weightSignature =
     weightMode === 'equal'
       ? 'equal'
@@ -1089,12 +1098,12 @@ const PortfolioPage: React.FC = () => {
       weightSignature,
       constraintsSignature,
       enableBacktestHint,
-    ]
+    ],
   );
 
   const periodLabel = useMemo(
     () => PERIOD_OPTIONS.find((option) => option.value === period)?.label ?? period,
-    [period]
+    [period],
   );
 
   const quickCheckQuery = useQuickPortfolioCheck({
@@ -1120,6 +1129,11 @@ const PortfolioPage: React.FC = () => {
         constraints: constraintsForRequest,
         enableBacktestHint,
       });
+      setBacktestExecutionMap({});
+      setBacktestFeedback(null);
+      setIsRunningAllBacktests(false);
+      setIsStoppingAllBacktests(false);
+      backtestBatchAbortRef.current = false;
       setAnalysis(result);
       setLatestAnalysisRequestKey(analysisRequestKey);
     } catch (error) {
@@ -1162,7 +1176,7 @@ const PortfolioPage: React.FC = () => {
       symbols.reduce<Record<string, string>>((accumulator, symbol) => {
         accumulator[symbol] = equalPercent.toFixed(2);
         return accumulator;
-      }, {})
+      }, {}),
     );
   }, [symbols]);
 
@@ -1172,29 +1186,6 @@ const PortfolioPage: React.FC = () => {
       [symbol]: rawValue,
     }));
   }, []);
-
-  useEffect(() => {
-    if (symbols.length < 2) {
-      setAnalysis(null);
-      setLatestAnalysisRequestKey('');
-      return;
-    }
-
-    if (!isAnalysisReady || portfolioMutation.isPending) {
-      return;
-    }
-
-    if (latestAnalysisRequestKey !== analysisRequestKey) {
-      void handleAnalyze();
-    }
-  }, [
-    symbols.length,
-    isAnalysisReady,
-    analysisRequestKey,
-    latestAnalysisRequestKey,
-    portfolioMutation.isPending,
-    handleAnalyze,
-  ]);
 
   const sortedReturns = useMemo(() => {
     if (!analysis?.correlation.returns_summary) return [];
@@ -1240,7 +1231,7 @@ const PortfolioPage: React.FC = () => {
     }
 
     const currentWeightMap = new Map<string, number>(
-      effectiveWeights.map((item) => [item.symbol, item.weight])
+      effectiveWeights.map((item) => [item.symbol, item.weight]),
     );
 
     const rawScores = symbolsInAnalysis.map((symbol, index) => {
@@ -1324,7 +1315,9 @@ const PortfolioPage: React.FC = () => {
     }
 
     return Array.from(
-      new Set(backtestPayloadHint.requests.map((requestItem) => requestItem.symbol).filter(Boolean))
+      new Set(
+        backtestPayloadHint.requests.map((requestItem) => requestItem.symbol).filter(Boolean),
+      ),
     );
   }, [backtestPayloadHint]);
 
@@ -1339,38 +1332,22 @@ const PortfolioPage: React.FC = () => {
 
   const isBacktestHistoryLoading = backtestHistoryQueries.some((query) => query.isFetching);
 
-  const backtestDetailQuery = useQuery({
-    queryKey: [
-      ...BACKTEST_KEY,
-      'detail',
-      selectedBacktestRecord?.symbol ?? '',
-      selectedBacktestRecord?.recordId ?? 0,
-    ],
-    queryFn: async () => {
-      if (!selectedBacktestRecord) {
-        return null as BacktestDetailResponse | null;
-      }
-      return getBacktestDetail(selectedBacktestRecord.symbol, selectedBacktestRecord.recordId);
-    },
-    enabled: Boolean(selectedBacktestRecord),
-    staleTime: 30_000,
-  });
-
-  const selectedBacktestDetail = (backtestDetailQuery.data ?? null) as BacktestDetailResponse | null;
-
   const latestBacktestHistoryMap = useMemo(
     () =>
-      hintedBacktestSymbols.reduce<Record<string, BacktestHistoryItem>>((accumulator, symbol, index) => {
-        const response = backtestHistoryQueries[index]?.data as
-          | { history?: BacktestHistoryItem[] }
-          | undefined;
-        const latestRecord = response?.history?.[0];
-        if (latestRecord) {
-          accumulator[symbol] = latestRecord;
-        }
-        return accumulator;
-      }, {}),
-    [hintedBacktestSymbols, backtestHistoryQueries]
+      hintedBacktestSymbols.reduce<Record<string, BacktestHistoryItem>>(
+        (accumulator, symbol, index) => {
+          const response = backtestHistoryQueries[index]?.data as
+            | { history?: BacktestHistoryItem[] }
+            | undefined;
+          const latestRecord = response?.history?.[0];
+          if (latestRecord) {
+            accumulator[symbol] = latestRecord;
+          }
+          return accumulator;
+        },
+        {},
+      ),
+    [hintedBacktestSymbols, backtestHistoryQueries],
   );
 
   const refreshBacktestHistory = useCallback(() => {
@@ -1378,13 +1355,6 @@ const PortfolioPage: React.FC = () => {
       void queryClient.invalidateQueries({ queryKey: [...BACKTEST_KEY, 'history', symbol] });
     }
   }, [hintedBacktestSymbols, queryClient]);
-
-  useEffect(() => {
-    setBacktestExecutionMap({});
-    setBacktestFeedback(null);
-    setIsRunningAllBacktests(false);
-    setSelectedBacktestRecord(null);
-  }, [backtestPayloadHint?.generated_at, backtestPayloadHint?.strategy_name]);
 
   const buildBacktestPayload = useCallback(
     (requestItem: BacktestPayloadHintItem['requests'][number]): BacktestRunRequest => {
@@ -1413,13 +1383,13 @@ const PortfolioPage: React.FC = () => {
         days_back: requestItem.days_back,
       };
     },
-    []
+    [],
   );
 
   const executeBacktestFromHint = useCallback(
     async (
       requestItem: BacktestPayloadHintItem['requests'][number],
-      options: { silent?: boolean } = {}
+      options: { silent?: boolean } = {},
     ): Promise<boolean> => {
       setBacktestExecutionMap((previous) => ({
         ...previous,
@@ -1481,37 +1451,113 @@ const PortfolioPage: React.FC = () => {
         return false;
       }
     },
-    [backtestMutation, buildBacktestPayload, queryClient]
+    [backtestMutation, buildBacktestPayload, queryClient],
   );
+
+  const runBacktestsWithConcurrency = useCallback(
+    async (
+      requests: BacktestPayloadHintItem['requests'],
+      maxConcurrency: number,
+    ): Promise<BacktestBatchExecutionSummary> => {
+      const summary: BacktestExecutionSummary = { success: 0, failed: 0 };
+      let cursor = 0;
+
+      const runner = async (): Promise<void> => {
+        while (true) {
+          if (backtestBatchAbortRef.current) {
+            return;
+          }
+
+          const currentIndex = cursor;
+          cursor += 1;
+
+          const requestItem = requests[currentIndex];
+          if (!requestItem) {
+            return;
+          }
+
+          const success = await executeBacktestFromHint(requestItem, { silent: true });
+          if (success) {
+            summary.success += 1;
+          } else {
+            summary.failed += 1;
+          }
+
+          setBacktestBatchProgress((previous) => {
+            if (!previous) {
+              return previous;
+            }
+            return {
+              ...previous,
+              completed: Math.min(previous.completed + 1, previous.total),
+            };
+          });
+        }
+      };
+
+      const runnerCount = Math.max(1, Math.min(maxConcurrency, requests.length));
+      await Promise.all(Array.from({ length: runnerCount }, () => runner()));
+
+      return {
+        ...summary,
+        cancelled: backtestBatchAbortRef.current,
+      };
+    },
+    [executeBacktestFromHint],
+  );
+
+  const handleStopAllHintBacktests = useCallback(() => {
+    if (!isRunningAllBacktests || isStoppingAllBacktests) {
+      return;
+    }
+    backtestBatchAbortRef.current = true;
+    setIsStoppingAllBacktests(true);
+    setBacktestFeedback({
+      type: 'info',
+      message: '已发出停止请求，正在等待进行中的回测任务收敛。',
+    });
+  }, [isRunningAllBacktests, isStoppingAllBacktests]);
 
   const handleRunAllHintBacktests = useCallback(async () => {
     if (!backtestPayloadHint?.requests?.length || isRunningAllBacktests) {
       return;
     }
 
+    const requests = backtestPayloadHint.requests;
+    backtestBatchAbortRef.current = false;
     setIsRunningAllBacktests(true);
-    const summary: BacktestExecutionSummary = { success: 0, failed: 0 };
+    setIsStoppingAllBacktests(false);
+    setBacktestBatchProgress({ completed: 0, total: requests.length });
 
-    for (const requestItem of backtestPayloadHint.requests) {
-      const success = await executeBacktestFromHint(requestItem, { silent: true });
-      if (success) {
-        summary.success += 1;
-      } else {
-        summary.failed += 1;
-      }
+    let summary: BacktestBatchExecutionSummary = { success: 0, failed: 0, cancelled: false };
+    try {
+      summary = await runBacktestsWithConcurrency(requests, MAX_CONCURRENT_BACKTEST_RUNNERS);
+    } finally {
+      setIsRunningAllBacktests(false);
+      setIsStoppingAllBacktests(false);
+      setBacktestBatchProgress(null);
     }
 
-    setIsRunningAllBacktests(false);
     refreshBacktestHistory();
+    const remaining = Math.max(0, requests.length - summary.success - summary.failed);
+
+    if (summary.cancelled) {
+      setBacktestFeedback({
+        type: 'info',
+        message: `批量回测已停止：成功 ${summary.success}，失败 ${summary.failed}，未执行 ${remaining}。`,
+      });
+      return;
+    }
+
     setBacktestFeedback({
       type: summary.failed === 0 ? 'success' : summary.success === 0 ? 'error' : 'info',
       message: `批量回测完成：成功 ${summary.success}，失败 ${summary.failed}。`,
     });
   }, [
     backtestPayloadHint,
-    executeBacktestFromHint,
     isRunningAllBacktests,
     refreshBacktestHistory,
+    runBacktestsWithConcurrency,
   ]);
 
   const handleApplyRebalanceSuggestion = useCallback(() => {
@@ -1520,7 +1566,7 @@ const PortfolioPage: React.FC = () => {
     }
 
     const targetWeightMap = new Map<string, number>(
-      rebalanceSuggestions.map((item) => [item.symbol, item.targetWeight])
+      rebalanceSuggestions.map((item) => [item.symbol, item.targetWeight]),
     );
     const weights = symbols.map((symbol) => targetWeightMap.get(symbol) ?? 0);
     const normalized = normalizeWeightScores(weights);
@@ -1553,7 +1599,7 @@ const PortfolioPage: React.FC = () => {
           icon: RefreshCw,
           onClick: handleRefreshQuickCheck,
           loading: quickCheckQuery.isFetching,
-          disabled: !isAnalysisReady,
+          disabled: !isAnalysisReady || isRunningAllBacktests,
           variant: 'secondary',
         },
         {
@@ -1561,7 +1607,7 @@ const PortfolioPage: React.FC = () => {
           icon: RefreshCw,
           onClick: handleRefreshAll,
           loading: portfolioMutation.isPending,
-          disabled: !isAnalysisReady,
+          disabled: !isAnalysisReady || isRunningAllBacktests,
           variant: 'primary',
         },
       ]}
@@ -1619,7 +1665,10 @@ const PortfolioPage: React.FC = () => {
                   step="1"
                   value={(rebalanceConstraints.maxSingleWeight * 100).toFixed(0)}
                   onChange={(event) =>
-                    handleConstraintNumberChange('maxSingleWeight', String(Number(event.target.value) / 100))
+                    handleConstraintNumberChange(
+                      'maxSingleWeight',
+                      String(Number(event.target.value) / 100),
+                    )
                   }
                   className="w-full h-11 px-3 rounded-lg bg-surface-raised border border-border-strong text-stone-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/60"
                 />
@@ -1634,7 +1683,10 @@ const PortfolioPage: React.FC = () => {
                   step="1"
                   value={(rebalanceConstraints.maxTop2Weight * 100).toFixed(0)}
                   onChange={(event) =>
-                    handleConstraintNumberChange('maxTop2Weight', String(Number(event.target.value) / 100))
+                    handleConstraintNumberChange(
+                      'maxTop2Weight',
+                      String(Number(event.target.value) / 100),
+                    )
                   }
                   className="w-full h-11 px-3 rounded-lg bg-surface-raised border border-border-strong text-stone-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/60"
                 />
@@ -1649,7 +1701,10 @@ const PortfolioPage: React.FC = () => {
                   step="1"
                   value={(rebalanceConstraints.maxTurnover * 100).toFixed(0)}
                   onChange={(event) =>
-                    handleConstraintNumberChange('maxTurnover', String(Number(event.target.value) / 100))
+                    handleConstraintNumberChange(
+                      'maxTurnover',
+                      String(Number(event.target.value) / 100),
+                    )
                   }
                   className="w-full h-11 px-3 rounded-lg bg-surface-raised border border-border-strong text-stone-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/60"
                 />
@@ -1679,7 +1734,9 @@ const PortfolioPage: React.FC = () => {
             <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border-strong bg-surface-raised/40 px-3 py-2">
               <div>
                 <p className="text-xs text-stone-300">生成回测参数提示</p>
-                <p className="text-[11px] text-stone-500">分析结果中会附带 backtest 请求参数建议。</p>
+                <p className="text-[11px] text-stone-500">
+                  分析结果中会附带 backtest 请求参数建议。
+                </p>
               </div>
               <button
                 type="button"
@@ -1741,7 +1798,9 @@ const PortfolioPage: React.FC = () => {
                     </button>
                   ))}
                   {!analysis && (
-                    <span className="text-xs text-stone-500">（当前无收益数据，模板将按等权近似）</span>
+                    <span className="text-xs text-stone-500">
+                      （当前无收益数据，模板将按等权近似）
+                    </span>
                   )}
                 </div>
 
@@ -1810,7 +1869,9 @@ const PortfolioPage: React.FC = () => {
                   >
                     覆盖全部
                   </button>
-                  <span className="text-[11px] text-stone-500">最多保留 {MAX_WEIGHT_PRESETS} 个预设</span>
+                  <span className="text-[11px] text-stone-500">
+                    最多保留 {MAX_WEIGHT_PRESETS} 个预设
+                  </span>
                 </div>
 
                 {presetFeedback && (
@@ -1869,7 +1930,9 @@ const PortfolioPage: React.FC = () => {
                               <div className="space-y-0.5">
                                 <p className="text-xs text-stone-200 font-medium">{preset.name}</p>
                                 <p className="text-[11px] text-stone-500">
-                                  {new Date(preset.createdAt).toLocaleString('zh-CN', { hour12: false })}
+                                  {new Date(preset.createdAt).toLocaleString('zh-CN', {
+                                    hour12: false,
+                                  })}
                                 </p>
                                 <p
                                   className={`text-[11px] ${
@@ -1888,7 +1951,8 @@ const PortfolioPage: React.FC = () => {
                                 </p>
                                 {Boolean(compatibility?.extraSymbols.length) && (
                                   <p className="text-[11px] text-stone-500">
-                                    预设含历史标的 {compatibility?.extraSymbols.length ?? 0} 个（当前未在股票池中）。
+                                    预设含历史标的 {compatibility?.extraSymbols.length ?? 0}{' '}
+                                    个（当前未在股票池中）。
                                   </p>
                                 )}
                               </div>
@@ -1968,8 +2032,10 @@ const PortfolioPage: React.FC = () => {
                             min="0"
                             step="0.1"
                             inputMode="decimal"
-                            value={customWeightInputs[symbol] ?? ''}
-                            onChange={(event) => handleWeightInputChange(symbol, event.target.value)}
+                            value={customWeightInputsWithDefaults[symbol] ?? ''}
+                            onChange={(event) =>
+                              handleWeightInputChange(symbol, event.target.value)
+                            }
                             className="w-full bg-transparent text-sm text-stone-100 outline-none"
                             placeholder="0"
                           />
@@ -1986,16 +2052,23 @@ const PortfolioPage: React.FC = () => {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="text-xs text-stone-300">有效权重预览（请求实际生效）</p>
                     <span className="text-[11px] text-stone-500">
-                      Top1 {(effectiveWeightStats.topOne * 100).toFixed(1)}% · Top2 {(effectiveWeightStats.topTwo * 100).toFixed(1)}% · HHI {effectiveWeightStats.hhi.toFixed(3)}
+                      Top1 {(effectiveWeightStats.topOne * 100).toFixed(1)}% · Top2{' '}
+                      {(effectiveWeightStats.topTwo * 100).toFixed(1)}% · HHI{' '}
+                      {effectiveWeightStats.hhi.toFixed(3)}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {effectiveWeights.map((item) => (
-                      <div key={`effective-weight-${item.symbol}`} className="rounded-md border border-border-strong bg-surface-overlay/50 px-2.5 py-2">
+                      <div
+                        key={`effective-weight-${item.symbol}`}
+                        className="rounded-md border border-border-strong bg-surface-overlay/50 px-2.5 py-2"
+                      >
                         <div className="mb-1 flex items-center justify-between gap-2">
                           <span className="text-xs text-stone-200 font-mono">{item.symbol}</span>
-                          <span className="text-xs text-stone-400">{(item.weight * 100).toFixed(2)}%</span>
+                          <span className="text-xs text-stone-400">
+                            {(item.weight * 100).toFixed(2)}%
+                          </span>
                         </div>
                         <div className="h-1.5 rounded-full bg-surface-muted overflow-hidden">
                           <div
@@ -2042,7 +2115,9 @@ const PortfolioPage: React.FC = () => {
                 <h3 className="text-lg font-bold text-white">Quick Check</h3>
                 <p className="text-xs text-stone-500 mt-1">
                   周期 {periodLabel} · 聚类阈值 ≥ {clusterThreshold.toFixed(2)} ·{' '}
-                  {weightMode === 'equal' ? '等权' : `输入合计 ${weightConfig.totalInputPercent.toFixed(2)}%`}
+                  {weightMode === 'equal'
+                    ? '等权'
+                    : `输入合计 ${weightConfig.totalInputPercent.toFixed(2)}%`}
                 </p>
               </div>
               <button
@@ -2052,7 +2127,9 @@ const PortfolioPage: React.FC = () => {
                 disabled={quickCheckQuery.isFetching || !isAnalysisReady}
                 aria-label="刷新组合快速体检"
               >
-                <RefreshCw className={`w-4 h-4 ${quickCheckQuery.isFetching ? 'animate-spin' : ''}`} />
+                <RefreshCw
+                  className={`w-4 h-4 ${quickCheckQuery.isFetching ? 'animate-spin' : ''}`}
+                />
                 刷新
               </button>
             </div>
@@ -2082,7 +2159,9 @@ const PortfolioPage: React.FC = () => {
                       <span className="text-sm text-stone-400">Diversification Score</span>
                       <Info className="w-4 h-4 text-stone-600" />
                     </div>
-                    <div className={`text-3xl font-bold ${getDiversificationColor(quickCheckQuery.data.diversification_score)}`}>
+                    <div
+                      className={`text-3xl font-bold ${getDiversificationColor(quickCheckQuery.data.diversification_score)}`}
+                    >
                       {quickCheckQuery.data.diversification_score}
                       <span className="text-base text-stone-500">/100</span>
                     </div>
@@ -2117,7 +2196,7 @@ const PortfolioPage: React.FC = () => {
                     </div>
                     <p className="text-sm text-stone-200 leading-relaxed">
                       {stripRecommendationPrefix(
-                        quickCheckQuery.data.top_recommendation ?? quickCheckQuery.data.message
+                        quickCheckQuery.data.top_recommendation ?? quickCheckQuery.data.message,
                       )}
                     </p>
                   </div>
@@ -2162,7 +2241,8 @@ const PortfolioPage: React.FC = () => {
                 <div className="flex items-start gap-3 rounded-lg border border-yellow-700/40 bg-yellow-950/20 px-4 py-3">
                   <AlertTriangle className="w-4 h-4 text-yellow-400 mt-0.5 shrink-0" />
                   <p className="text-sm text-yellow-200">
-                    最近一次刷新失败: {(portfolioMutation.error as Error).message}。当前展示的是上次成功分析结果。
+                    最近一次刷新失败: {(portfolioMutation.error as Error).message}
+                    。当前展示的是上次成功分析结果。
                   </p>
                 </div>
               )}
@@ -2174,7 +2254,9 @@ const PortfolioPage: React.FC = () => {
                     <span className="text-sm text-stone-400">Diversification Score</span>
                     <Info className="w-4 h-4 text-stone-600" />
                   </div>
-                  <div className={`text-4xl font-bold ${getDiversificationColor(analysis.diversification_score)}`}>
+                  <div
+                    className={`text-4xl font-bold ${getDiversificationColor(analysis.diversification_score)}`}
+                  >
                     {analysis.diversification_score}
                     <span className="text-lg text-stone-500">/100</span>
                   </div>
@@ -2293,11 +2375,15 @@ const PortfolioPage: React.FC = () => {
                         <div className="text-xs text-stone-400 font-mono truncate">
                           {item.symbol.split('.')[0]}
                         </div>
-                        <div className={`text-lg font-bold ${item.total_return >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        <div
+                          className={`text-lg font-bold ${item.total_return >= 0 ? 'text-green-400' : 'text-red-400'}`}
+                        >
                           {item.total_return >= 0 ? '+' : ''}
                           {item.total_return.toFixed(1)}%
                         </div>
-                        <div className="text-xs text-stone-500">Vol: {item.volatility.toFixed(1)}%</div>
+                        <div className="text-xs text-stone-500">
+                          Vol: {item.volatility.toFixed(1)}%
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -2323,7 +2409,10 @@ const PortfolioPage: React.FC = () => {
 
                   {rebalanceSummary && (
                     <div className="mb-3 text-xs text-stone-400">
-                      预计换手约 {(rebalanceSummary.turnover * 100).toFixed(1)}% · 建议增持 {rebalanceSummary.increaseCount} 只 · 建议减持 {rebalanceSummary.decreaseCount} 只 · 来源 {rebalanceSummary.source === 'server' ? '后端模型' : '前端兜底'}
+                      预计换手约 {(rebalanceSummary.turnover * 100).toFixed(1)}% · 建议增持{' '}
+                      {rebalanceSummary.increaseCount} 只 · 建议减持{' '}
+                      {rebalanceSummary.decreaseCount} 只 · 来源{' '}
+                      {rebalanceSummary.source === 'server' ? '后端模型' : '前端兜底'}
                     </div>
                   )}
 
@@ -2353,18 +2442,21 @@ const PortfolioPage: React.FC = () => {
                             </span>
                           </div>
                           <div className="text-xs text-stone-300">
-                            当前 {(item.currentWeight * 100).toFixed(2)}% → 建议 {(item.targetWeight * 100).toFixed(2)}% （
-                            {item.delta >= 0 ? '+' : ''}
+                            当前 {(item.currentWeight * 100).toFixed(2)}% → 建议{' '}
+                            {(item.targetWeight * 100).toFixed(2)}% （{item.delta >= 0 ? '+' : ''}
                             {(item.delta * 100).toFixed(2)}%）
                           </div>
                         </div>
                         <div className="mt-1 text-[11px] text-stone-500">
-                          近一期收益 {item.totalReturn.toFixed(1)}% · 波动率 {item.volatility.toFixed(1)}%
+                          近一期收益 {item.totalReturn.toFixed(1)}% · 波动率{' '}
+                          {item.volatility.toFixed(1)}%
                           {typeof item.confidence === 'number' && (
                             <span> · 置信度 {(item.confidence * 100).toFixed(0)}%</span>
                           )}
                         </div>
-                        {item.rationale && <div className="mt-1 text-[11px] text-stone-400">{item.rationale}</div>}
+                        {item.rationale && (
+                          <div className="mt-1 text-[11px] text-stone-400">{item.rationale}</div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -2393,7 +2485,8 @@ const PortfolioPage: React.FC = () => {
                           </span>
                         </div>
                         <div className="mt-1 text-[11px] text-stone-500">
-                          实际值 {violation.actual.toFixed(4)} · 限制 {violation.limit.toFixed(4)} · 代码 {violation.code}
+                          实际值 {violation.actual.toFixed(4)} · 限制 {violation.limit.toFixed(4)} ·
+                          代码 {violation.code}
                         </div>
                       </div>
                     ))}
@@ -2420,18 +2513,31 @@ const PortfolioPage: React.FC = () => {
                         disabled={isBacktestHistoryLoading}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-surface-overlay text-stone-200 hover:bg-surface-muted disabled:opacity-50"
                       >
-                        <RefreshCw className={`h-3.5 w-3.5 ${isBacktestHistoryLoading ? 'animate-spin' : ''}`} />
+                        <RefreshCw
+                          className={`h-3.5 w-3.5 ${isBacktestHistoryLoading ? 'animate-spin' : ''}`}
+                        />
                         {isBacktestHistoryLoading ? '刷新中...' : '刷新历史'}
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleRunAllHintBacktests()}
-                        disabled={isRunningAllBacktests || backtestPayloadHint.requests.length === 0}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-cyan-700 text-white hover:bg-cyan-600 disabled:opacity-50"
-                      >
-                        <Play className="h-3.5 w-3.5" />
-                        {isRunningAllBacktests ? '批量执行中...' : '一键执行全部回测'}
-                      </button>
+                      {isRunningAllBacktests ? (
+                        <button
+                          type="button"
+                          onClick={handleStopAllHintBacktests}
+                          disabled={isStoppingAllBacktests}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-amber-700 text-white hover:bg-amber-600 disabled:opacity-50"
+                        >
+                          {isStoppingAllBacktests ? '停止中...' : '停止批量执行'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void handleRunAllHintBacktests()}
+                          disabled={backtestPayloadHint.requests.length === 0}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-cyan-700 text-white hover:bg-cyan-600 disabled:opacity-50"
+                        >
+                          <Play className="h-3.5 w-3.5" />
+                          一键执行全部回测
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -2452,6 +2558,13 @@ const PortfolioPage: React.FC = () => {
                   {isBacktestHistoryLoading && (
                     <p className="mb-3 text-[11px] text-stone-500">正在同步最近回测记录...</p>
                   )}
+                  {isRunningAllBacktests && backtestBatchProgress && (
+                    <p className="mb-3 text-[11px] text-cyan-300">
+                      并发执行中（最多 {MAX_CONCURRENT_BACKTEST_RUNNERS} 个） · 已完成{' '}
+                      {backtestBatchProgress.completed}/{backtestBatchProgress.total}
+                      {isStoppingAllBacktests ? ' · 正在停止中' : ''}
+                    </p>
+                  )}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {backtestPayloadHint.requests.map((request) => {
@@ -2465,15 +2578,21 @@ const PortfolioPage: React.FC = () => {
                           className="rounded-lg border border-border-strong bg-surface-raised/50 px-3 py-2"
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-mono text-stone-200">{request.symbol}</span>
-                            <span className="text-[11px] text-stone-400">{request.signals[0]?.signal ?? 'neutral'}</span>
+                            <span className="text-sm font-mono text-stone-200">
+                              {request.symbol}
+                            </span>
+                            <span className="text-[11px] text-stone-400">
+                              {request.signals[0]?.signal ?? 'neutral'}
+                            </span>
                           </div>
                           <div className="mt-1 text-[11px] text-stone-500">
-                            持有 {request.holding_days} 天 · 止损 {request.stop_loss_pct}% · 止盈 {request.take_profit_pct}%
+                            持有 {request.holding_days} 天 · 止损 {request.stop_loss_pct}% · 止盈{' '}
+                            {request.take_profit_pct}%
                           </div>
                           <div className="mt-2 flex items-center justify-between gap-2">
                             <span className="text-[11px] text-stone-500">
-                              信号数 {request.signals.length} · 资金 {request.initial_capital.toLocaleString('zh-CN')}
+                              信号数 {request.signals.length} · 资金{' '}
+                              {request.initial_capital.toLocaleString('zh-CN')}
                             </span>
                             <button
                               type="button"
@@ -2500,7 +2619,10 @@ const PortfolioPage: React.FC = () => {
                               {execution.finishedAt && (
                                 <span className="text-stone-500">
                                   {' '}
-                                  · {new Date(execution.finishedAt).toLocaleTimeString('zh-CN', { hour12: false })}
+                                  ·{' '}
+                                  {new Date(execution.finishedAt).toLocaleTimeString('zh-CN', {
+                                    hour12: false,
+                                  })}
                                 </span>
                               )}
                             </div>
@@ -2509,21 +2631,12 @@ const PortfolioPage: React.FC = () => {
                           {latestHistory && (
                             <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-stone-500">
                               <span>
-                                最近记录 · 收益 {latestHistory.total_return_pct.toFixed(2)}% · 胜率 {latestHistory.win_rate} ·{' '}
-                                {new Date(latestHistory.created_at).toLocaleString('zh-CN', { hour12: false })}
+                                最近记录 · 收益 {latestHistory.total_return_pct.toFixed(2)}% · 胜率{' '}
+                                {latestHistory.win_rate} ·{' '}
+                                {new Date(latestHistory.created_at).toLocaleString('zh-CN', {
+                                  hour12: false,
+                                })}
                               </span>
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setSelectedBacktestRecord({
-                                    symbol: request.symbol,
-                                    recordId: latestHistory.id,
-                                  })
-                                }
-                                className="px-2 py-0.5 rounded-md bg-surface-overlay text-stone-200 hover:bg-surface-muted"
-                              >
-                                查看详情
-                              </button>
                             </div>
                           )}
                         </div>

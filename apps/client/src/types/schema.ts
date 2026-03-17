@@ -12,26 +12,31 @@ import { paths, components } from './generated';
 /**
  * 从 OpenAPI 路径中提取响应类型
  */
-export type ApiResponse<T extends keyof paths, M extends keyof paths[T] & string = 'get'> =
-  paths[T][M] extends { responses: { 200: { content: { 'application/json': infer R } } } }
-    ? R
-    : never;
+export type ApiResponse<
+  T extends keyof paths,
+  M extends keyof paths[T] & string = 'get',
+> = paths[T][M] extends { responses: { 200: { content: { 'application/json': infer R } } } }
+  ? R
+  : never;
 
 /**
  * 从 OpenAPI 路径中提取请求参数类型
  */
-export type ApiRequestParams<T extends keyof paths, M extends keyof paths[T] & string = 'get'> =
-  paths[T][M] extends { parameters: { query?: infer Q; path?: infer P } }
-    ? (Q extends undefined ? Record<string, never> : Q) & (P extends undefined ? Record<string, never> : P)
-    : Record<string, never>;
+export type ApiRequestParams<
+  T extends keyof paths,
+  M extends keyof paths[T] & string = 'get',
+> = paths[T][M] extends { parameters: { query?: infer Q; path?: infer P } }
+  ? (Q extends undefined ? Record<string, never> : Q) &
+      (P extends undefined ? Record<string, never> : P)
+  : Record<string, never>;
 
 /**
  * 从 OpenAPI 路径中提取请求体类型
  */
-export type ApiRequestBody<T extends keyof paths, M extends keyof paths[T] & string = 'post'> =
-  paths[T][M] extends { requestBody: { content: { 'application/json': infer B } } }
-    ? B
-    : never;
+export type ApiRequestBody<
+  T extends keyof paths,
+  M extends keyof paths[T] & string = 'post',
+> = paths[T][M] extends { requestBody: { content: { 'application/json': infer B } } } ? B : never;
 
 // ============ Schema 类型别名 ============
 export type Schemas = components['schemas'];
@@ -145,7 +150,7 @@ export type ReflectionReport = Schemas['ReflectionReport'];
 
 // --- 投资组合 ---
 export type PortfolioAnalysis = Schemas['PortfolioAnalysis'];
-export type CorrelationResult = Schemas['api__routes__trading__portfolio__CorrelationResult'];
+export type CorrelationResult = Schemas['CorrelationResult'];
 export type QuickPortfolioCheck = Schemas['QuickPortfolioCheckResponse'];
 
 // --- 宏观 ---
@@ -237,4 +242,3 @@ export type AgentAnalysis = AgentAnalysisResponse;
 export type MacroImpactAnalysis = MacroAnalysisResult;
 /** @deprecated 使用 PortfolioAnalysis */
 export type PortfolioAnalysisResult = PortfolioAnalysis;
-

@@ -1,6 +1,6 @@
 import React from 'react';
 import type * as T from '../src/types/schema';
-import { Zap, TrendingUp, TrendingDown } from 'lucide-react';
+import { Zap, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 interface FlashNewsTickerProps {
   news: T.FlashNews[];
@@ -16,25 +16,46 @@ const FlashNewsTicker: React.FC<FlashNewsTickerProps> = ({ news, isRefreshing })
         <Zap className={`w-3 h-3 text-yellow-400 ${isRefreshing ? 'animate-pulse' : ''}`} />
         WATCHDOG
       </div>
-      
+
       <div className="flex gap-12 animate-marquee px-4 w-full items-center">
-         {news.map((item, i) => (
-           <div key={`${item.id}-${i}`} className="flex items-center gap-3 shrink-0">
-              <span className="text-[10px] text-stone-400 font-mono">{item.time}</span>
-              <div className="flex items-center gap-2">
-                 <span className={`text-xs font-medium ${item.sentiment === 'Positive' ? 'text-green-300' : 'text-red-300'}`}>
-                   {item.sentiment === 'Positive' ? <TrendingUp className="w-3 h-3 inline mr-1" /> : <TrendingDown className="w-3 h-3 inline mr-1" />}
-                   {item.headline}
-                 </span>
-                 {item.relatedSymbols?.map(sym => (
-                   <span key={sym} className="text-[9px] bg-surface-overlay px-1 rounded text-stone-300 border border-border-strong">{sym}</span>
-                 ))}
-                 {item.impact === 'High' && (
-                    <span className="text-[9px] bg-red-600 text-white px-1 rounded font-bold animate-pulse">BREAKING</span>
-                 )}
-              </div>
-           </div>
-         ))}
+        {news.map((item, i) => (
+          <div key={`${item.id}-${i}`} className="flex items-center gap-3 shrink-0">
+            <span className="text-[10px] text-stone-400 font-mono">{item.time}</span>
+            <div className="flex items-center gap-2">
+              <span
+                className={`text-xs font-medium ${
+                  item.sentiment === 'Positive'
+                    ? 'text-green-300'
+                    : item.sentiment === 'Negative'
+                      ? 'text-red-300'
+                      : 'text-stone-300'
+                }`}
+              >
+                {item.sentiment === 'Positive' ? (
+                  <TrendingUp className="w-3 h-3 inline mr-1" />
+                ) : item.sentiment === 'Negative' ? (
+                  <TrendingDown className="w-3 h-3 inline mr-1" />
+                ) : (
+                  <Minus className="w-3 h-3 inline mr-1" />
+                )}
+                {item.headline}
+              </span>
+              {item.relatedSymbols?.map((sym) => (
+                <span
+                  key={sym}
+                  className="text-[9px] bg-surface-overlay px-1 rounded text-stone-300 border border-border-strong"
+                >
+                  {sym}
+                </span>
+              ))}
+              {item.impact === 'High' && (
+                <span className="text-[9px] bg-red-600 text-white px-1 rounded font-bold animate-pulse">
+                  BREAKING
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -30,7 +30,7 @@ export interface FlashNews {
   time: string;
   headline: string;
   impact: 'High' | 'Medium' | 'Low';
-  sentiment: 'Positive' | 'Negative';
+  sentiment: 'Positive' | 'Negative' | 'Neutral';
   relatedSymbols: string[];
 }
 
@@ -65,11 +65,14 @@ export interface PortfolioAnalysisResult {
 export interface MarketSentiment {
   global_sentiment: string;
   risk_level: number;
-  regions: Record<string, {
-    indices_count: number;
-    avg_change_percent: number;
-    sentiment: string;
-  }>;
+  regions: Record<
+    string,
+    {
+      indices_count: number;
+      avg_change_percent: number;
+      sentiment: string;
+    }
+  >;
   updated_at: string;
 }
 

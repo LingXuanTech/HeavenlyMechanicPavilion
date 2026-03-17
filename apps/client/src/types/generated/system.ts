@@ -1465,7 +1465,7 @@ export type paths = {
         get: operations["get_notification_configs_api_notifications_config_get"];
         /**
          * Upsert Notification Config
-         * @description 创建或更新通知配置（按 user_id + channel 唯一）
+         * @description 创建或更新通知配置 (按 user_id + channel 唯一).
          */
         put: operations["upsert_notification_config_api_notifications_config_put"];
         post?: never;
@@ -1509,6 +1509,30 @@ export type paths = {
         get: operations["get_notification_logs_api_notifications_logs_get"];
         put?: never;
         post?: never;
+        /**
+         * Delete Notification Logs
+         * @description 删除当前用户通知日志 (可按筛选条件删除).
+         */
+        delete: operations["delete_notification_logs_api_notifications_logs_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Notification Stats
+         * @description 获取当前用户通知统计
+         */
+        get: operations["get_notification_stats_api_notifications_stats_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1529,6 +1553,26 @@ export type paths = {
          * @description 发送测试通知
          */
         post: operations["send_test_notification_api_notifications_test_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/test-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Test Notification All Configs
+         * @description 向当前用户所有启用配置发送测试通知
+         */
+        post: operations["send_test_notification_all_configs_api_notifications_test_all_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3123,6 +3167,13 @@ export type components = {
          * @enum {string}
          */
         DebateWinner: "Bull" | "Bear" | "Neutral";
+        /** DeleteLogsResponse */
+        DeleteLogsResponse: {
+            /** Ok */
+            ok: boolean;
+            /** Deleted */
+            deleted: number;
+        };
         /**
          * ErrorRecord
          * @description 错误记录
@@ -4644,8 +4695,9 @@ export type components = {
             /**
              * Channel
              * @default telegram
+             * @constant
              */
-            channel: string;
+            channel: "telegram";
             /** Channel User Id */
             channel_user_id?: string | null;
             /**
@@ -4656,8 +4708,9 @@ export type components = {
             /**
              * Signal Threshold
              * @default STRONG_BUY
+             * @enum {string}
              */
-            signal_threshold: string;
+            signal_threshold: "STRONG_BUY" | "BUY" | "ALL";
             /** Quiet Hours Start */
             quiet_hours_start?: number | null;
             /** Quiet Hours End */
@@ -4713,6 +4766,37 @@ export type components = {
             delivered: boolean;
             /** Error */
             error: string | null;
+        };
+        /** NotificationLogsPageResponse */
+        NotificationLogsPageResponse: {
+            /** Items */
+            items: components["schemas"]["NotificationLogResponse"][];
+            /** Total */
+            total: number;
+            /** Limit */
+            limit: number;
+            /** Offset */
+            offset: number;
+        };
+        /** NotificationStatsResponse */
+        NotificationStatsResponse: {
+            /** Total Sent */
+            total_sent: number;
+            /** Total Failed */
+            total_failed: number;
+            /** Success Rate */
+            success_rate: number;
+            /** Channels Count */
+            channels_count: number;
+            /** Enabled Channels Count */
+            enabled_channels_count: number;
+            /** Last Sent At */
+            last_sent_at: string | null;
+        };
+        /** OperationOkResponse */
+        OperationOkResponse: {
+            /** Ok */
+            ok: boolean;
         };
         /**
          * PatentAnalysisResponse
@@ -6035,15 +6119,41 @@ export type components = {
             macd: string;
             trend: components["schemas"]["TrendDirection"];
         };
+        /** TestAllResponse */
+        TestAllResponse: {
+            /** Total */
+            total: number;
+            /** Delivered */
+            delivered: number;
+            /** Results */
+            results: components["schemas"]["TestAllResultItem"][];
+        };
+        /** TestAllResultItem */
+        TestAllResultItem: {
+            /** Channel */
+            channel: string;
+            /** Channel User Id */
+            channel_user_id: string;
+            /** Delivered */
+            delivered: boolean;
+        };
         /** TestNotificationRequest */
         TestNotificationRequest: {
             /**
              * Channel
              * @default telegram
+             * @constant
              */
-            channel: string;
+            channel: "telegram";
             /** Channel User Id */
             channel_user_id: string;
+        };
+        /** TestNotificationResponse */
+        TestNotificationResponse: {
+            /** Ok */
+            ok: boolean;
+            /** Message */
+            message: string;
         };
         /**
          * TestProviderResult
@@ -8785,7 +8895,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["OperationOkResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8803,6 +8913,11 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                offset?: number;
+                symbol?: string | null;
+                delivered?: boolean | null;
+                sent_after?: string | null;
+                sent_before?: string | null;
             };
             header?: never;
             path?: never;
@@ -8816,7 +8931,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["NotificationLogResponse"][];
+                    "application/json": components["schemas"]["NotificationLogsPageResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8826,6 +8941,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_notification_logs_api_notifications_logs_delete: {
+        parameters: {
+            query?: {
+                symbol?: string | null;
+                delivered?: boolean | null;
+                sent_after?: string | null;
+                sent_before?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeleteLogsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_notification_stats_api_notifications_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationStatsResponse"];
                 };
             };
         };
@@ -8849,7 +9018,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["TestNotificationResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8859,6 +9028,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_test_notification_all_configs_api_notifications_test_all_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TestAllResponse"];
                 };
             };
         };

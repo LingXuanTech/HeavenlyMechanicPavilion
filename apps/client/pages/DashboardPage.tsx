@@ -33,19 +33,11 @@ const DashboardPage: React.FC = () => {
   const { prices } = useStockPrices(stocks);
 
   // 分析相关
-  const {
-    analyzingStates,
-    analyzingStages,
-    runAnalysis,
-    runMultipleAnalyses,
-    getAnalysis,
-  } = useStockAnalysis();
+  const { analyzingStates, analyzingStages, runAnalysis, runMultipleAnalyses, getAnalysis } =
+    useStockAnalysis();
 
   // 市场数据
-  const {
-    data: globalMarketData,
-    isFetching: isMarketRefreshing,
-  } = useGlobalMarket();
+  const { data: globalMarketData, isFetching: isMarketRefreshing } = useGlobalMarket();
 
   const { data: flashNews = [], isFetching: isFlashNewsRefreshing } = useFlashNews();
   const { refreshGlobalMarket } = useMarketStatus();
@@ -59,21 +51,26 @@ const DashboardPage: React.FC = () => {
   // === 计算属性 ===
   const marketStatus: T.MarketStatus = useMemo(
     () => ({
-      sentiment: (globalMarketData?.global_sentiment as any) || 'Neutral',
+      sentiment:
+        globalMarketData?.global_sentiment === 'Bullish'
+          ? 'Bullish'
+          : globalMarketData?.global_sentiment === 'Bearish'
+            ? 'Bearish'
+            : 'Neutral',
       lastUpdated: new Date().toISOString(),
       activeAgents: Object.values(analyzingStates).filter(Boolean).length,
     }),
-    [globalMarketData, analyzingStates]
+    [globalMarketData, analyzingStates],
   );
 
   const filteredStocks = useMemo(
     () => stocks.filter((s) => marketFilter === 'ALL' || s.market === marketFilter),
-    [stocks, marketFilter]
+    [stocks, marketFilter],
   );
 
   const isGlobalRefreshing = useMemo(
     () => Object.values(analyzingStates).some(Boolean),
-    [analyzingStates]
+    [analyzingStates],
   );
 
   // === 事件处理 ===
@@ -81,19 +78,19 @@ const DashboardPage: React.FC = () => {
     async (symbol: string, _stockName: string, options?: AnalysisOptions) => {
       try {
         // 标记为新鲜分析（用于打字机效果）
-        setFreshAnalyses(prev => new Set(prev).add(symbol));
+        setFreshAnalyses((prev) => new Set(prev).add(symbol));
         await runAnalysis(symbol, options);
       } catch (error) {
         logger.error(`Analysis failed for ${symbol}`, error);
         // 失败时移除新鲜标记
-        setFreshAnalyses(prev => {
+        setFreshAnalyses((prev) => {
           const next = new Set(prev);
           next.delete(symbol);
           return next;
         });
       }
     },
-    [runAnalysis]
+    [runAnalysis],
   );
 
   const handleRunAll = useCallback(() => {
@@ -112,7 +109,7 @@ const DashboardPage: React.FC = () => {
         logger.error('Failed to delete stock', e);
       }
     },
-    [removeStockMutation, selectedStock]
+    [removeStockMutation, selectedStock],
   );
 
   const handleRefreshMarket = useCallback(async () => {
@@ -140,7 +137,12 @@ const DashboardPage: React.FC = () => {
           time: n.published_at,
           headline: n.title,
           impact: 'Medium',
-          sentiment: n.sentiment === 'positive' ? 'Positive' : 'Negative',
+          sentiment:
+            n.sentiment === 'positive'
+              ? 'Positive'
+              : n.sentiment === 'negative'
+                ? 'Negative'
+                : 'Neutral',
           relatedSymbols: n.symbols,
         }))}
         isRefreshing={isFlashNewsRefreshing}
@@ -151,7 +153,9 @@ const DashboardPage: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
           {/* Loading State */}
           {isWatchlistLoading && (
-            <div className="flex items-center justify-center h-64 text-stone-500">Loading watchlist...</div>
+            <div className="flex items-center justify-center h-64 text-stone-500">
+              Loading watchlist...
+            </div>
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
@@ -169,12 +173,12 @@ const DashboardPage: React.FC = () => {
                   } as T.AssetPrice
                 }
                 priceData={prices[stock.symbol]}
-                analysis={getAnalysis(stock.symbol) as any}
+                analysis={getAnalysis(stock.symbol)}
                 onRefresh={handleRunAnalysis}
                 isAnalyzing={analyzingStates[stock.symbol] || false}
                 currentStage={analyzingStages[stock.symbol]}
                 onDelete={handleDeleteStock}
-                onClick={(s) => setSelectedStock(s as T.AssetPrice)}
+                onClick={setSelectedStock}
               />
             ))}
 
@@ -199,17 +203,12 @@ const DashboardPage: React.FC = () => {
       {/* Detail Modal */}
       {selectedStock && (
         <StockDetailModal
-          stock={
-            {
-              ...selectedStock,
-              market: (selectedStock as any).market || 'CN',
-            } as any
-          }
+          stock={selectedStock}
           priceData={prices[selectedStock.symbol]}
-          analysis={getAnalysis(selectedStock.symbol) as any}
+          analysis={getAnalysis(selectedStock.symbol)}
           onClose={() => {
             // 关闭时清除新鲜标记
-            setFreshAnalyses(prev => {
+            setFreshAnalyses((prev) => {
               const next = new Set(prev);
               next.delete(selectedStock.symbol);
               return next;

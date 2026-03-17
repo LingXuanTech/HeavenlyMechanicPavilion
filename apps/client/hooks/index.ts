@@ -8,7 +8,13 @@
 export { useWatchlist, useAddStock, useRemoveStock, WATCHLIST_KEY } from './useWatchlist';
 
 // 价格数据
-export { useStockPrice, useStockHistory, useStockPrices, PRICE_KEY, HISTORY_KEY } from './usePrices';
+export {
+  useStockPrice,
+  useStockHistory,
+  useStockPrices,
+  PRICE_KEY,
+  HISTORY_KEY,
+} from './usePrices';
 
 // 分析数据
 export {
@@ -58,12 +64,7 @@ export {
 } from './useBacktest';
 
 // 宏观经济分析
-export {
-  useMacroOverview,
-  useMacroImpactAnalysis,
-  useRefreshMacro,
-  MACRO_KEY,
-} from './useMacro';
+export { useMacroOverview, useMacroImpactAnalysis, useRefreshMacro, MACRO_KEY } from './useMacro';
 
 // 记忆服务
 export {
@@ -147,10 +148,7 @@ export type {
 
 // 流式分析
 export { useStreamingAnalysis } from './useStreamingAnalysis';
-export type {
-  StreamingAnalysisState,
-  UseStreamingAnalysisOptions,
-} from './useStreamingAnalysis';
+export type { StreamingAnalysisState, UseStreamingAnalysisOptions } from './useStreamingAnalysis';
 
 // A 股特有功能
 export {
@@ -235,16 +233,8 @@ export type {
 } from './useAlternativeData';
 
 // Vision 分析（多模态）
-export {
-  useVisionAnalysis,
-  useVisionHistory,
-  visionKeys,
-} from './useVision';
-export type {
-  VisionAnalysisResult,
-  VisionAnalysisResponse,
-  VisionKeyDataPoint,
-} from './useVision';
+export { useVisionAnalysis, useVisionHistory, visionKeys } from './useVision';
+export type { VisionAnalysisResult, VisionAnalysisResponse, VisionKeyDataPoint } from './useVision';
 
 // 产业链知识图谱
 export {
@@ -267,11 +257,7 @@ export type {
 } from './useSupplyChain';
 
 // 风控建模
-export {
-  useCalculateVaR,
-  useStressTest,
-  useRiskMetrics,
-} from './useRiskModeling';
+export { useCalculateVaR, useStressTest, useRiskMetrics } from './useRiskModeling';
 export type {
   VaRResult,
   StressTestScenario,
@@ -298,12 +284,26 @@ export {
   useUpsertNotificationConfig,
   useDeleteNotificationConfig,
   useNotificationLogs,
+  useNotificationLogsWithParams,
+  useNotificationStats,
+  useClearNotificationLogs,
   useTestNotification,
+  useTestAllNotifications,
   NOTIFICATION_KEY,
 } from './useNotifications';
 export type {
   NotificationConfig,
   NotificationLog,
+  NotificationLogsPageResponse,
+  NotificationLogQueryParams,
+  NotificationStats,
+  ClearNotificationLogsResponse,
   UpsertNotificationConfigParams,
   TestNotificationParams,
+  TestAllNotificationResultItem,
+  TestAllNotificationsResponse,
 } from './useNotifications';
+
+// 通用状态辅助
+export { useAutoClear } from './useAutoClear';
+export { useLocalStoragePersistence } from './useLocalStoragePersistence';

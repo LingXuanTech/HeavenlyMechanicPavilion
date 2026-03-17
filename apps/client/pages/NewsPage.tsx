@@ -71,7 +71,9 @@ const SentimentIcon: React.FC<{ sentiment: T.NewsSentiment }> = ({ sentiment }) 
 };
 
 const CategoryBadge: React.FC<{ category: T.NewsCategory }> = ({ category }) => (
-  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${CATEGORY_COLORS[category]}`}>
+  <span
+    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${CATEGORY_COLORS[category]}`}
+  >
     <Tag className="w-3 h-3" />
     {CATEGORY_LABELS[category]}
   </span>
@@ -111,9 +113,7 @@ const NewsCard: React.FC<{ news: T.AggregatedNewsItem }> = ({ news }) => (
         <h3 className="text-white font-medium text-sm leading-snug group-hover:text-accent transition-colors line-clamp-2">
           {news.title}
         </h3>
-        {news.summary && (
-          <p className="text-stone-400 text-xs mt-2 line-clamp-2">{news.summary}</p>
-        )}
+        {news.summary && <p className="text-stone-400 text-xs mt-2 line-clamp-2">{news.summary}</p>}
         <div className="flex items-center justify-between mt-3">
           <div className="flex items-center gap-2">
             <CategoryBadge category={news.category} />
@@ -127,7 +127,10 @@ const NewsCard: React.FC<{ news: T.AggregatedNewsItem }> = ({ news }) => (
         {news.symbols.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {news.symbols.slice(0, 5).map((symbol: string) => (
-              <span key={symbol} className="text-[10px] px-1.5 py-0.5 bg-surface-muted text-stone-300 rounded">
+              <span
+                key={symbol}
+                className="text-[10px] px-1.5 py-0.5 bg-surface-muted text-stone-300 rounded"
+              >
                 {symbol}
               </span>
             ))}
@@ -179,7 +182,7 @@ const NewsPage: React.FC = () => {
   // 按分类获取（当选择特定分类时）
   const { data: categoryNews, isLoading: isCategoryLoading } = useNewsByCategory(
     selectedCategory as T.NewsCategory,
-    50
+    50,
   );
 
   // 决定使用哪个数据源
@@ -198,6 +201,13 @@ const NewsPage: React.FC = () => {
 
   const isLoading = isAllLoading || (selectedCategory !== 'all' && isCategoryLoading);
   const isRefreshing = isAllFetching || refreshNews.isPending;
+  const sourcesCount = useMemo(() => {
+    if (!sourcesData || typeof sourcesData !== 'object') {
+      return null;
+    }
+    const raw = (sourcesData as Record<string, unknown>).total_sources;
+    return typeof raw === 'number' ? raw : null;
+  }, [sourcesData]);
 
   // 刷新处理
   const handleRefresh = async () => {
@@ -205,12 +215,15 @@ const NewsPage: React.FC = () => {
   };
 
   // 分类列表
-  const categories: (T.NewsCategory | 'all')[] = ['all', ...Object.keys(CATEGORY_LABELS) as T.NewsCategory[]];
+  const categories: (T.NewsCategory | 'all')[] = [
+    'all',
+    ...(Object.keys(CATEGORY_LABELS) as T.NewsCategory[]),
+  ];
 
   return (
     <PageLayout
       title="News Aggregator"
-      subtitle={sourcesData ? `${(sourcesData as any).total_sources} 个新闻源` : '多源聚合新闻'}
+      subtitle={sourcesCount !== null ? `${sourcesCount} 个新闻源` : '多源聚合新闻'}
       icon={Newspaper}
       iconColor="text-orange-400"
       iconBgColor="bg-orange-500/10"
@@ -266,9 +279,24 @@ const NewsPage: React.FC = () => {
                 }`}
               >
                 {sent === 'all' && '全部'}
-                {sent === 'positive' && <><TrendingUp className="w-3 h-3" />利好</>}
-                {sent === 'negative' && <><TrendingDown className="w-3 h-3" />利空</>}
-                {sent === 'neutral' && <><Minus className="w-3 h-3" />中性</>}
+                {sent === 'positive' && (
+                  <>
+                    <TrendingUp className="w-3 h-3" />
+                    利好
+                  </>
+                )}
+                {sent === 'negative' && (
+                  <>
+                    <TrendingDown className="w-3 h-3" />
+                    利空
+                  </>
+                )}
+                {sent === 'neutral' && (
+                  <>
+                    <Minus className="w-3 h-3" />
+                    中性
+                  </>
+                )}
               </button>
             ))}
           </div>
@@ -297,9 +325,7 @@ const NewsPage: React.FC = () => {
               overscan={3}
               emptyText="暂无新闻数据"
               className="pb-10"
-              renderItem={(news) => (
-                <NewsCard key={news.id} news={news} />
-              )}
+              renderItem={(news) => <NewsCard key={news.id} news={news} />}
             />
           )}
         </div>
@@ -320,13 +346,9 @@ const NewsPage: React.FC = () => {
                 <Loader2 className="w-5 h-5 animate-spin text-stone-400" />
               </div>
             ) : flashNews.length === 0 ? (
-              <div className="text-center py-10 text-stone-500 text-sm">
-                暂无快讯
-              </div>
+              <div className="text-center py-10 text-stone-500 text-sm">暂无快讯</div>
             ) : (
-              flashNews.map((news) => (
-                <FlashNewsItem key={news.id} news={news} />
-              ))
+              flashNews.map((news) => <FlashNewsItem key={news.id} news={news} />)
             )}
           </div>
         </aside>
